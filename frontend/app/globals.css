@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+/* Housler Design System - только черно-белая палитра */
+:root {
+  /* Основа */
+  --black: #000000;
+  --white: #FFFFFF;
+
+  /* Серая шкала */
+  --gray-900: #181A20;  /* Основной текст, primary кнопки */
+  --gray-800: #333333;
+  --gray-700: #4A4A4A;
+  --gray-600: #6B7280;  /* Вторичный текст */
+  --gray-500: #9CA3AF;
+  --gray-400: #D1D5DB;
+  --gray-300: #E5E7EB;  /* Границы */
+  --gray-200: #F3F4F6;  /* Hover фон */
+  --gray-100: #F9FAFB;  /* Фоны секций */
+
+  /* Семантические алиасы */
+  --color-text: var(--gray-900);
+  --color-text-secondary: var(--gray-600);
+  --color-border: var(--gray-300);
+  --color-bg: var(--white);
+  --color-bg-secondary: var(--gray-100);
+  --color-bg-hover: var(--gray-200);
+  --color-accent: var(--black);
+}
+
+@theme inline {
+  /* Colors - черно-белая палитра */
+  --color-black: var(--black);
+  --color-white: var(--white);
+  --color-gray-900: var(--gray-900);
+  --color-gray-800: var(--gray-800);
+  --color-gray-700: var(--gray-700);
+  --color-gray-600: var(--gray-600);
+  --color-gray-500: var(--gray-500);
+  --color-gray-400: var(--gray-400);
+  --color-gray-300: var(--gray-300);
+  --color-gray-200: var(--gray-200);
+  --color-gray-100: var(--gray-100);
+
+  /* Font - только Inter */
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  
+  /* Border radius */
+  --radius: 8px;
+  --radius-sm: 4px;
+  --radius-lg: 12px;
+  
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+}
+
+/* Base styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Remove focus outline for mouse users */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Focus visible styles */
+:focus-visible {
+  outline: 2px solid var(--black);
+  outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+  background-color: var(--black);
+  color: var(--white);
+}
+
+/* Links */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Buttons */
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Inputs */
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+/* Scrollbar (webkit) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--gray-100);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--gray-400);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-500);
+}
