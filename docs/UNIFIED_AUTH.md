@@ -197,6 +197,31 @@ curl -X POST https://agent.housler.ru/api/auth/verify-sms \
   -d '{"phone": "79999222222", "code": "111111"}'
 ```
 
+## Общие компоненты (Shared Components)
+
+Некоторые UI компоненты синхронизированы между проектами:
+
+| Компонент | agent.housler.ru | lk.housler.ru |
+|-----------|-----------------|---------------|
+| Footer | `src/components/Footer.tsx` | `components/shared/Footer.tsx` |
+| CookieBanner | `src/components/CookieBanner.tsx` | `components/shared/CookieBanner.tsx` |
+
+### Правила синхронизации
+
+1. **Источник правды** - `agent.housler.ru`
+2. При изменении компонента в agent.housler.ru - скопировать в lk.housler.ru
+3. Компоненты в lk.housler.ru содержат `@sync-with` комментарий с путем к оригиналу
+4. Ссылки на документы ведут на `agent.housler.ru` (там хранятся все правовые документы)
+
+### Чеклист при обновлении:
+
+```
+[ ] Изменен компонент в agent.housler.ru
+[ ] Скопировано изменение в lk.housler.ru
+[ ] Проверено на обоих сайтах
+[ ] Задеплоены оба проекта
+```
+
 ## Контакты
 
 При проблемах с авторизацией проверять ОБА проекта:
