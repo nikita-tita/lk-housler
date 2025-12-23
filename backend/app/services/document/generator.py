@@ -4,7 +4,13 @@ import hashlib
 from typing import Dict, Any
 from io import BytesIO
 
-from weasyprint import HTML
+# WeasyPrint requires system libraries, make it optional
+try:
+    from weasyprint import HTML
+    WEASYPRINT_AVAILABLE = True
+except ImportError:
+    HTML = None
+    WEASYPRINT_AVAILABLE = False
 
 
 class DocumentGenerator:
@@ -23,6 +29,8 @@ class DocumentGenerator:
     @staticmethod
     def html_to_pdf(html_content: str) -> bytes:
         """Convert HTML to PDF"""
+        if not WEASYPRINT_AVAILABLE:
+            raise RuntimeError("WeasyPrint not installed. PDF generation unavailable.")
         pdf_bytes = HTML(string=html_content).write_pdf()
         return pdf_bytes
     
