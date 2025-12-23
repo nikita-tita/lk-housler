@@ -23,16 +23,17 @@ export function SMSAuthForm() {
     setLoading(true);
 
     try {
+      // Normalize to format 7XXXXXXXXXX (no +)
       const normalizedPhone = phone.replace(/\D/g, '');
       const fullPhone = normalizedPhone.startsWith('7')
-        ? `+${normalizedPhone}`
-        : `+7${normalizedPhone}`;
+        ? normalizedPhone
+        : `7${normalizedPhone}`;
 
       await sendSMS(fullPhone);
       setPhone(fullPhone);
       setStep('code');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Ошибка отправки SMS');
+      setError(err.response?.data?.message || err.response?.data?.error || 'Ошибка отправки SMS');
     } finally {
       setLoading(false);
     }
