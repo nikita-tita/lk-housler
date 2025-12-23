@@ -1,0 +1,455 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useAuthStore } from '@/lib/store/authStore';
+import { sendSMS, verifySMS, registerAgent } from '@/lib/api/auth';
+import { getDashboardPath } from '@/lib/utils/redirect';
+import { PhoneInput, SmsCodeInput, ConsentCheckbox, RegistrationStepper } from '@/components/auth';
+
+type Step = 'phone' | 'code' | 'registration';
+
+const STEPS = [
+  { id: 'phone', title: 'Телефон' },
+  { id: 'code', title: 'Код' },
+  { id: 'registration', title: 'Данные' },
+];
+
+interface RealtorFormData {
+  phone: string;
+  name: string;
+  email: string;
+  city: string;
+  isSelfEmployed: boolean;
+  personalInn: string;
+  consents: {
+    personalData: boolean;
+    terms: boolean;
+    realtorOffer: boolean;
+    marketing: boolean;
+  };
+}
+
+export default function RealtorLoginPage() {
+  const router = useRouter();
+  const { isAuthenticated, setAuth } = useAuthStore();
+
+  const [step, setStep] = useState<Step>('phone');
+  const [phone, setPhone] = useState('');
+  const [code, setCode] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  // State for resend cooldown
+  const [canResendAt, setCanResendAt] = useState<Date | null>(null);
+  const [resendCountdown, setResendCountdown] = useState(0);
+
+  // Countdown timer
+  useEffect(() => {
+    if (!canResendAt) return;
+
+    const updateCountdown = () => {
+      const now = new Date();
+      const diff = Math.max(0, Math.ceil((canResendAt.getTime() - now.getTime()) / 1000));
+      setResendCountdown(diff);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, [canResendAt]);
+
+  const [formData, setFormData] = useState<RealtorFormData>({
+    phone: '',
+    name: '',
+    email: '',
+    city: '',
+    isSelfEmployed: false,
+    personalInn: '',
+    consents: {
+      personalData: false,
+      terms: false,
+      realtorOffer: false,
+      marketing: false,
+    },
+  });
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/agent/dashboard');
+    }
+  }, [isAuthenticated, router]);
+
+  const getCleanPhone = () => {
+    return phone.replace(/\D/g, '');
+  };
+
+  // Request SMS code
+  const handleRequestCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    const cleanPhone = getCleanPhone();
+    if (cleanPhone.length !== 11) {
+      setError('Введите номер телефона полностью');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      await sendSMS(cleanPhone);
+      setFormData(prev => ({ ...prev, phone: cleanPhone }));
+      setCanResendAt(new Date(Date.now() + 60 * 1000));
+      setStep('code');
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Ошибка отправки SMS');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Resend SMS code
+  const handleResendCode = async () => {
+    setError('');
+    setIsLoading(true);
+
+    try {
+      await sendSMS(formData.phone);
+      setCanResendAt(new Date(Date.now() + 60 * 1000));
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Ошибка отправки SMS');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Verify SMS code
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const response = await verifySMS(formData.phone, code);
+      // User exists - login successful
+      setAuth(response.access_token, response.user);
+      router.push(getDashboardPath(response.user.role));
+    } catch (err: any) {
+      if (err.message === 'NEW_USER_NEEDS_REGISTRATION') {
+        // New user - show registration form
+        setStep('registration');
+      } else {
+        setError(err.response?.data?.message || err.message || 'Неверный код');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Complete registration
+  const handleRegistration = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    // Validate consents
+    if (!formData.consents.personalData || !formData.consents.terms || !formData.consents.realtorOffer) {
+      setError('Необходимо принять обязательные соглашения');
+      return;
+    }
+
+    // Validate INN for self-employed
+    if (formData.isSelfEmployed && formData.personalInn.length !== 12) {
+      setError('ИНН должен содержать 12 цифр');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await registerAgent({
+        phone: formData.phone,
+        name: formData.name,
+        email: formData.email,
+        city: formData.city || undefined,
+        isSelfEmployed: formData.isSelfEmployed,
+        personalInn: formData.isSelfEmployed ? formData.personalInn : undefined,
+        consents: formData.consents,
+      });
+      setAuth(response.access_token, response.user);
+      router.push(getDashboardPath(response.user.role));
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Ошибка регистрации');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const currentStepIndex = STEPS.findIndex(s => s.id === step);
+
+  return (
+    <div className="w-full max-w-md mx-auto">
+      <Link
+        href="/login"
+        className="inline-flex items-center gap-2 text-sm text-[var(--color-text-light)] hover:text-[var(--color-accent)] mb-6"
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+        </svg>
+        Выбрать другую роль
+      </Link>
+
+      <h1 className="text-2xl font-semibold text-center mb-2">Вход для риелторов</h1>
+      <p className="text-[var(--color-text-light)] text-center mb-6">
+        Частные риелторы и самозанятые
+      </p>
+
+      <RegistrationStepper steps={STEPS} currentStep={currentStepIndex} />
+
+      {step === 'phone' && (
+        <form onSubmit={handleRequestCode} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium mb-2">Номер телефона</label>
+            <PhoneInput
+              value={phone}
+              onChange={setPhone}
+              placeholder="+7 (999) 123-45-67"
+            />
+          </div>
+
+          {error && (
+            <div className="text-[var(--color-text)] text-sm text-center">{error}</div>
+          )}
+
+          <button
+            type="submit"
+            disabled={isLoading || getCleanPhone().length !== 11}
+            className="btn btn-primary btn-block"
+          >
+            {isLoading ? 'Отправка...' : 'Получить код'}
+          </button>
+
+          <p className="text-xs text-[var(--color-text-light)] text-center">
+            Продолжая, вы соглашаетесь с{' '}
+            <Link href="https://agent.housler.ru/doc/clients/soglasiya/terms" target="_blank" className="text-[var(--color-accent)] hover:underline">
+              Пользовательским соглашением
+            </Link>
+          </p>
+
+          <p className="text-xs text-[var(--color-text-light)] text-center border-t border-[var(--color-border)] pt-4 mt-4">
+            Тест: номера 79999xxxxxx, коды 111111-666666
+          </p>
+        </form>
+      )}
+
+      {step === 'code' && (
+        <form onSubmit={handleVerifyCode} className="space-y-6">
+          <div className="text-center text-sm text-[var(--color-text-light)] mb-4">
+            Код отправлен на <strong>+{formData.phone}</strong>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2 text-center">Код из SMS</label>
+            <SmsCodeInput
+              value={code}
+              onChange={setCode}
+            />
+          </div>
+
+          {error && (
+            <div className="text-[var(--color-text)] text-sm text-center">{error}</div>
+          )}
+
+          <button
+            type="submit"
+            disabled={isLoading || code.length !== 6}
+            className="btn btn-primary btn-block"
+          >
+            {isLoading ? 'Проверка...' : 'Продолжить'}
+          </button>
+
+          {/* Resend code button */}
+          <div className="text-center">
+            {resendCountdown > 0 ? (
+              <span className="text-sm text-[var(--color-text-light)]">
+                Отправить повторно через {resendCountdown} сек.
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleResendCode}
+                disabled={isLoading}
+                className="text-sm text-[var(--color-accent)] hover:underline"
+              >
+                Отправить новый код
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setStep('phone');
+              setCode('');
+              setError('');
+              setCanResendAt(null);
+            }}
+            className="w-full py-2 text-sm text-[var(--color-text-light)] hover:text-[var(--color-text)]"
+          >
+            Изменить номер
+          </button>
+        </form>
+      )}
+
+      {step === 'registration' && (
+        <form onSubmit={handleRegistration} className="space-y-5">
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium mb-2">
+              ФИО *
+            </label>
+            <input
+              type="text"
+              id="name"
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="Иванов Иван Иванович"
+              required
+              className="input"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium mb-2">
+              Email *
+            </label>
+            <input
+              type="email"
+              id="email"
+              value={formData.email}
+              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              placeholder="email@example.com"
+              required
+              className="input"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="city" className="block text-sm font-medium mb-2">
+              Город
+            </label>
+            <input
+              type="text"
+              id="city"
+              value={formData.city}
+              onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+              placeholder="Москва"
+              className="input"
+            />
+          </div>
+
+          <div className="border border-[var(--color-border)] rounded-lg p-4">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.isSelfEmployed}
+                onChange={(e) => setFormData(prev => ({ ...prev, isSelfEmployed: e.target.checked }))}
+                className="w-5 h-5 rounded border-[var(--color-border)]"
+              />
+              <span className="text-sm">Я самозанятый (плательщик НПД)</span>
+            </label>
+
+            {formData.isSelfEmployed && (
+              <div className="mt-4">
+                <label htmlFor="inn" className="block text-sm font-medium mb-2">
+                  ИНН *
+                </label>
+                <input
+                  type="text"
+                  id="inn"
+                  value={formData.personalInn}
+                  onChange={(e) => setFormData(prev => ({ ...prev, personalInn: e.target.value.replace(/\D/g, '').slice(0, 12) }))}
+                  placeholder="123456789012"
+                  maxLength={12}
+                  required={formData.isSelfEmployed}
+                  className="input"
+                />
+                <p className="text-xs text-[var(--color-text-light)] mt-1">12 цифр</p>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3 pt-2">
+            <ConsentCheckbox
+              id="personalData"
+              checked={formData.consents.personalData}
+              onChange={(checked) => setFormData(prev => ({
+                ...prev,
+                consents: { ...prev.consents, personalData: checked }
+              }))}
+              type="personal_data"
+              required
+            />
+
+            <ConsentCheckbox
+              id="terms"
+              checked={formData.consents.terms}
+              onChange={(checked) => setFormData(prev => ({
+                ...prev,
+                consents: { ...prev.consents, terms: checked }
+              }))}
+              type="terms"
+              required
+            />
+
+            <ConsentCheckbox
+              id="realtorOffer"
+              checked={formData.consents.realtorOffer}
+              onChange={(checked) => setFormData(prev => ({
+                ...prev,
+                consents: { ...prev.consents, realtorOffer: checked }
+              }))}
+              type="realtor_offer"
+              required
+            />
+
+            <ConsentCheckbox
+              id="marketing"
+              checked={formData.consents.marketing}
+              onChange={(checked) => setFormData(prev => ({
+                ...prev,
+                consents: { ...prev.consents, marketing: checked }
+              }))}
+              type="marketing"
+            />
+          </div>
+
+          {error && (
+            <div className="text-[var(--color-text)] text-sm text-center">{error}</div>
+          )}
+
+          <button
+            type="submit"
+            disabled={isLoading || !formData.name || !formData.email || !formData.consents.personalData || !formData.consents.terms || !formData.consents.realtorOffer}
+            className="btn btn-primary btn-block"
+          >
+            {isLoading ? 'Регистрация...' : 'Зарегистрироваться'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setStep('code');
+              setError('');
+            }}
+            className="w-full py-2 text-sm text-[var(--color-text-light)] hover:text-[var(--color-text)]"
+          >
+            Назад
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}

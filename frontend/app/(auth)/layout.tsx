@@ -4,13 +4,11 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="auth-container">
-      <div>
-        <div className="auth-card">
-          {children}
-        </div>
+    <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg-gray)] py-12 px-4">
+      <div className="w-full max-w-2xl">
+        {children}
 
-        <div className="footer">
+        <div className="text-center mt-8 text-sm text-[var(--color-text-light)]">
           <p>OOO "Сектор ИТ" (ИНН 5190237491)</p>
           <p>hello@housler.ru</p>
         </div>
