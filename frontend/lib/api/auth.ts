@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import type { User } from '@/types/user';
 
 export interface AuthResponse {
   access_token: string;
@@ -6,13 +7,7 @@ export interface AuthResponse {
   token_type: string;
 }
 
-export interface User {
-  id: string;
-  email?: string;
-  phone?: string;
-  role: 'client' | 'agent' | 'agency_admin' | 'operator' | 'admin';
-  status: string;
-}
+export type { User };
 
 // ==========================================
 // 1. SMS Auth (Agent)

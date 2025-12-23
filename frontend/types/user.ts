@@ -18,8 +18,8 @@ export interface User {
   role: UserRole;
   status: UserStatus;
   last_login_at?: string;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface UserProfile {
