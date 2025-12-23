@@ -1,56 +1,29 @@
 'use client';
 
 import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
 
 export default function LoginPage() {
   return (
-    <div className="flex flex-col gap-6">
-      <div className="text-center">
-        <h1 className="text-3xl font-semibold text-gray-900 mb-2">
-          LK Housler
-        </h1>
-        <p className="text-gray-600">
-          Выберите способ входа
-        </p>
-      </div>
+    <div>
+      <h1 className="auth-title">LK Housler</h1>
+      <p className="auth-subtitle">Выберите способ входа</p>
 
-      <div className="flex flex-col gap-4">
-        <Link href="agent">
-          <Card className="cursor-pointer hover:bg-gray-50 transition-colors">
-            <CardHeader>
-              <CardTitle>Я агент</CardTitle>
-              <CardDescription>
-                Вход через SMS для частных риелторов
-              </CardDescription>
-            </CardHeader>
-          </Card>
+      <div className="space-y-3">
+        <Link href="agent" className="role-card">
+          <div className="role-card-title">Я агент</div>
+          <div className="role-card-desc">Вход через SMS для частных риелторов</div>
         </Link>
 
-        <Link href="client">
-          <Card className="cursor-pointer hover:bg-gray-50 transition-colors">
-            <CardHeader>
-              <CardTitle>Я клиент</CardTitle>
-              <CardDescription>
-                Вход через Email для покупателей и продавцов
-              </CardDescription>
-            </CardHeader>
-          </Card>
+        <Link href="client" className="role-card">
+          <div className="role-card-title">Я клиент</div>
+          <div className="role-card-desc">Вход через Email для покупателей и продавцов</div>
         </Link>
 
-        <Link href="agency">
-          <Card className="cursor-pointer hover:bg-gray-50 transition-colors">
-            <CardHeader>
-              <CardTitle>Я из агентства</CardTitle>
-              <CardDescription>
-                Вход через Email и пароль для сотрудников
-              </CardDescription>
-            </CardHeader>
-          </Card>
+        <Link href="agency" className="role-card">
+          <div className="role-card-title">Я из агентства</div>
+          <div className="role-card-desc">Вход через Email и пароль для сотрудников</div>
         </Link>
       </div>
     </div>
   );
 }
-

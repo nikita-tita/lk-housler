@@ -4,7 +4,6 @@ import { useRequireAuth } from '@/lib/hooks/useAuth';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
-import { cn } from '@/lib/utils/cn';
 
 export default function ClientLayout({
   children,
@@ -17,8 +16,8 @@ export default function ClientLayout({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin h-8 w-8 border-2 border-black border-t-transparent rounded-full" />
+      <div className="auth-container">
+        <div className="spinner" />
       </div>
     );
   }
@@ -29,25 +28,20 @@ export default function ClientLayout({
   ];
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-white border-b border-gray-300">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-8">
-              <h1 className="text-xl font-semibold text-gray-900">LK Housler</h1>
-              <nav className="hidden md:flex gap-1">
+    <div style={{ minHeight: '100vh', background: 'var(--color-bg-gray)' }}>
+      <header className="header">
+        <div className="container">
+          <div className="header-content">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+              <span className="header-logo">LK Housler</span>
+              <nav className="header-nav">
                 {menuItems.map((item) => {
                   const isActive = pathname === item.href;
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={cn(
-                        'px-4 py-2 rounded-lg text-sm transition-colors',
-                        isActive
-                          ? 'bg-black text-white'
-                          : 'text-gray-900 hover:bg-gray-100'
-                      )}
+                      className={isActive ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm'}
                     >
                       {item.label}
                     </Link>
@@ -55,22 +49,18 @@ export default function ClientLayout({
                 })}
               </nav>
             </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">{user?.email}</span>
-              <button
-                onClick={logout}
-                className="text-sm text-gray-600 hover:text-black transition-colors"
-              >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <span style={{ fontSize: '14px', color: 'var(--color-text-light)' }}>{user?.email}</span>
+              <button onClick={logout} className="btn btn-ghost btn-sm">
                 Выйти
               </button>
             </div>
           </div>
         </div>
       </header>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="container" style={{ padding: '32px 16px' }}>
         {children}
       </main>
     </div>
   );
 }
-

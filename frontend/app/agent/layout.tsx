@@ -18,17 +18,16 @@ export default function AgentLayout({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin h-8 w-8 border-2 border-black border-t-transparent rounded-full" />
+      <div className="auth-container">
+        <div className="spinner" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="dashboard">
       <Sidebar items={agentMenuItems} />
-      <main className="flex-1 p-8">{children}</main>
+      <main className="dashboard-main">{children}</main>
     </div>
   );
 }
-

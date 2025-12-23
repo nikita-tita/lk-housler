@@ -2,8 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { sendSMS, verifySMS, getCurrentUser } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/store/authStore';
 import { formatPhone } from '@/lib/utils/format';
@@ -25,7 +23,6 @@ export function SMSAuthForm() {
     setLoading(true);
 
     try {
-      // Нормализация телефона
       const normalizedPhone = phone.replace(/\D/g, '');
       const fullPhone = normalizedPhone.startsWith('7')
         ? `+${normalizedPhone}`
@@ -48,14 +45,8 @@ export function SMSAuthForm() {
 
     try {
       const response = await verifySMS(phone, code);
-
-      // Получаем данные пользователя
       const user = await getCurrentUser();
-
-      // Сохраняем в store
       setAuth(response.access_token, user);
-
-      // Редирект на dashboard по роли
       router.push(getDashboardPath(user.role));
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Неверный код');
@@ -66,66 +57,58 @@ export function SMSAuthForm() {
 
   if (step === 'phone') {
     return (
-      <form onSubmit={handleSendSMS} className="flex flex-col gap-6">
-        <div>
-          <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-            Вход для агентов
-          </h2>
-          <p className="text-gray-600">
-            Введите номер телефона для получения кода
-          </p>
+      <form onSubmit={handleSendSMS}>
+        <h1 className="auth-title">Вход для агентов</h1>
+        <p className="auth-subtitle">Введите номер телефона для получения кода</p>
+
+        <div className="field">
+          <label className="field-label">Номер телефона</label>
+          <input
+            className="input"
+            type="tel"
+            placeholder="+7 999 123 45 67"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            disabled={loading}
+            required
+          />
+          {error && <p className="field-error">{error}</p>}
         </div>
 
-        <Input
-          label="Номер телефона"
-          type="tel"
-          placeholder="+7 999 123 45 67"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          error={error}
-          disabled={loading}
-          required
-        />
+        <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
+          {loading ? 'Отправка...' : 'Получить код'}
+        </button>
 
-        <Button type="submit" loading={loading} fullWidth>
-          Получить код
-        </Button>
-
-        <p className="text-sm text-gray-600 text-center">
-          Для тестирования используйте номера 79999000000-79999999999
-          <br />
-          Коды: 111111-666666
+        <p className="footer" style={{ marginTop: '24px', padding: 0 }}>
+          Для тестирования: 79999000000-79999999999, коды: 111111-666666
         </p>
       </form>
     );
   }
 
   return (
-    <form onSubmit={handleVerifyCode} className="flex flex-col gap-6">
-      <div>
-        <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-          Введите код из SMS
-        </h2>
-        <p className="text-gray-600">
-          Код отправлен на номер {formatPhone(phone)}
-        </p>
+    <form onSubmit={handleVerifyCode}>
+      <h1 className="auth-title">Введите код из SMS</h1>
+      <p className="auth-subtitle">Код отправлен на {formatPhone(phone)}</p>
+
+      <div className="field">
+        <label className="field-label">Код подтверждения</label>
+        <input
+          className="input"
+          type="text"
+          placeholder="123456"
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          disabled={loading}
+          maxLength={6}
+          required
+        />
+        {error && <p className="field-error">{error}</p>}
       </div>
 
-      <Input
-        label="Код подтверждения"
-        type="text"
-        placeholder="123456"
-        value={code}
-        onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-        error={error}
-        disabled={loading}
-        maxLength={6}
-        required
-      />
-
-      <Button type="submit" loading={loading} fullWidth>
-        Войти
-      </Button>
+      <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
+        {loading ? 'Проверка...' : 'Войти'}
+      </button>
 
       <button
         type="button"
@@ -134,11 +117,11 @@ export function SMSAuthForm() {
           setCode('');
           setError('');
         }}
-        className="text-sm text-gray-600 hover:text-black transition-colors"
+        className="btn btn-ghost btn-block"
+        style={{ marginTop: '12px' }}
       >
         Изменить номер
       </button>
     </form>
   );
 }
-

@@ -3,12 +3,10 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
-import { cn } from '@/lib/utils/cn';
 
 interface MenuItem {
   href: string;
   label: string;
-  icon?: string;
 }
 
 interface SidebarProps {
@@ -20,49 +18,36 @@ export function Sidebar({ items }: SidebarProps) {
   const { user, logout } = useAuthStore();
 
   return (
-    <aside className="w-64 min-h-screen bg-white border-r border-gray-300 flex flex-col">
-      <div className="p-6 border-b border-gray-300">
-        <h1 className="text-xl font-semibold text-gray-900">LK Housler</h1>
+    <aside className="sidebar">
+      <div style={{ padding: '24px 16px', borderBottom: '1px solid var(--color-border)' }}>
+        <div className="header-logo">LK Housler</div>
         {user && (
-          <p className="text-sm text-gray-600 mt-1">
+          <p style={{ fontSize: '14px', color: 'var(--color-text-light)', marginTop: '4px' }}>
             {user.email || user.phone}
           </p>
         )}
       </div>
 
-      <nav className="flex-1 p-4">
-        <ul className="space-y-2">
-          {items.map((item) => {
-            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
-            
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className={cn(
-                    'block px-4 py-3 rounded-lg transition-colors',
-                    isActive
-                      ? 'bg-black text-white'
-                      : 'text-gray-900 hover:bg-gray-100'
-                  )}
-                >
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+      <nav style={{ flex: 1, padding: '16px 0' }}>
+        {items.map((item) => {
+          const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`sidebar-item ${isActive ? 'active' : ''}`}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
       </nav>
 
-      <div className="p-4 border-t border-gray-300">
-        <button
-          onClick={logout}
-          className="w-full px-4 py-3 text-gray-900 hover:bg-gray-100 rounded-lg transition-colors text-left"
-        >
+      <div style={{ padding: '16px', borderTop: '1px solid var(--color-border)' }}>
+        <button onClick={logout} className="btn btn-ghost btn-block" style={{ justifyContent: 'flex-start' }}>
           Выйти
         </button>
       </div>
     </aside>
   );
 }
-

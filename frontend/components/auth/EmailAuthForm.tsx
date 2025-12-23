@@ -2,8 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { sendEmail, verifyEmail, getCurrentUser } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/store/authStore';
 import { getDashboardPath } from '@/lib/utils/redirect';
@@ -40,14 +38,8 @@ export function EmailAuthForm() {
 
     try {
       const response = await verifyEmail(email.toLowerCase().trim(), code);
-
-      // Получаем данные пользователя
       const user = await getCurrentUser();
-
-      // Сохраняем в store
       setAuth(response.access_token, user);
-
-      // Редирект на dashboard по роли
       router.push(getDashboardPath(user.role));
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Неверный код');
@@ -58,32 +50,29 @@ export function EmailAuthForm() {
 
   if (step === 'email') {
     return (
-      <form onSubmit={handleSendEmail} className="flex flex-col gap-6">
-        <div>
-          <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-            Вход для клиентов
-          </h2>
-          <p className="text-gray-600">
-            Введите email для получения кода
-          </p>
+      <form onSubmit={handleSendEmail}>
+        <h1 className="auth-title">Вход для клиентов</h1>
+        <p className="auth-subtitle">Введите email для получения кода</p>
+
+        <div className="field">
+          <label className="field-label">Email</label>
+          <input
+            className="input"
+            type="email"
+            placeholder="example@mail.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={loading}
+            required
+          />
+          {error && <p className="field-error">{error}</p>}
         </div>
 
-        <Input
-          label="Email"
-          type="email"
-          placeholder="example@mail.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          error={error}
-          disabled={loading}
-          required
-        />
+        <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
+          {loading ? 'Отправка...' : 'Получить код'}
+        </button>
 
-        <Button type="submit" loading={loading} fullWidth>
-          Получить код
-        </Button>
-
-        <p className="text-sm text-gray-600 text-center">
+        <p className="footer" style={{ marginTop: '24px', padding: 0 }}>
           Код будет отправлен на указанный email
         </p>
       </form>
@@ -91,31 +80,28 @@ export function EmailAuthForm() {
   }
 
   return (
-    <form onSubmit={handleVerifyCode} className="flex flex-col gap-6">
-      <div>
-        <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-          Введите код из письма
-        </h2>
-        <p className="text-gray-600">
-          Код отправлен на {email}
-        </p>
+    <form onSubmit={handleVerifyCode}>
+      <h1 className="auth-title">Введите код из письма</h1>
+      <p className="auth-subtitle">Код отправлен на {email}</p>
+
+      <div className="field">
+        <label className="field-label">Код подтверждения</label>
+        <input
+          className="input"
+          type="text"
+          placeholder="123456"
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          disabled={loading}
+          maxLength={6}
+          required
+        />
+        {error && <p className="field-error">{error}</p>}
       </div>
 
-      <Input
-        label="Код подтверждения"
-        type="text"
-        placeholder="123456"
-        value={code}
-        onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-        error={error}
-        disabled={loading}
-        maxLength={6}
-        required
-      />
-
-      <Button type="submit" loading={loading} fullWidth>
-        Войти
-      </Button>
+      <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
+        {loading ? 'Проверка...' : 'Войти'}
+      </button>
 
       <button
         type="button"
@@ -124,11 +110,11 @@ export function EmailAuthForm() {
           setCode('');
           setError('');
         }}
-        className="text-sm text-gray-600 hover:text-black transition-colors"
+        className="btn btn-ghost btn-block"
+        style={{ marginTop: '12px' }}
       >
         Изменить email
       </button>
     </form>
   );
 }
-
