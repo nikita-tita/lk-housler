@@ -45,7 +45,9 @@ export default function ProfilePage() {
               </div>
               <div>
                 <dt className="text-sm text-gray-600">Статус</dt>
-                <dd className="text-base text-gray-900 mt-1 capitalize">{user?.status}</dd>
+                <dd className="text-base text-gray-900 mt-1 capitalize">
+                  {user?.is_active ? 'Активен' : 'Неактивен'}
+                </dd>
               </div>
             </dl>
           </CardContent>
