@@ -4,6 +4,36 @@
 
 **lk.housler.ru** — Личный кабинет экосистемы Housler
 
+---
+
+## ЕДИНАЯ АВТОРИЗАЦИЯ (КРИТИЧЕСКИ ВАЖНО)
+
+**Авторизация использует API agent.housler.ru!**
+
+Подробная документация: `docs/UNIFIED_AUTH.md`
+
+```
+lk.housler.ru (frontend) ──> agent.housler.ru/api/auth/* ──> housler_agent (БД)
+```
+
+### Ключевые моменты:
+
+1. **Frontend** вызывает `https://agent.housler.ru/api/auth/*` для авторизации
+2. **JWT_SECRET** и **ENCRYPTION_KEY** должны совпадать с agent.housler.ru
+3. **База данных** - общая: `housler_agent` на `agent-postgres`
+4. **Изменения auth в agent.housler.ru влияют на lk.housler.ru!**
+
+### Тестовые данные:
+- SMS: `79999xxxxxx`, коды `111111-666666`
+- Email: `*@test.housler.ru`, коды `111111-666666`
+
+### НЕ МЕНЯТЬ без согласования:
+- Формат ответа auth API
+- JWT_SECRET / ENCRYPTION_KEY
+- Структуру таблицы users
+
+---
+
 ## Технологический стек
 
 ### Backend (Python)
