@@ -15,9 +15,12 @@ from app.models import *  # noqa
 # this is the Alembic Config object
 config = context.config
 
-# Override sqlalchemy.url from environment variable
-database_url = os.environ.get("DATABASE_URL")
+# Override sqlalchemy.url from environment variable (use sync URL for alembic)
+database_url = os.environ.get("DATABASE_URL_SYNC") or os.environ.get("DATABASE_URL")
 if database_url:
+    # Ensure we use sync driver for alembic migrations
+    if "+asyncpg" in database_url:
+        database_url = database_url.replace("+asyncpg", "")
     config.set_main_option("sqlalchemy.url", database_url)
 
 # Interpret the config file for Python logging
