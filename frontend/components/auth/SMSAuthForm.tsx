@@ -84,7 +84,7 @@ export function SMSAuthForm() {
         </button>
 
         <p className="footer" style={{ marginTop: '24px', padding: 0 }}>
-          Тест: номера 79999xxxxxx, код 123456
+          Тест: номера 79999xxxxxx, коды 111111-666666
         </p>
       </form>
     );
