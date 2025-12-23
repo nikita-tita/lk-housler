@@ -35,9 +35,9 @@ python-dateutil==2.8.2
 phonenumbers==8.13.27
 pytz==2023.3
 
-# PDF Generation
-reportlab==4.0.9
-weasyprint==60.2
+# PDF Generation (disabled - requires system libs)
+# reportlab==4.0.9
+# weasyprint==60.2
 
 # Testing
 pytest==7.4.4
