@@ -115,12 +115,12 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: https://lk.housler.ru
+        NEXT_PUBLIC_API_URL: https://lk.housler.ru/api/v1
     container_name: lk-frontend
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=https://lk.housler.ru
+      - NEXT_PUBLIC_API_URL=https://lk.housler.ru/api/v1
     depends_on:
       - backend
     healthcheck:

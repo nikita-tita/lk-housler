@@ -42,7 +42,7 @@ export default function ClientDealDetailPage() {
     return (
       <div className="text-center py-12">
         <p className="text-gray-600 mb-4">Сделка не найдена</p>
-        <Link href="/dashboard">
+        <Link href="/client/dashboard">
           <Button>Вернуться к списку</Button>
         </Link>
       </div>
@@ -52,7 +52,7 @@ export default function ClientDealDetailPage() {
   return (
     <div>
       <div className="mb-6">
-        <Link href="/dashboard" className="text-gray-600 hover:text-black text-sm">
+        <Link href="/client/dashboard" className="text-gray-600 hover:text-black text-sm">
           ← Назад к списку
         </Link>
       </div>

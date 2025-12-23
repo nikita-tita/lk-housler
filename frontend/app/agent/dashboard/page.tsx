@@ -56,7 +56,7 @@ export default function AgentDashboard() {
           <h1 className="text-3xl font-semibold text-gray-900">Главная</h1>
           <p className="text-gray-600 mt-1">Обзор ваших сделок</p>
         </div>
-        <Link href="/deals/new">
+        <Link href="/agent/deals/new">
           <Button>Создать сделку</Button>
         </Link>
       </div>
@@ -93,7 +93,7 @@ export default function AgentDashboard() {
           {deals.length === 0 ? (
             <div className="text-center py-12 text-gray-600">
               <p className="mb-4">У вас пока нет сделок</p>
-              <Link href="/deals/new">
+              <Link href="/agent/deals/new">
                 <Button>Создать первую сделку</Button>
               </Link>
             </div>
@@ -102,7 +102,7 @@ export default function AgentDashboard() {
               {deals.map((deal) => (
                 <Link
                   key={deal.id}
-                  href={`/deals/${deal.id}`}
+                  href={`/agent/deals/${deal.id}`}
                   className="block p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-center justify-between">

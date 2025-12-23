@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     
     # Email (Yandex 360 SMTP)
     EMAIL_PROVIDER: str = "mock"  # mock or smtp
+    EMAIL_TEST_MODE: bool = False  # Test mode: use fixed code 123456
     SMTP_HOST: str = "smtp.yandex.ru"
     SMTP_PORT: int = 465  # 465 for SSL, 587 for STARTTLS
     SMTP_USER: str = ""  # email@domain.ru or email@yandex.ru

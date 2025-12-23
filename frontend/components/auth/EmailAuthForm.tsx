@@ -73,7 +73,7 @@ export function EmailAuthForm() {
         </button>
 
         <p className="footer" style={{ marginTop: '24px', padding: 0 }}>
-          Код будет отправлен на указанный email
+          Тест: любой email, код 123456
         </p>
       </form>
     );

@@ -83,9 +83,12 @@ class AuthServiceExtended:
     
     async def send_email_otp(self, email: str) -> None:
         """Send Email OTP for client login/registration"""
-        # Generate OTP
+        # Generate OTP (fixed code in test mode)
         from app.core.security import generate_otp
-        code = generate_otp(settings.OTP_LENGTH)
+        if settings.EMAIL_TEST_MODE or settings.EMAIL_PROVIDER == "mock":
+            code = "123456"
+        else:
+            code = generate_otp(settings.OTP_LENGTH)
         expires_at = datetime.utcnow() + timedelta(minutes=settings.OTP_EXPIRE_MINUTES)
         
         # Store in OTPSession (reuse phone field for email)

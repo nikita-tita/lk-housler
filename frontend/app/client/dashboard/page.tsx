@@ -49,7 +49,7 @@ export default function ClientDashboard() {
       ) : (
         <div className="grid gap-6">
           {deals.map((deal) => (
-            <Link key={deal.id} href={`/deals/${deal.id}`}>
+            <Link key={deal.id} href={`/client/deals/${deal.id}`}>
               <Card className="hover:bg-gray-50 transition-colors cursor-pointer">
                 <CardHeader>
                   <div className="flex items-start justify-between">

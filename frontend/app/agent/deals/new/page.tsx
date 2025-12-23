@@ -27,7 +27,7 @@ export default function CreateDealPage() {
 
     try {
       const deal = await createDeal(formData);
-      router.push(`/deals/${deal.id}`);
+      router.push(`/agent/deals/${deal.id}`);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Ошибка создания сделки');
     } finally {
@@ -38,7 +38,7 @@ export default function CreateDealPage() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
-        <Link href="/deals" className="text-gray-600 hover:text-black text-sm">
+        <Link href="/agent/deals" className="text-gray-600 hover:text-black text-sm">
           ← Назад к списку
         </Link>
       </div>
@@ -132,7 +132,7 @@ export default function CreateDealPage() {
               <Button type="submit" loading={loading} fullWidth>
                 Создать сделку
               </Button>
-              <Link href="/deals" className="flex-1">
+              <Link href="/agent/deals" className="flex-1">
                 <Button type="button" variant="secondary" fullWidth>
                   Отмена
                 </Button>

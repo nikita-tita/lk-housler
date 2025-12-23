@@ -55,7 +55,7 @@ export default function DealDetailPage() {
     setActionLoading(true);
     try {
       await cancelDeal(deal.id);
-      router.push('/deals');
+      router.push('/agent/deals');
     } catch (error) {
       console.error('Failed to cancel deal:', error);
       alert('Ошибка отмены сделки');
@@ -76,7 +76,7 @@ export default function DealDetailPage() {
     return (
       <div className="max-w-4xl mx-auto text-center py-12">
         <p className="text-gray-600 mb-4">Сделка не найдена</p>
-        <Link href="/deals">
+        <Link href="/agent/deals">
           <Button>Вернуться к списку</Button>
         </Link>
       </div>
@@ -86,7 +86,7 @@ export default function DealDetailPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
-        <Link href="/deals" className="text-gray-600 hover:text-black text-sm">
+        <Link href="/agent/deals" className="text-gray-600 hover:text-black text-sm">
           ← Назад к списку
         </Link>
       </div>

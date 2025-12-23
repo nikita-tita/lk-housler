@@ -44,7 +44,12 @@ class OTPService:
                 raise ValueError("Too many attempts. Blocked for 10 minutes.")
         
         # Generate new OTP
-        code = generate_otp(settings.OTP_LENGTH)
+        # For test phones in test mode, use fixed code
+        normalized_phone = phone.lstrip('+')
+        if settings.SMS_TEST_MODE and normalized_phone.startswith('79999'):
+            code = "123456"
+        else:
+            code = generate_otp(settings.OTP_LENGTH)
         expires_at = datetime.utcnow() + timedelta(minutes=settings.OTP_EXPIRE_MINUTES)
         
         # Create session
