@@ -75,7 +75,7 @@ services:
       - DB_NAME=${DB_NAME:-lk_housler}
       - DB_USER=${DB_USER:-lk_user}
       - DB_PASSWORD=${DB_PASSWORD}
-      - DATABASE_URL=postgresql://${DB_USER:-lk_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-lk_housler}
+      - DATABASE_URL=postgresql+asyncpg://${DB_USER:-lk_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-lk_housler}
       - DATABASE_URL_SYNC=postgresql://${DB_USER:-lk_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-lk_housler}
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/1
