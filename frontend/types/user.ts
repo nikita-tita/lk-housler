@@ -5,29 +5,23 @@ export type UserRole =
   | 'operator'
   | 'admin';
 
-export type UserStatus =
-  | 'pending'
-  | 'active'
-  | 'suspended'
-  | 'banned';
-
 export interface User {
-  id: string;
-  email?: string;
-  phone?: string;
+  id: number;
+  email: string;
+  phone: string | null;
+  name: string | null;
   role: UserRole;
-  status: UserStatus;
-  last_login_at?: string;
-  created_at?: string;
-  updated_at?: string;
+  agency_id: number | null;
+  is_active: boolean;
+  last_login_at: string | null;
+  created_at: string;
 }
 
 export interface UserProfile {
-  user_id: string;
+  user_id: number;
   full_name?: string;
   city?: string;
   tax_status?: 'npd' | 'ip' | 'ooo';
   verified_level: number;
   kyc_checked_at?: string;
 }
-

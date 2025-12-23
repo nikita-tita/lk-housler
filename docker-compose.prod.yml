@@ -1,29 +1,11 @@
 version: '3.8'
 
 # Production Docker Compose for lk.housler.ru
+# Uses shared database with agent.housler.ru for unified auth
 # Deploy: docker-compose -f docker-compose.prod.yml up -d
 
 services:
-  # PostgreSQL
-  postgres:
-    image: postgres:15-alpine
-    container_name: lk-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${DB_NAME:-lk_housler}
-      POSTGRES_USER: ${DB_USER:-lk_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-lk_user} -d ${DB_NAME:-lk_housler}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - lk-network
-
-  # Redis
+  # Redis (local for lk cache)
   redis:
     image: redis:7-alpine
     container_name: lk-redis
@@ -58,7 +40,7 @@ services:
     networks:
       - lk-network
 
-  # Backend (FastAPI)
+  # Backend (FastAPI) - connects to agent-postgres for unified auth
   backend:
     build:
       context: ./backend
@@ -70,13 +52,14 @@ services:
     environment:
       - APP_ENV=production
       - DEBUG=false
-      - DB_HOST=postgres
+      # Use agent-postgres from agent.housler.ru network
+      - DB_HOST=agent-postgres
       - DB_PORT=5432
-      - DB_NAME=${DB_NAME:-lk_housler}
-      - DB_USER=${DB_USER:-lk_user}
+      - DB_NAME=housler_agent
+      - DB_USER=housler
       - DB_PASSWORD=${DB_PASSWORD}
-      - DATABASE_URL=postgresql+asyncpg://${DB_USER:-lk_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-lk_housler}
-      - DATABASE_URL_SYNC=postgresql://${DB_USER:-lk_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-lk_housler}
+      - DATABASE_URL=postgresql+asyncpg://housler:${DB_PASSWORD}@agent-postgres:5432/housler_agent
+      - DATABASE_URL_SYNC=postgresql://housler:${DB_PASSWORD}@agent-postgres:5432/housler_agent
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
@@ -96,8 +79,6 @@ services:
     volumes:
       - ./logs/backend:/app/logs
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
@@ -108,6 +89,7 @@ services:
       start_period: 30s
     networks:
       - lk-network
+      - agent-network
 
   # Frontend (Next.js)
   frontend:
@@ -148,8 +130,6 @@ services:
       - lk-network
 
 volumes:
-  postgres_data:
-    driver: local
   redis_data:
     driver: local
   minio_data:
@@ -158,3 +138,7 @@ volumes:
 networks:
   lk-network:
     driver: bridge
+  # External network to access agent-postgres
+  agent-network:
+    external: true
+    name: agenthouslerru_agent-network

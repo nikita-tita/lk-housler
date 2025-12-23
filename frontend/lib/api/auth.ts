@@ -1,92 +1,118 @@
-import { apiClient } from './client';
-import type { User } from '@/types/user';
+import { authClient, apiClient } from './client';
 
+// User type matching agent.housler.ru
+export interface User {
+  id: number;
+  email: string;
+  phone: string | null;
+  name: string | null;
+  role: 'client' | 'agent' | 'agency_admin' | 'operator' | 'admin';
+  agency_id: number | null;
+  is_active: boolean;
+  last_login_at: string | null;
+  created_at: string;
+}
+
+// Response format from agent.housler.ru
+interface AgentAuthResponse {
+  success: boolean;
+  token?: string;
+  user?: User;
+  isNewUser?: boolean;
+  message: string;
+}
+
+// Unified auth response for frontend
 export interface AuthResponse {
   access_token: string;
-  refresh_token: string;
-  token_type: string;
-}
-
-export type { User };
-
-// ==========================================
-// 1. SMS Auth (Agent)
-// ==========================================
-
-export async function sendSMS(phone: string): Promise<void> {
-  await apiClient.post('/auth/agent/sms/send', { phone });
-}
-
-export async function verifySMS(
-  phone: string,
-  code: string
-): Promise<AuthResponse> {
-  const { data } = await apiClient.post<AuthResponse>(
-    '/auth/agent/sms/verify',
-    {
-      phone,
-      code,
-    }
-  );
-  return data;
+  user: User;
 }
 
 // ==========================================
-// 2. Email Auth (Client)
+// 1. SMS Auth (Agent) - uses agent.housler.ru
 // ==========================================
 
-export async function sendEmail(email: string): Promise<void> {
-  await apiClient.post('/auth/client/email/send', { email });
+export async function sendSMS(phone: string): Promise<{ success: boolean; message: string }> {
+  const { data } = await authClient.post<AgentAuthResponse>('/auth/request-sms', { phone });
+  return { success: data.success, message: data.message };
 }
 
-export async function verifyEmail(
-  email: string,
-  code: string
-): Promise<AuthResponse> {
-  const { data } = await apiClient.post<AuthResponse>(
-    '/auth/client/email/verify',
-    {
-      email,
-      code,
-    }
-  );
-  return data;
+export async function verifySMS(phone: string, code: string): Promise<AuthResponse> {
+  const { data } = await authClient.post<AgentAuthResponse>('/auth/verify-sms', { phone, code });
+
+  if (!data.success || !data.token || !data.user) {
+    throw new Error(data.message || 'Authentication failed');
+  }
+
+  // If new user, they need to register first
+  if (data.isNewUser) {
+    throw new Error('NEW_USER_NEEDS_REGISTRATION');
+  }
+
+  return {
+    access_token: data.token,
+    user: data.user,
+  };
+}
+
+// ==========================================
+// 2. Email Auth (Client) - uses agent.housler.ru
+// ==========================================
+
+export async function sendEmail(email: string): Promise<{ success: boolean; message: string }> {
+  const { data } = await authClient.post<AgentAuthResponse>('/auth/request-code', { email });
+  return { success: data.success, message: data.message };
+}
+
+export async function verifyEmail(email: string, code: string): Promise<AuthResponse> {
+  const { data } = await authClient.post<AgentAuthResponse>('/auth/verify-code', { email, code });
+
+  if (!data.success || !data.token || !data.user) {
+    throw new Error(data.message || 'Authentication failed');
+  }
+
+  return {
+    access_token: data.token,
+    user: data.user,
+  };
 }
 
 // ==========================================
 // 3. Agency Auth (Email + Password)
 // ==========================================
 
-export async function loginAgency(
-  email: string,
-  password: string
-): Promise<AuthResponse> {
-  const { data} = await apiClient.post<AuthResponse>('/auth/agency/login', {
-    email,
-    password,
-  });
-  return data;
+export async function loginAgency(email: string, password: string): Promise<AuthResponse> {
+  const { data } = await authClient.post<AgentAuthResponse>('/auth/login-agency', { email, password });
+
+  if (!data.success || !data.token || !data.user) {
+    throw new Error(data.message || 'Invalid credentials');
+  }
+
+  return {
+    access_token: data.token,
+    user: data.user,
+  };
 }
 
 // ==========================================
-// Current User
+// Current User - uses agent.housler.ru
 // ==========================================
 
 export async function getCurrentUser(): Promise<User> {
-  const { data } = await apiClient.get<User>('/users/me');
+  const { data } = await authClient.get<User>('/auth/me');
   return data;
 }
 
 // ==========================================
-// Registration
+// Registration - uses agent.housler.ru
 // ==========================================
 
 export interface ConsentInput {
-  personal_data: boolean;
+  personalData: boolean;
   terms: boolean;
   marketing?: boolean;
-  realtor_offer?: boolean;
-  agency_offer?: boolean;
+  realtorOffer?: boolean;
+  agencyOffer?: boolean;
 }
 
 export interface AgentRegisterData {
@@ -95,28 +121,43 @@ export interface AgentRegisterData {
   email: string;
   consents: ConsentInput;
   city?: string;
-  is_self_employed?: boolean;
-  personal_inn?: string;
+  isSelfEmployed?: boolean;
+  personalInn?: string;
 }
 
 export interface AgencyRegisterData {
   inn: string;
   name: string;
-  legal_address: string;
-  contact_name: string;
-  contact_phone: string;
-  contact_email: string;
+  legalAddress: string;
+  contactName: string;
+  contactPhone: string;
+  contactEmail: string;
   password: string;
   consents: ConsentInput;
 }
 
-export async function registerAgent(data: AgentRegisterData): Promise<{ id: string; message: string }> {
-  const { data: response } = await apiClient.post('/auth/register/agent', data);
-  return response;
+export async function registerAgent(data: AgentRegisterData): Promise<AuthResponse> {
+  const { data: response } = await authClient.post<AgentAuthResponse>('/auth/register-realtor', data);
+
+  if (!response.success || !response.token || !response.user) {
+    throw new Error(response.message || 'Registration failed');
+  }
+
+  return {
+    access_token: response.token,
+    user: response.user,
+  };
 }
 
-export async function registerAgency(data: AgencyRegisterData): Promise<{ id: string; message: string }> {
-  const { data: response } = await apiClient.post('/auth/register/agency', data);
-  return response;
-}
+export async function registerAgency(data: AgencyRegisterData): Promise<AuthResponse> {
+  const { data: response } = await authClient.post<AgentAuthResponse>('/auth/register-agency', data);
 
+  if (!response.success || !response.token || !response.user) {
+    throw new Error(response.message || 'Registration failed');
+  }
+
+  return {
+    access_token: response.token,
+    user: response.user,
+  };
+}

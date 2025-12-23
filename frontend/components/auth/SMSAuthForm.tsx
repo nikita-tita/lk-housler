@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { sendSMS, verifySMS, getCurrentUser } from '@/lib/api/auth';
+import { sendSMS, verifySMS } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/store/authStore';
 import { formatPhone } from '@/lib/utils/format';
 import { getDashboardPath } from '@/lib/utils/redirect';
@@ -45,11 +45,14 @@ export function SMSAuthForm() {
 
     try {
       const response = await verifySMS(phone, code);
-      const user = await getCurrentUser();
-      setAuth(response.access_token, user);
-      router.push(getDashboardPath(user.role));
+      setAuth(response.access_token, response.user);
+      router.push(getDashboardPath(response.user.role));
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Неверный код');
+      if (err.message === 'NEW_USER_NEEDS_REGISTRATION') {
+        setError('Номер не зарегистрирован. Пожалуйста, зарегистрируйтесь на agent.housler.ru');
+      } else {
+        setError(err.response?.data?.message || err.message || 'Неверный код');
+      }
     } finally {
       setLoading(false);
     }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { loginAgency, getCurrentUser } from '@/lib/api/auth';
+import { loginAgency } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/store/authStore';
 import { getDashboardPath } from '@/lib/utils/redirect';
 
@@ -22,11 +22,10 @@ export function PasswordAuthForm() {
 
     try {
       const response = await loginAgency(email.toLowerCase().trim(), password);
-      const user = await getCurrentUser();
-      setAuth(response.access_token, user);
-      router.push(getDashboardPath(user.role));
+      setAuth(response.access_token, response.user);
+      router.push(getDashboardPath(response.user.role));
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Неверный email или пароль');
+      setError(err.response?.data?.message || err.message || 'Неверный email или пароль');
     } finally {
       setLoading(false);
     }

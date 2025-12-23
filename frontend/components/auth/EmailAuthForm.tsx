@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { sendEmail, verifyEmail, getCurrentUser } from '@/lib/api/auth';
+import { sendEmail, verifyEmail } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/store/authStore';
 import { getDashboardPath } from '@/lib/utils/redirect';
 
@@ -38,11 +38,10 @@ export function EmailAuthForm() {
 
     try {
       const response = await verifyEmail(email.toLowerCase().trim(), code);
-      const user = await getCurrentUser();
-      setAuth(response.access_token, user);
-      router.push(getDashboardPath(user.role));
+      setAuth(response.access_token, response.user);
+      router.push(getDashboardPath(response.user.role));
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Неверный код');
+      setError(err.response?.data?.message || err.message || 'Неверный код');
     } finally {
       setLoading(false);
     }
