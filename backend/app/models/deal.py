@@ -2,7 +2,7 @@
 
 from enum import Enum as PyEnum
 
-from sqlalchemy import Column, String, Enum, Integer, ForeignKey, Text, Numeric
+from sqlalchemy import Column, String, Enum, Integer, ForeignKey, Text, Numeric, Boolean
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 
