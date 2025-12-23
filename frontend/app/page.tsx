@@ -1,9 +1,8 @@
-import Image from "next/image";
-
 'use client';
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from "next/image";
 import { useAuthStore } from '@/lib/store/authStore';
 
 export default function Home() {
@@ -17,7 +16,8 @@ export default function Home() {
   useEffect(() => {
     if (!isLoading) {
       if (isAuthenticated) {
-        router.push('/dashboard');
+        // Редирект на дашборд в зависимости от роли (по умолчанию client)
+        router.push('/client/dashboard');
       } else {
         router.push('/login');
       }
