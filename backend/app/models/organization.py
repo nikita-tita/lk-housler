@@ -85,7 +85,7 @@ class Organization(BaseModel):
     
     # Relationships
     members = relationship("OrganizationMember", back_populates="organization")
-    payout_accounts = relationship("PayoutAccount", back_populates="organization")
+    # Note: payout_accounts uses polymorphic owner pattern, query manually
 
 
 class OrganizationMember(BaseModel):
@@ -128,6 +128,6 @@ class PayoutAccount(BaseModel):
     verified_at = Column(DateTime, nullable=True)
     is_default = Column(Boolean, default=False, nullable=False)
     
-    # Relationships
-    organization = relationship("Organization", back_populates="payout_accounts", foreign_keys=[owner_id])
+    # Note: Polymorphic owner - no FK relationship, use manual queries
+    # owner_type='user' -> users.id, owner_type='org' -> organizations.id
 
