@@ -4,11 +4,11 @@ import { useRequireAuth } from '@/lib/hooks/useAuth';
 import { Sidebar } from '@/components/layout/Sidebar';
 
 const agencyMenuItems = [
-  { href: '/dashboard', label: 'Главная' },
-  { href: '/agents', label: 'Агенты' },
-  { href: '/deals', label: 'Сделки' },
-  { href: '/finance', label: 'Финансы' },
-  { href: '/settings', label: 'Настройки' },
+  { href: '/agency/dashboard', label: 'Главная' },
+  { href: '/agency/agents', label: 'Агенты' },
+  { href: '/agency/deals', label: 'Сделки' },
+  { href: '/agency/finance', label: 'Финансы' },
+  { href: '/agency/settings', label: 'Настройки' },
 ];
 
 export default function AgencyLayout({

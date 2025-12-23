@@ -24,8 +24,8 @@ export default function ClientLayout({
   }
 
   const menuItems = [
-    { href: '/dashboard', label: 'Мои сделки' },
-    { href: '/documents', label: 'Документы' },
+    { href: '/client/dashboard', label: 'Мои сделки' },
+    { href: '/client/documents', label: 'Документы' },
   ];
 
   return (

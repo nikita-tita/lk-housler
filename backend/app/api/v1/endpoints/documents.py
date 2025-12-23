@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_deal_access
 from app.db.session import get_db
 from app.models.user import User
 from app.services.document.service import DocumentService
@@ -28,9 +28,9 @@ async def generate_contract(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Deal not found"
         )
-    
-    # TODO: Check if user has access
-    
+
+    require_deal_access(deal, current_user)
+
     doc_service = DocumentService(db)
     
     try:
@@ -59,15 +59,18 @@ async def get_document(
     """Get document metadata"""
     doc_service = DocumentService(db)
     document = await doc_service.get_by_id(document_id)
-    
+
     if not document:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found"
         )
-    
-    # TODO: Check if user has access
-    
+
+    deal_service = DealService(db)
+    deal = await deal_service.get_by_id(document.deal_id)
+    if deal:
+        require_deal_access(deal, current_user)
+
     return {
         "id": str(document.id),
         "deal_id": str(document.deal_id),
@@ -88,16 +91,18 @@ async def download_document(
     """Redirect to document download URL"""
     doc_service = DocumentService(db)
     document = await doc_service.get_by_id(document_id)
-    
+
     if not document:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found"
         )
-    
-    # TODO: Check if user has access
-    
-    # Return redirect to S3 URL
+
+    deal_service = DealService(db)
+    deal = await deal_service.get_by_id(document.deal_id)
+    if deal:
+        require_deal_access(deal, current_user)
+
     return RedirectResponse(url=document.file_url)
 
 

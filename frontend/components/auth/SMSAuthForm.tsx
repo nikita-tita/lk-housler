@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { sendSMS, verifySMS } from '@/lib/api/auth';
+import { sendSMS, verifySMS, getCurrentUser } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/store/authStore';
 import { formatPhone } from '@/lib/utils/format';
+import { getDashboardPath } from '@/lib/utils/redirect';
 
 export function SMSAuthForm() {
   const router = useRouter();
@@ -47,16 +48,15 @@ export function SMSAuthForm() {
 
     try {
       const response = await verifySMS(phone, code);
-      
+
       // Получаем данные пользователя
-      const { getCurrentUser } = await import('@/lib/api/auth');
       const user = await getCurrentUser();
-      
+
       // Сохраняем в store
       setAuth(response.access_token, user);
-      
-      // Редирект на dashboard
-      router.push('/dashboard');
+
+      // Редирект на dashboard по роли
+      router.push(getDashboardPath(user.role));
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Неверный код');
     } finally {

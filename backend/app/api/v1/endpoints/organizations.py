@@ -5,7 +5,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_org_membership, require_org_admin
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.organization import (
@@ -61,13 +61,15 @@ async def get_organization(
     """Get organization by ID"""
     org_service = OrganizationService(db)
     organization = await org_service.get_by_id(org_id)
-    
+
     if not organization:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Organization not found"
         )
-    
+
+    await require_org_membership(organization.id, current_user, db)
+
     return organization
 
 
@@ -81,15 +83,15 @@ async def update_organization(
     """Update organization"""
     org_service = OrganizationService(db)
     organization = await org_service.get_by_id(org_id)
-    
+
     if not organization:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Organization not found"
         )
-    
-    # TODO: Check if user has admin role
-    
+
+    await require_org_admin(organization.id, current_user, db)
+
     organization = await org_service.update(organization, org_in)
     return organization
 
@@ -104,15 +106,15 @@ async def add_member(
     """Add member to organization"""
     org_service = OrganizationService(db)
     organization = await org_service.get_by_id(org_id)
-    
+
     if not organization:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Organization not found"
         )
-    
-    # TODO: Check if user has admin role
-    
+
+    await require_org_admin(organization.id, current_user, db)
+
     try:
         member = await org_service.add_member(organization, member_in)
         return member
@@ -133,15 +135,15 @@ async def create_payout_account(
     """Create payout account for organization"""
     org_service = OrganizationService(db)
     organization = await org_service.get_by_id(org_id)
-    
+
     if not organization:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Organization not found"
         )
-    
-    # TODO: Check if user has admin role
-    
+
+    await require_org_admin(organization.id, current_user, db)
+
     account = await org_service.create_payout_account("org", org_id, account_in)
     return account
 

@@ -17,7 +17,7 @@ export default function LoginPage() {
       </div>
 
       <div className="flex flex-col gap-4">
-        <Link href="/agent">
+        <Link href="agent">
           <Card className="cursor-pointer hover:bg-gray-50 transition-colors">
             <CardHeader>
               <CardTitle>Я агент</CardTitle>
@@ -28,7 +28,7 @@ export default function LoginPage() {
           </Card>
         </Link>
 
-        <Link href="/client">
+        <Link href="client">
           <Card className="cursor-pointer hover:bg-gray-50 transition-colors">
             <CardHeader>
               <CardTitle>Я клиент</CardTitle>
@@ -39,7 +39,7 @@ export default function LoginPage() {
           </Card>
         </Link>
 
-        <Link href="/agency">
+        <Link href="agency">
           <Card className="cursor-pointer hover:bg-gray-50 transition-colors">
             <CardHeader>
               <CardTitle>Я из агентства</CardTitle>

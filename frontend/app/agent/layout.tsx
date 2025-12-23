@@ -4,9 +4,9 @@ import { useRequireAuth } from '@/lib/hooks/useAuth';
 import { Sidebar } from '@/components/layout/Sidebar';
 
 const agentMenuItems = [
-  { href: '/dashboard', label: 'Главная' },
-  { href: '/deals', label: 'Сделки' },
-  { href: '/profile', label: 'Профиль' },
+  { href: '/agent/dashboard', label: 'Главная' },
+  { href: '/agent/deals', label: 'Сделки' },
+  { href: '/agent/profile', label: 'Профиль' },
 ];
 
 export default function AgentLayout({

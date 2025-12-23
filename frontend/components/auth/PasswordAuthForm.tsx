@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { loginAgency } from '@/lib/api/auth';
+import { loginAgency, getCurrentUser } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/store/authStore';
+import { getDashboardPath } from '@/lib/utils/redirect';
 
 export function PasswordAuthForm() {
   const router = useRouter();
@@ -23,16 +24,15 @@ export function PasswordAuthForm() {
 
     try {
       const response = await loginAgency(email.toLowerCase().trim(), password);
-      
+
       // Получаем данные пользователя
-      const { getCurrentUser } = await import('@/lib/api/auth');
       const user = await getCurrentUser();
-      
+
       // Сохраняем в store
       setAuth(response.access_token, user);
-      
-      // Редирект на dashboard
-      router.push('/dashboard');
+
+      // Редирект на dashboard по роли
+      router.push(getDashboardPath(user.role));
     } catch (err: any) {
       setError(
         err.response?.data?.detail ||

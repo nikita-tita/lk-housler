@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_deal_access, require_deal_owner
 from app.db.session import get_db
 from app.models.user import User
 from app.models.deal import DealStatus
@@ -79,9 +79,9 @@ async def get_deal(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Deal not found"
         )
-    
-    # TODO: Check if user has access to this deal
-    
+
+    require_deal_access(deal, current_user)
+
     return deal
 
 
@@ -101,9 +101,9 @@ async def update_deal(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Deal not found"
         )
-    
-    # TODO: Check if user is creator
-    
+
+    require_deal_access(deal, current_user)
+
     try:
         deal = await deal_service.update(deal, deal_in)
         return deal
@@ -129,9 +129,9 @@ async def submit_deal(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Deal not found"
         )
-    
-    # TODO: Check if user is creator
-    
+
+    require_deal_owner(deal, current_user)
+
     try:
         deal = await deal_service.submit_for_signatures(deal)
         return deal
@@ -157,9 +157,9 @@ async def cancel_deal(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Deal not found"
         )
-    
-    # TODO: Check if user is creator
-    
+
+    require_deal_owner(deal, current_user)
+
     try:
         deal = await deal_service.cancel(deal)
         return deal

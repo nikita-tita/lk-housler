@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
 from app.services.payment.service import PaymentService
@@ -111,14 +112,18 @@ async def payment_webhook(
     Should validate webhook signature in production.
     """
     try:
+        # Validate webhook secret
+        webhook_secret = request.headers.get("X-Webhook-Secret")
+        if settings.PAYMENT_WEBHOOK_SECRET:
+            if not webhook_secret or webhook_secret != settings.PAYMENT_WEBHOOK_SECRET:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid webhook secret"
+                )
+
         # Get webhook data
         data = await request.json()
-        
-        # TODO: Validate webhook signature
-        # signature = request.headers.get("X-Webhook-Signature")
-        # if not validate_signature(signature, data):
-        #     raise HTTPException(status_code=401, detail="Invalid signature")
-        
+
         payment_service = PaymentService(db)
         
         # Process webhook
