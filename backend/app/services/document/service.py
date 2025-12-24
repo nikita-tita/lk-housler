@@ -208,7 +208,31 @@ class DocumentService:
         # Executor info (from settings or party)
         executor_name = getattr(settings, 'COMPANY_NAME', 'Исполнитель')
         executor_inn = getattr(settings, 'COMPANY_INN', 'не указан') or 'не указан'
+        executor_kpp = getattr(settings, 'COMPANY_KPP', '') or ''
+        executor_ogrn = getattr(settings, 'COMPANY_OGRN', '') or ''
+        executor_address = getattr(settings, 'COMPANY_ADDRESS', '') or ''
         executor_phone = getattr(settings, 'COMPANY_PHONE', '') or ''
+        executor_email = getattr(settings, 'COMPANY_EMAIL', '') or ''
+
+        # Bank details
+        bank_name = getattr(settings, 'COMPANY_BANK_NAME', '') or ''
+        bank_bik = getattr(settings, 'COMPANY_BANK_BIK', '') or ''
+        bank_account = getattr(settings, 'COMPANY_BANK_ACCOUNT', '') or ''
+        bank_corr = getattr(settings, 'COMPANY_BANK_CORR', '') or ''
+
+        # Build bank details block (only if filled)
+        executor_bank_block = ""
+        if bank_name and bank_account:
+            executor_bank_block = f"""
+                <div class="bank-details">
+                    <p><strong>Банковские реквизиты:</strong></p>
+                    <p>Банк: {bank_name}</p>
+                    <p>БИК: {bank_bik}</p>
+                    <p>Р/с: {bank_account}</p>
+                    <p>К/с: {bank_corr}</p>
+                </div>
+            """
+
         if executor_party:
             executor_name = executor_party.display_name_snapshot
 
@@ -225,10 +249,15 @@ class DocumentService:
             "client_name": client_name,
             "client_phone": client_phone,
 
-            # Executor info
+            # Executor info (full requisites)
             "executor_name": executor_name,
             "executor_inn": executor_inn,
+            "executor_kpp": executor_kpp or "-",
+            "executor_ogrn": executor_ogrn or "-",
+            "executor_address": executor_address or "не указан",
             "executor_phone": executor_phone,
+            "executor_email": executor_email or "-",
+            "executor_bank_block": executor_bank_block,
 
             # Financial info
             "commission_total": commission_total,
