@@ -1,25 +1,40 @@
 import { apiClient } from './client';
 
-export interface Deal {
-  id: string;
-  type: 'resale_sale' | 'resale_purchase' | 'newbuild_booking';
-  status: 'draft' | 'awaiting_signatures' | 'signed' | 'paid' | 'closed' | 'cancelled';
-  address: string;
-  price: number;
-  commission_agent: number;
-  commission_split_percent?: number;
-  agent_user_id?: string;
-  created_by_user_id: string;
-  created_at: string;
-  updated_at: string;
+// Deal types matching backend
+export type DealType = 'secondary_buy' | 'secondary_sell' | 'newbuild_booking';
+export type DealStatus = 'draft' | 'awaiting_signatures' | 'signed' | 'payment_pending' | 'in_progress' | 'closed' | 'dispute' | 'cancelled';
+
+// Address for structured input
+export interface AddressInput {
+  city: string;
+  street: string;
+  house: string;
+  building?: string;
+  apartment?: string;
 }
 
-export interface DealCreate {
-  type: 'resale_sale' | 'resale_purchase' | 'newbuild_booking';
+// Simplified deal creation for MVP
+export interface DealCreateSimple {
+  type: DealType;
+  address: AddressInput;
+  price: number;
+  commission: number;
+  client_name: string;
+  client_phone: string;
+}
+
+// Deal response from API
+export interface Deal {
+  id: string;
+  type: DealType;
+  status: DealStatus;
   address: string;
   price: number;
   commission_agent: number;
-  commission_split_percent?: number;
+  client_name?: string;
+  agent_user_id: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface DealsListResponse {
@@ -41,13 +56,13 @@ export async function getDeal(id: string): Promise<Deal> {
   return data;
 }
 
-export async function createDeal(deal: DealCreate): Promise<Deal> {
+export async function createDeal(deal: DealCreateSimple): Promise<Deal> {
   const { data } = await apiClient.post<Deal>('/deals', deal);
   return data;
 }
 
-export async function updateDeal(id: string, deal: Partial<DealCreate>): Promise<Deal> {
-  const { data } = await apiClient.patch<Deal>(`/deals/${id}`, deal);
+export async function updateDeal(id: string, deal: Partial<DealCreateSimple>): Promise<Deal> {
+  const { data } = await apiClient.put<Deal>(`/deals/${id}`, deal);
   return data;
 }
 
@@ -58,4 +73,3 @@ export async function submitDeal(id: string): Promise<void> {
 export async function cancelDeal(id: string): Promise<void> {
   await apiClient.post(`/deals/${id}/cancel`);
 }
-

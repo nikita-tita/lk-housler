@@ -5,10 +5,95 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.deal import DealType, DealStatus, ExecutorType, PartyRole
 
+
+# ============================================
+# Address schemas
+# ============================================
+
+class AddressCreate(BaseModel):
+    """Structured address for deal"""
+    city: str = Field(..., min_length=1, max_length=100)
+    street: str = Field(..., min_length=1, max_length=255)
+    house: str = Field(..., min_length=1, max_length=20)
+    building: Optional[str] = Field(None, max_length=20)
+    apartment: Optional[str] = Field(None, max_length=20)
+
+    def to_full_address(self) -> str:
+        """Format as full address string"""
+        parts = [f"г. {self.city}", self.street, f"д. {self.house}"]
+        if self.building:
+            parts.append(f"корп. {self.building}")
+        if self.apartment:
+            parts.append(f"кв. {self.apartment}")
+        return ", ".join(parts)
+
+
+# ============================================
+# Simplified deal creation (MVP)
+# ============================================
+
+class DealCreateSimple(BaseModel):
+    """Simplified deal creation for MVP"""
+    type: DealType
+
+    # Address
+    address: AddressCreate
+
+    # Financials
+    price: int = Field(..., gt=0, description="Property price in rubles")
+    commission: int = Field(..., gt=0, description="Agent commission in rubles")
+
+    # Client
+    client_name: str = Field(..., min_length=2, max_length=255)
+    client_phone: str = Field(..., min_length=10, max_length=20)
+
+    @field_validator('client_phone')
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        # Remove all non-digits
+        digits = ''.join(filter(str.isdigit, v))
+        if len(digits) < 10 or len(digits) > 11:
+            raise ValueError('Phone must have 10-11 digits')
+        # Normalize to 7XXXXXXXXXX format
+        if len(digits) == 11 and digits.startswith('8'):
+            digits = '7' + digits[1:]
+        elif len(digits) == 10:
+            digits = '7' + digits
+        return digits
+
+
+class DealSimpleResponse(BaseModel):
+    """Simplified deal response for frontend"""
+    id: UUID
+    type: DealType
+    status: DealStatus
+    address: str
+    price: int
+    commission_agent: int
+    client_name: Optional[str] = None
+    agent_user_id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class DealListSimple(BaseModel):
+    """Simplified deal list response"""
+    items: List[DealSimpleResponse]
+    total: int
+    page: int
+    size: int
+
+
+# ============================================
+# Full deal schemas (for complex operations)
+# ============================================
 
 class DealTermsBase(BaseModel):
     """Base deal terms schema"""

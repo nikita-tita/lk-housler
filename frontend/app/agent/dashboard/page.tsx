@@ -4,8 +4,19 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { getDeals, Deal } from '@/lib/api/deals';
+import { getDeals, Deal, DealStatus } from '@/lib/api/deals';
 import { formatPrice, formatDate } from '@/lib/utils/format';
+
+const STATUS_LABELS: Record<DealStatus, string> = {
+  draft: 'Черновик',
+  awaiting_signatures: 'Ожидает подписания',
+  signed: 'Подписано',
+  payment_pending: 'Ожидает оплаты',
+  in_progress: 'В работе',
+  closed: 'Закрыта',
+  dispute: 'Спор',
+  cancelled: 'Отменена',
+};
 
 export default function AgentDashboard() {
   const [deals, setDeals] = useState<Deal[]>([]);
@@ -26,11 +37,11 @@ export default function AgentDashboard() {
       setDeals(response.items);
 
       const inProgress = response.items.filter(
-        (d) => d.status === 'awaiting_signatures' || d.status === 'signed'
+        (d) => d.status === 'awaiting_signatures' || d.status === 'signed' || d.status === 'in_progress'
       ).length;
-      const completed = response.items.filter((d) => d.status === 'paid' || d.status === 'closed').length;
+      const completed = response.items.filter((d) => d.status === 'closed').length;
       const totalRevenue = response.items
-        .filter((d) => d.status === 'paid' || d.status === 'closed')
+        .filter((d) => d.status === 'closed')
         .reduce((sum, d) => sum + d.commission_agent, 0);
 
       setStats({ inProgress, completed, totalRevenue });
@@ -121,7 +132,7 @@ export default function AgentDashboard() {
                           : 'bg-gray-100 text-gray-900'
                       }`}
                     >
-                      {deal.status}
+                      {STATUS_LABELS[deal.status]}
                     </span>
                   </div>
                 </Link>

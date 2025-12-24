@@ -4,9 +4,26 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
-import { getDeal, submitDeal, cancelDeal, Deal } from '@/lib/api/deals';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { getDeal, submitDeal, cancelDeal, Deal, DealStatus, DealType } from '@/lib/api/deals';
 import { formatPrice, formatDate } from '@/lib/utils/format';
+
+const STATUS_LABELS: Record<DealStatus, string> = {
+  draft: 'Черновик',
+  awaiting_signatures: 'Ожидает подписания',
+  signed: 'Подписано',
+  payment_pending: 'Ожидает оплаты',
+  in_progress: 'В работе',
+  closed: 'Закрыта',
+  dispute: 'Спор',
+  cancelled: 'Отменена',
+};
+
+const TYPE_LABELS: Record<DealType, string> = {
+  secondary_sell: 'Продажа вторички',
+  secondary_buy: 'Покупка вторички',
+  newbuild_booking: 'Бронирование новостройки',
+};
 
 export default function DealDetailPage() {
   const params = useParams();
@@ -107,7 +124,7 @@ export default function DealDetailPage() {
               : 'bg-gray-100 text-gray-900'
           }`}
         >
-          {deal.status}
+          {STATUS_LABELS[deal.status]}
         </span>
       </div>
 
@@ -120,7 +137,7 @@ export default function DealDetailPage() {
             <dl className="space-y-4">
               <div>
                 <dt className="text-sm text-gray-600">Тип сделки</dt>
-                <dd className="text-base text-gray-900 mt-1">{deal.type}</dd>
+                <dd className="text-base text-gray-900 mt-1">{TYPE_LABELS[deal.type]}</dd>
               </div>
               <div>
                 <dt className="text-sm text-gray-600">Адрес</dt>
@@ -138,11 +155,11 @@ export default function DealDetailPage() {
                   {formatPrice(deal.commission_agent)}
                 </dd>
               </div>
-              {deal.commission_split_percent && (
+              {deal.client_name && (
                 <div>
-                  <dt className="text-sm text-gray-600">Сплит комиссии</dt>
+                  <dt className="text-sm text-gray-600">Клиент</dt>
                   <dd className="text-base text-gray-900 mt-1">
-                    {deal.commission_split_percent}% агенту
+                    {deal.client_name}
                   </dd>
                 </div>
               )}

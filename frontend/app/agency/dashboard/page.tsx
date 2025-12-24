@@ -31,7 +31,7 @@ export default function AgencyDashboard() {
         (d) => d.status === 'closed'
       ).length;
       const totalRevenue = response.items
-        .filter((d) => d.status === 'paid' || d.status === 'closed')
+        .filter((d) => d.status === 'closed')
         .reduce((sum, d) => sum + d.commission_agent, 0);
 
       setStats({

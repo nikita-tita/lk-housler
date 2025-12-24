@@ -8,9 +8,9 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.deal import Deal, DealParty, DealTerms, DealStatus, PartyType
+from app.models.deal import Deal, DealParty, DealTerms, DealStatus, PartyType, ExecutorType
 from app.models.user import User
-from app.schemas.deal import DealCreate, DealUpdate
+from app.schemas.deal import DealCreate, DealUpdate, DealCreateSimple
 from app.services.user.service import UserService
 
 
@@ -133,9 +133,38 @@ class DealService:
         
         await self.db.flush()
         await self.db.refresh(deal, ["parties", "terms"])
-        
+
         return deal
-    
+
+    async def create_simple(
+        self,
+        deal_in: DealCreateSimple,
+        creator: User
+    ) -> Deal:
+        """Create deal with simplified schema (MVP)"""
+        # Build full address from structured input
+        full_address = deal_in.address.to_full_address()
+
+        # Create deal with simplified fields
+        deal = Deal(
+            type=deal_in.type,
+            created_by_user_id=creator.id,
+            agent_user_id=creator.id,
+            executor_type=ExecutorType.USER,
+            executor_id=creator.id,
+            property_address=full_address,
+            price=deal_in.price,
+            commission_agent=deal_in.commission,
+            client_name=deal_in.client_name,
+            client_phone=deal_in.client_phone,
+            status=DealStatus.DRAFT,
+        )
+        self.db.add(deal)
+        await self.db.flush()
+        await self.db.refresh(deal)
+
+        return deal
+
     async def update(
         self,
         deal: Deal,
