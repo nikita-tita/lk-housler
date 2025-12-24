@@ -177,7 +177,20 @@ export default function RealtorLoginPage() {
         // New user - show registration form
         setStep('registration');
       } else {
-        setError(err.response?.data?.message || err.message || 'Неверный код');
+        // API returns error in 'error' field, not 'message'
+        const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message;
+        // Map common errors to user-friendly messages
+        if (errorMessage?.includes('Invalid code') || errorMessage?.includes('Неверный код')) {
+          setError('Неверный код. Проверьте код и попробуйте снова.');
+        } else if (errorMessage?.includes('expired') || errorMessage?.includes('истек')) {
+          setError('Код истек. Запросите новый код.');
+        } else if (errorMessage?.includes('already used') || errorMessage?.includes('использован')) {
+          setError('Код уже был использован. Запросите новый код.');
+        } else if (errorMessage?.includes('not found') || errorMessage?.includes('не найден')) {
+          setError('Код не найден. Сначала запросите отправку кода.');
+        } else {
+          setError(errorMessage || 'Ошибка проверки кода');
+        }
       }
     } finally {
       setIsLoading(false);
@@ -216,7 +229,8 @@ export default function RealtorLoginPage() {
       setAuth(response.access_token, response.user);
       router.push(getDashboardPath(response.user.role));
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Ошибка регистрации');
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message;
+      setError(errorMessage || 'Ошибка регистрации');
     } finally {
       setIsLoading(false);
     }
