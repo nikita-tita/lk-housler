@@ -32,7 +32,13 @@ class Settings(BaseSettings):
     COMPANY_ADDRESS: str = "183008, Мурманская область, г. Мурманск, ул. Олега Кошевого, д. 6 к. 1, помещ. 1"
     COMPANY_EMAIL: str = "hello@housler.ru"
     COMPANY_PHONE: str = "+7 (800) 555-35-35"
-    
+
+    # Bank Details (для реквизитов в договорах)
+    COMPANY_BANK_NAME: str = ""       # Название банка
+    COMPANY_BANK_BIK: str = ""        # БИК
+    COMPANY_BANK_ACCOUNT: str = ""    # Расчетный счет
+    COMPANY_BANK_CORR: str = ""       # Корр. счет
+
     # Database
     DATABASE_URL: str
     DATABASE_URL_SYNC: str

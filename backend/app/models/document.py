@@ -2,7 +2,7 @@
 
 from enum import Enum as PyEnum
 
-from sqlalchemy import Column, String, Enum, Integer, ForeignKey, Text, DateTime, Boolean
+from sqlalchemy import Column, String, Enum, Integer, ForeignKey, Text, DateTime, Boolean, Date
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 
@@ -16,6 +16,17 @@ class TemplateType(str, PyEnum):
     NEWBUILD_BOOKING = "newbuild_booking"
     ACT = "act"
     ADDITIONAL_AGREEMENT = "additional_agreement"
+    TERMINATION = "termination"
+    PD_CONSENT = "pd_consent"
+
+
+class TemplateStatus(str, PyEnum):
+    """Template workflow status"""
+    DRAFT = "draft"
+    PENDING_REVIEW = "pending_review"
+    APPROVED = "approved"
+    PUBLISHED = "published"
+    ARCHIVED = "archived"
 
 
 class DocumentStatus(str, PyEnum):
@@ -33,21 +44,43 @@ class SignatureMethod(str, PyEnum):
 
 
 class ContractTemplate(BaseModel):
-    """Contract template"""
-    
+    """Contract template with versioning and workflow"""
+
     __tablename__ = "contract_templates"
-    
+
+    # Identification
+    code = Column(String(50), nullable=False, index=True)  # secondary_buy, act, etc.
     type = Column(Enum(TemplateType), nullable=False)
-    version = Column(String(20), nullable=False)
-    
-    # JSON-схема плейсхолдеров
-    placeholders_schema = Column(JSONB, nullable=False)
-    # Например: {"client_name": "string", "commission": "decimal", ...}
-    
-    # Тело шаблона (HTML для рендеринга в PDF)
-    template_body = Column(Text, nullable=False)
-    
-    active = Column(Boolean, default=True, nullable=False)
+    version = Column(String(20), nullable=False)  # "1.0", "1.1", "2.0"
+    name = Column(String(255), nullable=False)  # Display name
+    description = Column(Text, nullable=True)  # Description for admins
+
+    # Content
+    template_body = Column(Text, nullable=False)  # HTML template
+    placeholders_schema = Column(JSONB, nullable=False)  # JSON Schema of placeholders
+
+    # Metadata
+    legal_basis = Column(Text, nullable=True)  # Legal references (ГК РФ, 63-ФЗ, etc.)
+    effective_from = Column(Date, nullable=True)  # Effective date
+
+    # Workflow status
+    status = Column(
+        Enum(TemplateStatus),
+        default=TemplateStatus.DRAFT,
+        nullable=False,
+        index=True
+    )
+    active = Column(Boolean, default=False, nullable=False)  # Is used for new deals
+    published_at = Column(DateTime, nullable=True)
+
+    # Audit
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approved_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
+    approved_by = relationship("User", foreign_keys=[approved_by_user_id])
 
 
 class Document(BaseModel):

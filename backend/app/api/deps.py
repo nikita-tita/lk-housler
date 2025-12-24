@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decode_token
 from app.db.session import get_db
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.deal import Deal
 from app.models.organization import OrganizationMember
 from app.services.user.service import UserService
@@ -137,4 +137,16 @@ async def require_org_admin(
             detail="Admin role required for this action"
         )
     return member
+
+
+async def require_admin(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Raise 403 if user is not platform admin"""
+    if current_user.role not in [UserRole.ADMIN, UserRole.OPERATOR]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin role required for this action"
+        )
+    return current_user
 
