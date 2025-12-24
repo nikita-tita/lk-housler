@@ -15,7 +15,10 @@ interface AuthState {
   updateUser: (user: User) => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+// Singleton promise для предотвращения race condition
+let checkAuthPromise: Promise<void> | null = null;
+
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: null,
   isAuthenticated: false,
@@ -37,6 +40,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (typeof window !== 'undefined') {
       localStorage.removeItem('housler_token');
     }
+    checkAuthPromise = null;
     set({
       token: null,
       user: null,
@@ -46,38 +50,56 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   checkAuth: async () => {
-    set({ isLoading: true });
-
-    try {
-      if (typeof window === 'undefined') {
-        set({ isLoading: false });
-        return;
-      }
-
-      const token = localStorage.getItem('housler_token');
-      if (!token) {
-        set({ isLoading: false, isAuthenticated: false });
-        return;
-      }
-
-      const user = await getCurrentUser();
-      set({
-        token,
-        user,
-        isAuthenticated: true,
-        isLoading: false,
-      });
-    } catch (error) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('housler_token');
-      }
-      set({
-        token: null,
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-      });
+    // Если уже авторизован и есть user - не перепроверяем
+    const state = get();
+    if (state.isAuthenticated && state.user && !state.isLoading) {
+      return;
     }
+
+    // Если проверка уже выполняется - возвращаем существующий промис
+    if (checkAuthPromise) {
+      return checkAuthPromise;
+    }
+
+    // Создаём новый промис для проверки
+    checkAuthPromise = (async () => {
+      set({ isLoading: true });
+
+      try {
+        if (typeof window === 'undefined') {
+          set({ isLoading: false });
+          return;
+        }
+
+        const token = localStorage.getItem('housler_token');
+        if (!token) {
+          set({ isLoading: false, isAuthenticated: false });
+          return;
+        }
+
+        const user = await getCurrentUser();
+        set({
+          token,
+          user,
+          isAuthenticated: true,
+          isLoading: false,
+        });
+      } catch (error) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('housler_token');
+        }
+        set({
+          token: null,
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
+      } finally {
+        checkAuthPromise = null;
+      }
+    })();
+
+    return checkAuthPromise;
   },
 
   updateUser: (user) => {
