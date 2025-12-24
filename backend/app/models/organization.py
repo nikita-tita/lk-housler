@@ -94,7 +94,7 @@ class OrganizationMember(BaseModel):
     __tablename__ = "organization_members"
     
     org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     role = Column(Enum(MemberRole), nullable=False)
     

@@ -1,82 +1,46 @@
-"""User schemas"""
+"""User schemas - matches agent.housler.ru database schema"""
 
 from datetime import datetime
 from typing import Optional
-from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
-
-from app.models.user import UserStatus, TaxStatus, VerificationLevel
 
 
 class UserBase(BaseModel):
     """Base user schema"""
-    phone: str = Field(..., description="Phone number")
-    email: Optional[EmailStr] = Field(None, description="Email address")
+    email: EmailStr = Field(..., description="Email address")
+    phone: Optional[str] = Field(None, description="Phone number")
+    name: Optional[str] = Field(None, description="Display name")
 
 
-class UserCreate(UserBase):
-    """User creation schema"""
-    pass
+class UserResponse(BaseModel):
+    """User response schema - matches agent.housler.ru users table"""
+    id: int
+    email: str
+    phone: Optional[str] = None
+    name: Optional[str] = None
+    role: str
+    is_active: bool = True
+    agency_id: Optional[int] = None
+    city: Optional[str] = None
+    is_self_employed: Optional[bool] = False
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
-
-class UserUpdate(BaseModel):
-    """User update schema"""
-    email: Optional[EmailStr] = None
-    status: Optional[UserStatus] = None
-
-
-class UserProfileBase(BaseModel):
-    """Base user profile schema"""
-    full_name: str = Field(..., description="Full name")
-    inn: Optional[str] = Field(None, description="INN")
-    tax_status: Optional[TaxStatus] = Field(None, description="Tax status")
-    address: Optional[str] = Field(None, description="Address")
-
-
-class UserProfileCreate(UserProfileBase):
-    """User profile creation schema"""
-    passport_series: Optional[str] = None
-    passport_number: Optional[str] = None
-    passport_issued_by: Optional[str] = None
-    passport_issued_at: Optional[datetime] = None
-
-
-class UserProfileUpdate(BaseModel):
-    """User profile update schema"""
-    full_name: Optional[str] = None
-    inn: Optional[str] = None
-    tax_status: Optional[TaxStatus] = None
-    address: Optional[str] = None
-    passport_series: Optional[str] = None
-    passport_number: Optional[str] = None
-    passport_issued_by: Optional[str] = None
-    passport_issued_at: Optional[datetime] = None
-
-
-class UserProfile(UserProfileBase):
-    """User profile response schema"""
-    id: UUID
-    user_id: UUID
-    passport_series: Optional[str] = None
-    passport_number: Optional[str] = None
-    verified_level: VerificationLevel
-    kyc_checked_at: Optional[datetime] = None
-    created_at: datetime
-    updated_at: datetime
-    
     class Config:
         from_attributes = True
 
 
-class User(UserBase):
-    """User response schema"""
-    id: UUID
-    status: UserStatus
-    profile: Optional[UserProfile] = None
-    created_at: datetime
-    updated_at: datetime
-    
+class UserPublic(BaseModel):
+    """Public user info (safe to expose)"""
+    id: int
+    name: Optional[str] = None
+    role: str
+    city: Optional[str] = None
+
     class Config:
         from_attributes = True
 
+
+# Aliases for backward compatibility
+User = UserResponse

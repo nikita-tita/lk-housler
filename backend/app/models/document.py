@@ -180,7 +180,7 @@ class AuditLog(BaseModel):
 
     action = Column(String(100), nullable=False)  # created, updated, signed, paid, etc.
 
-    actor_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    actor_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     meta = Column(JSONB, nullable=True)
 

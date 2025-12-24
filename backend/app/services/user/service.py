@@ -1,90 +1,36 @@
-"""User service implementation"""
+"""User service implementation - works with agent.housler.ru users table"""
 
 from typing import Optional
-from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from app.models.user import User, UserProfile, UserStatus
-from app.schemas.user import UserCreate, UserUpdate, UserProfileCreate, UserProfileUpdate
+from app.models.user import User
 
 
 class UserService:
-    """User service"""
-    
+    """User service - reads from shared agent.housler.ru database"""
+
     def __init__(self, db: AsyncSession):
         self.db = db
-    
-    async def get_by_id(self, user_id: UUID) -> Optional[User]:
-        """Get user by ID"""
-        stmt = (
-            select(User)
-            .where(User.id == user_id)
-            .options(selectinload(User.profile))
-        )
+
+    async def get_by_id(self, user_id: int) -> Optional[User]:
+        """Get user by ID (Integer, not UUID)"""
+        stmt = select(User).where(User.id == user_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
-    
+
     async def get_by_phone(self, phone: str) -> Optional[User]:
         """Get user by phone"""
-        stmt = (
-            select(User)
-            .where(User.phone == phone)
-            .options(selectinload(User.profile))
-        )
+        stmt = select(User).where(User.phone == phone)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
-    
-    async def create(self, user_in: UserCreate) -> User:
-        """Create new user"""
-        user = User(
-            phone=user_in.phone,
-            email=user_in.email,
-            status=UserStatus.PENDING,
-        )
-        self.db.add(user)
-        await self.db.flush()
-        await self.db.refresh(user)
-        return user
-    
-    async def update(self, user: User, user_in: UserUpdate) -> User:
-        """Update user"""
-        update_data = user_in.model_dump(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(user, field, value)
-        
-        await self.db.flush()
-        await self.db.refresh(user)
-        return user
-    
-    async def create_profile(
-        self, 
-        user: User, 
-        profile_in: UserProfileCreate
-    ) -> UserProfile:
-        """Create user profile"""
-        profile = UserProfile(
-            user_id=user.id,
-            **profile_in.model_dump()
-        )
-        self.db.add(profile)
-        await self.db.flush()
-        await self.db.refresh(profile)
-        return profile
-    
-    async def update_profile(
-        self,
-        profile: UserProfile,
-        profile_in: UserProfileUpdate
-    ) -> UserProfile:
-        """Update user profile"""
-        update_data = profile_in.model_dump(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(profile, field, value)
-        
-        await self.db.flush()
-        await self.db.refresh(profile)
-        return profile
 
+    async def get_by_email(self, email: str) -> Optional[User]:
+        """Get user by email"""
+        stmt = select(User).where(User.email == email)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    # Note: User creation/update is handled by agent.housler.ru
+    # lk.housler.ru only READS user data, does not modify it
