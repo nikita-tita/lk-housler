@@ -58,18 +58,18 @@ class Deal(BaseModel):
 
     type = Column(Enum(DealType), nullable=False)
 
-    # Создатель сделки
-    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    # Создатель сделки (INTEGER - совместимость с agent.housler.ru users table)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     # Агент (исполнитель сделки)
-    agent_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    agent_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     # Исполнитель (кто получает деньги: агент или агентство)
     executor_type = Column(Enum(ExecutorType), default=ExecutorType.USER, nullable=False)
-    executor_id = Column(UUID(as_uuid=True), nullable=True)  # user.id или organization.id
+    executor_id = Column(Integer, nullable=True)  # user.id или organization.id
 
     # Клиент (для MVP - просто текстовые поля)
-    client_id = Column(UUID(as_uuid=True), nullable=True)  # Может быть external party
+    client_id = Column(Integer, nullable=True)  # Может быть external party
     client_name = Column(String(255), nullable=True)
     client_phone = Column(String(20), nullable=True)
 
@@ -105,7 +105,7 @@ class DealParty(BaseModel):
     
     party_role = Column(Enum(PartyRole), nullable=False)
     party_type = Column(Enum(PartyType), nullable=False)
-    party_id = Column(UUID(as_uuid=True), nullable=True)  # user_id или org_id
+    party_id = Column(Integer, nullable=True)  # user_id или org_id
     
     # Snapshot данных участника на момент создания сделки
     display_name_snapshot = Column(String(255), nullable=False)
