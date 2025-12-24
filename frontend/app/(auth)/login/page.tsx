@@ -44,7 +44,11 @@ const roles = [
 
 export default function LoginPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading, user } = useAuthStore();
+  const { isAuthenticated, isLoading, user, checkAuth } = useAuthStore();
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   useEffect(() => {
     if (isAuthenticated && !isLoading && user) {

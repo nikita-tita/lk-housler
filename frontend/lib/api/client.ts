@@ -33,6 +33,19 @@ const addAuthToken = (config: any) => {
 // Request interceptor for authClient
 authClient.interceptors.request.use(addAuthToken, (error) => Promise.reject(error));
 
+// Response interceptor for authClient - обработка 401 ошибок
+authClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('housler_token');
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Request interceptor - добавляем JWT token
 apiClient.interceptors.request.use(
   (config) => {
