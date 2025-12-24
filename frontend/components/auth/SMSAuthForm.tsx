@@ -33,7 +33,7 @@ export function SMSAuthForm() {
       setPhone(fullPhone);
       setStep('code');
     } catch (err: any) {
-      setError(err.response?.data?.message || err.response?.data?.error || 'Ошибка отправки SMS');
+      setError(err.response?.data?.error || err.message || 'Ошибка отправки SMS');
     } finally {
       setLoading(false);
     }
@@ -52,7 +52,7 @@ export function SMSAuthForm() {
       if (err.message === 'NEW_USER_NEEDS_REGISTRATION') {
         setError('Номер не зарегистрирован. Пожалуйста, зарегистрируйтесь на agent.housler.ru');
       } else {
-        setError(err.response?.data?.message || err.message || 'Неверный код');
+        setError(err.response?.data?.error || err.message || 'Неверный код');
       }
     } finally {
       setLoading(false);

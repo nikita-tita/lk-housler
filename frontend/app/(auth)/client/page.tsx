@@ -56,7 +56,7 @@ export default function ClientLoginPage() {
       setCanResendAt(new Date(Date.now() + 60 * 1000));
       setStep('code');
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Ошибка отправки кода');
+      setError(err.response?.data?.error || err.message || 'Ошибка отправки кода');
     } finally {
       setIsLoading(false);
     }
@@ -70,7 +70,7 @@ export default function ClientLoginPage() {
       await sendEmail(email.toLowerCase().trim());
       setCanResendAt(new Date(Date.now() + 60 * 1000));
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Ошибка повторной отправки');
+      setError(err.response?.data?.error || err.message || 'Ошибка повторной отправки');
     } finally {
       setIsLoading(false);
     }
@@ -86,7 +86,7 @@ export default function ClientLoginPage() {
       setAuth(response.access_token, response.user);
       router.push(getDashboardPath(response.user.role));
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Неверный код');
+      setError(err.response?.data?.error || err.message || 'Неверный код');
     } finally {
       setIsLoading(false);
     }

@@ -65,27 +65,35 @@ interface VerifySmsData {
 }
 
 export async function verifySMS(phone: string, code: string): Promise<AuthResponse> {
-  const { data } = await authClient.post<ApiResponse<VerifySmsData>>('/auth/verify-sms', { phone, code });
+  try {
+    const { data } = await authClient.post<ApiResponse<VerifySmsData>>('/auth/verify-sms', { phone, code });
 
-  if (!data.success || !data.data) {
-    throw new Error(data.error || 'Ошибка авторизации');
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Ошибка авторизации');
+    }
+
+    const { isNewUser, user, token } = data.data;
+
+    // If new user, they need to register first
+    if (isNewUser) {
+      throw new Error('NEW_USER_NEEDS_REGISTRATION');
+    }
+
+    if (!token || !user) {
+      throw new Error('Ошибка авторизации');
+    }
+
+    return {
+      access_token: token,
+      user: user,
+    };
+  } catch (err: any) {
+    // Re-throw with proper error message from API response
+    if (err.response?.data?.error) {
+      throw new Error(err.response.data.error);
+    }
+    throw err;
   }
-
-  const { isNewUser, user, token } = data.data;
-
-  // If new user, they need to register first
-  if (isNewUser) {
-    throw new Error('NEW_USER_NEEDS_REGISTRATION');
-  }
-
-  if (!token || !user) {
-    throw new Error('Ошибка авторизации');
-  }
-
-  return {
-    access_token: token,
-    user: user,
-  };
 }
 
 // ==========================================
@@ -124,16 +132,23 @@ interface VerifyCodeData {
 }
 
 export async function verifyEmail(email: string, code: string): Promise<AuthResponse> {
-  const { data } = await authClient.post<ApiResponse<VerifyCodeData>>('/auth/verify-code', { email, code });
+  try {
+    const { data } = await authClient.post<ApiResponse<VerifyCodeData>>('/auth/verify-code', { email, code });
 
-  if (!data.success || !data.data) {
-    throw new Error(data.error || 'Ошибка авторизации');
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Ошибка авторизации');
+    }
+
+    return {
+      access_token: data.data.token,
+      user: data.data.user,
+    };
+  } catch (err: any) {
+    if (err.response?.data?.error) {
+      throw new Error(err.response.data.error);
+    }
+    throw err;
   }
-
-  return {
-    access_token: data.data.token,
-    user: data.data.user,
-  };
 }
 
 // ==========================================
@@ -146,16 +161,23 @@ interface LoginAgencyData {
 }
 
 export async function loginAgency(email: string, password: string): Promise<AuthResponse> {
-  const { data } = await authClient.post<ApiResponse<LoginAgencyData>>('/auth/login-agency', { email, password });
+  try {
+    const { data } = await authClient.post<ApiResponse<LoginAgencyData>>('/auth/login-agency', { email, password });
 
-  if (!data.success || !data.data) {
-    throw new Error(data.error || 'Неверные данные');
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Неверные данные');
+    }
+
+    return {
+      access_token: data.data.token,
+      user: data.data.user,
+    };
+  } catch (err: any) {
+    if (err.response?.data?.error) {
+      throw new Error(err.response.data.error);
+    }
+    throw err;
   }
-
-  return {
-    access_token: data.data.token,
-    user: data.data.user,
-  };
 }
 
 // ==========================================
@@ -212,27 +234,41 @@ interface RegisterData {
 }
 
 export async function registerAgent(data: AgentRegisterData): Promise<AuthResponse> {
-  const { data: response } = await authClient.post<ApiResponse<RegisterData>>('/auth/register-realtor', data);
+  try {
+    const { data: response } = await authClient.post<ApiResponse<RegisterData>>('/auth/register-realtor', data);
 
-  if (!response.success || !response.data) {
-    throw new Error(response.error || 'Ошибка регистрации');
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Ошибка регистрации');
+    }
+
+    return {
+      access_token: response.data.token,
+      user: response.data.user,
+    };
+  } catch (err: any) {
+    if (err.response?.data?.error) {
+      throw new Error(err.response.data.error);
+    }
+    throw err;
   }
-
-  return {
-    access_token: response.data.token,
-    user: response.data.user,
-  };
 }
 
 export async function registerAgency(data: AgencyRegisterData): Promise<AuthResponse> {
-  const { data: response } = await authClient.post<ApiResponse<RegisterData>>('/auth/register-agency', data);
+  try {
+    const { data: response } = await authClient.post<ApiResponse<RegisterData>>('/auth/register-agency', data);
 
-  if (!response.success || !response.data) {
-    throw new Error(response.error || 'Ошибка регистрации');
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Ошибка регистрации');
+    }
+
+    return {
+      access_token: response.data.token,
+      user: response.data.user,
+    };
+  } catch (err: any) {
+    if (err.response?.data?.error) {
+      throw new Error(err.response.data.error);
+    }
+    throw err;
   }
-
-  return {
-    access_token: response.data.token,
-    user: response.data.user,
-  };
 }

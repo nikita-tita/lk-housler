@@ -38,7 +38,7 @@ export default function AgencyLoginPage() {
       setAuth(response.access_token, response.user);
       router.push(getDashboardPath(response.user.role));
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Ошибка авторизации');
+      setError(err.response?.data?.error || err.message || 'Ошибка авторизации');
     } finally {
       setIsLoading(false);
     }
