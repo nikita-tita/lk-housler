@@ -2,7 +2,7 @@
 
 from enum import Enum as PyEnum
 
-from sqlalchemy import Column, String, Enum, ForeignKey, DateTime
+from sqlalchemy import Column, String, Enum, ForeignKey, DateTime, Integer
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 
@@ -60,7 +60,7 @@ class NPDTask(BaseModel):
     __tablename__ = "npd_tasks"
     
     deal_id = Column(UUID(as_uuid=True), ForeignKey("deals.id"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     due_at = Column(DateTime, nullable=False)
     

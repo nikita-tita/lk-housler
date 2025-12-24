@@ -57,13 +57,13 @@ class UserLimit(BaseModel):
     
     __tablename__ = "user_limits"
     
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True)
-    
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+
     max_deal_amount = Column(Integer, nullable=True)
     max_monthly_gmv = Column(Integer, nullable=True)
     payout_hold_days = Column(Integer, default=0, nullable=False)
-    
-    updated_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
 
 
 class Blacklist(BaseModel):
