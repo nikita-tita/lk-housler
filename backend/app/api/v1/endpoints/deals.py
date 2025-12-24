@@ -23,7 +23,7 @@ from app.services.deal.service import DealService
 router = APIRouter()
 
 
-@router.get("/", response_model=DealListSimple)
+@router.get("", response_model=DealListSimple)
 async def list_deals(
     status: Optional[DealStatus] = None,
     page: int = Query(1, ge=1),
@@ -64,7 +64,7 @@ async def list_deals(
     )
 
 
-@router.post("/", response_model=DealSimpleResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=DealSimpleResponse, status_code=status.HTTP_201_CREATED)
 async def create_deal(
     deal_in: DealCreateSimple,
     current_user: User = Depends(get_current_user),
