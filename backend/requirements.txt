@@ -35,6 +35,11 @@ python-dateutil==2.8.2
 phonenumbers==8.13.27
 pytz==2023.3
 
+# OCR (Passport Recognition)
+easyocr==1.7.1
+opencv-python-headless==4.9.0.80
+Pillow==10.2.0
+
 # PDF Generation (disabled - requires system libs)
 # reportlab==4.0.9
 # weasyprint==60.2

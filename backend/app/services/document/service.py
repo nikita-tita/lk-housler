@@ -59,36 +59,64 @@ class DocumentService:
     
     async def _prepare_contract_context(self, deal: Deal) -> dict:
         """Prepare context for contract rendering"""
-        # Получаем данные из deal
-        client_party = next((p for p in deal.parties if p.party_role == "client"), None)
-        executor_party = next((p for p in deal.parties if p.party_role == "executor"), None)
-        
-        # Формируем payment plan rows (HTML)
+        # Get parties if available (full deal flow)
+        parties = getattr(deal, 'parties', None) or []
+        client_party = next((p for p in parties if str(p.party_role) == "client"), None)
+        executor_party = next((p for p in parties if str(p.party_role) == "executor"), None)
+
+        # Get terms if available (full deal flow)
+        terms = getattr(deal, 'terms', None)
+
+        # Payment plan rows (only if terms exist)
         payment_plan_rows = ""
-        for idx, step in enumerate(deal.terms.payment_plan, 1):
-            amount = step.get("amount", 0)
-            trigger = step.get("trigger", "immediate")
-            payment_plan_rows += f"""
+        if terms and terms.payment_plan:
+            for idx, step in enumerate(terms.payment_plan, 1):
+                amount = step.get("amount", 0)
+                trigger = step.get("trigger", "immediate")
+                payment_plan_rows += f"""
+                <tr>
+                    <td>Платеж {idx}</td>
+                    <td>{amount} руб.</td>
+                    <td>{trigger}</td>
+                </tr>
+                """
+        else:
+            # Simplified deal - single payment
+            commission = deal.commission_agent or 0
+            payment_plan_rows = f"""
             <tr>
-                <td>Платеж {idx}</td>
-                <td>{amount} руб.</td>
-                <td>{trigger}</td>
+                <td>Платеж 1</td>
+                <td>{commission:,.0f} руб.</td>
+                <td>При подписании</td>
             </tr>
             """
-        
+
+        # Determine commission amount
+        if terms:
+            commission_total = f"{terms.commission_total:,.2f}"
+        else:
+            commission_total = f"{deal.commission_agent or 0:,.0f}"
+
+        # Determine deal type label
+        deal_type_label = {
+            "secondary_buy": "Покупка вторичного жилья",
+            "secondary_sell": "Продажа вторичного жилья",
+            "newbuild_booking": "Бронирование новостройки",
+        }.get(str(deal.type.value) if hasattr(deal.type, 'value') else str(deal.type), str(deal.type))
+
         context = {
             "contract_date": datetime.now().strftime("%d.%m.%Y"),
-            "deal_type": "Покупка вторичного жилья" if deal.type == "secondary_buy" else "Продажа",
+            "deal_type": deal_type_label,
             "property_address": deal.property_address or "не указан",
-            "client_name": client_party.display_name_snapshot if client_party else "Клиент",
-            "client_phone": client_party.phone_snapshot if client_party else "",
+            "client_name": client_party.display_name_snapshot if client_party else (deal.client_name or "Клиент"),
+            "client_phone": client_party.phone_snapshot if client_party else (deal.client_phone or ""),
             "executor_name": executor_party.display_name_snapshot if executor_party else "Исполнитель",
-            "executor_inn": "не указан",  # TODO: получить из Organization/User
-            "commission_total": f"{deal.terms.commission_total:,.2f}",
+            "executor_inn": "не указан",  # TODO: get from Organization/User
+            "commission_total": commission_total,
             "payment_plan_rows": payment_plan_rows,
-            "document_hash": "generating...",  # Будет обновлено после генерации
+            "document_hash": "generating...",  # Will be updated after generation
         }
-        
+
         return context
     
     async def get_by_id(self, document_id: UUID) -> Optional[Document]:

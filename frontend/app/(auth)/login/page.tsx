@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
+import { getDashboardPath } from '@/lib/utils/redirect';
 import { useEffect } from 'react';
 
 const roles = [
@@ -43,13 +44,13 @@ const roles = [
 
 export default function LoginPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated, isLoading, user } = useAuthStore();
 
   useEffect(() => {
-    if (isAuthenticated && !isLoading) {
-      router.push('/agent/dashboard');
+    if (isAuthenticated && !isLoading && user) {
+      router.push(getDashboardPath(user.role));
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, user, router]);
 
   if (isLoading) {
     return (

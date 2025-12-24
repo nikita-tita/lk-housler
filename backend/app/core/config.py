@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     
     # PII Encryption (152-ФЗ)
     ENCRYPTION_KEY: str  # 32 bytes hex key for AES-256
+    ENCRYPTION_SALT: str = "housler_salt_v1"  # Salt for key derivation (change in production!)
     
     # Company Info (ООО "Сектор ИТ")
     COMPANY_NAME: str = 'ООО "Сектор ИТ"'

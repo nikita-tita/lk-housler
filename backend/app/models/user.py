@@ -105,11 +105,15 @@ class UserProfile(BaseModel):
     # PII: Full name (encrypted)
     full_name = Column(String(255), nullable=True)  # Plain (deprecated)
     full_name_encrypted = Column(Text, nullable=True)  # Encrypted
-    
-    # Паспортные данные
-    passport_series = Column(String(10), nullable=True)
-    passport_number = Column(String(20), nullable=True)
-    passport_issued_by = Column(Text, nullable=True)
+
+    # PII: Паспортные данные (encrypted, 152-ФЗ)
+    passport_series = Column(String(10), nullable=True)  # Plain (deprecated)
+    passport_number = Column(String(20), nullable=True)  # Plain (deprecated)
+    passport_series_encrypted = Column(Text, nullable=True)  # Encrypted series
+    passport_number_encrypted = Column(Text, nullable=True)  # Encrypted number
+    passport_hash = Column(String(64), nullable=True, index=True)  # SHA-256 for duplicate check
+    passport_issued_by = Column(Text, nullable=True)  # Plain (deprecated)
+    passport_issued_by_encrypted = Column(Text, nullable=True)  # Encrypted
     passport_issued_at = Column(DateTime, nullable=True)
     
     # PII: Налоговые данные (encrypted + hash)

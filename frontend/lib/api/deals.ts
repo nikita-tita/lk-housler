@@ -73,3 +73,18 @@ export async function submitDeal(id: string): Promise<void> {
 export async function cancelDeal(id: string): Promise<void> {
   await apiClient.post(`/deals/${id}/cancel`);
 }
+
+// Send for signing response
+export interface SendForSigningResponse {
+  success: boolean;
+  document_id: string;
+  signing_token: string;
+  signing_url: string;
+  sms_sent: boolean;
+  message: string;
+}
+
+export async function sendForSigning(id: string): Promise<SendForSigningResponse> {
+  const { data } = await apiClient.post<SendForSigningResponse>(`/deals/${id}/send-for-signing`);
+  return data;
+}
