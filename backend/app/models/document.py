@@ -110,20 +110,47 @@ class Signature(BaseModel):
     party = relationship("DealParty", back_populates="signatures")
 
 
+class SigningToken(BaseModel):
+    """Token for public document signing (without auth)"""
+
+    __tablename__ = "signing_tokens"
+
+    # Short token for URL (e.g., Xk9mZ2)
+    token = Column(String(32), unique=True, nullable=False, index=True)
+
+    # Link to document and party
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False)
+    party_id = Column(UUID(as_uuid=True), ForeignKey("deal_parties.id"), nullable=False)
+
+    # Phone for OTP verification
+    phone = Column(String(20), nullable=False)
+
+    # Expiration (default 7 days)
+    expires_at = Column(DateTime, nullable=False)
+
+    # Status
+    used = Column(Boolean, default=False, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    document = relationship("Document")
+    party = relationship("DealParty")
+
+
 class AuditLog(BaseModel):
     """Audit log for all important actions"""
-    
+
     __tablename__ = "audit_logs"
-    
+
     entity_type = Column(String(50), nullable=False, index=True)  # deal, document, payment, etc.
     entity_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    
+
     action = Column(String(100), nullable=False)  # created, updated, signed, paid, etc.
-    
+
     actor_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    
+
     meta = Column(JSONB, nullable=True)
-    
+
     # IP и user agent для аудита
     ip_address = Column(String(45), nullable=True)
     user_agent = Column(Text, nullable=True)

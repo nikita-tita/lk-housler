@@ -17,10 +17,11 @@ class SMSProvider(ABC):
 
 class MockSMSProvider(SMSProvider):
     """Mock SMS provider for development"""
-    
+
     async def send(self, phone: str, message: str) -> bool:
-        """Mock send - just log"""
-        print(f"[SMS Mock] To: {phone}, Message: {message}")
+        """Mock send - log without exposing OTP code"""
+        # SECURITY: Never log OTP codes, only log the fact of sending
+        print(f"[SMS Mock] SMS sent to: {phone} (message content hidden)")
         return True
 
 
@@ -41,7 +42,8 @@ class SMSRuProvider(SMSProvider):
         
         # Test mode: accept test phone numbers 79999000000-79999999999
         if self.test_mode and phone.startswith('79999'):
-            print(f"[SMS.RU Test Mode] To: {phone}, Message: {message}")
+            # SECURITY: Never log OTP codes, only log the fact of sending
+            print(f"[SMS.RU Test Mode] SMS sent to: {phone} (message content hidden)")
             return True
         
         try:

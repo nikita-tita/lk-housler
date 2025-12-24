@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { getDeal, submitDeal, cancelDeal, Deal, DealStatus, DealType } from '@/lib/api/deals';
+import { getDeal, sendForSigning, cancelDeal, Deal, DealStatus, DealType } from '@/lib/api/deals';
 import { formatPrice, formatDate } from '@/lib/utils/format';
 
 const STATUS_LABELS: Record<DealStatus, string> = {
@@ -31,6 +31,7 @@ export default function DealDetailPage() {
   const [deal, setDeal] = useState<Deal | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [signingResult, setSigningResult] = useState<{ url: string; smsSent: boolean } | null>(null);
 
   useEffect(() => {
     if (params.id) {
@@ -49,16 +50,17 @@ export default function DealDetailPage() {
     }
   }
 
-  async function handleSubmit() {
+  async function handleSendForSigning() {
     if (!deal) return;
-    
+
     setActionLoading(true);
     try {
-      await submitDeal(deal.id);
+      const result = await sendForSigning(deal.id);
+      setSigningResult({ url: result.signing_url, smsSent: result.sms_sent });
       await loadDeal(deal.id);
-    } catch (error) {
-      console.error('Failed to submit deal:', error);
-      alert('Ошибка отправки сделки');
+    } catch (error: any) {
+      console.error('Failed to send for signing:', error);
+      alert(error.response?.data?.detail || 'Ошибка отправки на подпись');
     } finally {
       setActionLoading(false);
     }
@@ -167,9 +169,40 @@ export default function DealDetailPage() {
           </CardContent>
         </Card>
 
+        {signingResult && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <div className="text-green-600 mb-2">
+                  {signingResult.smsSent
+                    ? 'Ссылка для подписания отправлена клиенту по SMS'
+                    : 'Ссылка для подписания создана (SMS не отправлен)'}
+                </div>
+                <div className="text-sm text-gray-600 mb-4">
+                  Вы также можете скопировать и отправить ссылку вручную:
+                </div>
+                <div className="flex gap-2 items-center justify-center">
+                  <code className="bg-gray-100 px-4 py-2 rounded text-sm max-w-md truncate">
+                    {signingResult.url}
+                  </code>
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      navigator.clipboard.writeText(signingResult.url);
+                      alert('Ссылка скопирована');
+                    }}
+                  >
+                    Копировать
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {deal.status === 'draft' && (
           <div className="flex gap-4">
-            <Button onClick={handleSubmit} loading={actionLoading} fullWidth>
+            <Button onClick={handleSendForSigning} loading={actionLoading} fullWidth>
               Отправить на подпись
             </Button>
             <Button
@@ -181,6 +214,16 @@ export default function DealDetailPage() {
               Отменить сделку
             </Button>
           </div>
+        )}
+
+        {deal.status === 'awaiting_signatures' && !signingResult && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center text-gray-600">
+                Ожидаем подписания клиентом. Ссылка была отправлена по SMS.
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>

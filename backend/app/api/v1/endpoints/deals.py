@@ -183,7 +183,7 @@ async def cancel_deal(
     """Cancel deal"""
     deal_service = DealService(db)
     deal = await deal_service.get_by_id(deal_id)
-    
+
     if not deal:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -200,4 +200,114 @@ async def cancel_deal(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+
+
+@router.post("/{deal_id}/send-for-signing")
+async def send_deal_for_signing(
+    deal_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Generate document and send signing link to client via SMS"""
+    from uuid import UUID
+    from app.services.document.service import DocumentService
+    from app.services.notification.service import NotificationService
+    from app.api.v1.endpoints.sign import create_signing_token
+    from app.models.deal import DealParty, PartyRole
+    from sqlalchemy import select
+
+    deal_service = DealService(db)
+    deal = await deal_service.get_by_id(deal_id)
+
+    if not deal:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Deal not found"
+        )
+
+    require_deal_owner(deal, current_user)
+
+    if deal.status != DealStatus.DRAFT:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Can only send draft deals for signing"
+        )
+
+    # Generate document
+    doc_service = DocumentService(db)
+    try:
+        document = await doc_service.generate_contract(deal)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate document: {str(e)}"
+        )
+
+    # Find client party
+    stmt = select(DealParty).where(
+        DealParty.deal_id == deal.id,
+        DealParty.party_role == PartyRole.CLIENT
+    )
+    result = await db.execute(stmt)
+    client_party = result.scalar_one_or_none()
+
+    # If no client party exists, create one
+    if not client_party and deal.client_phone:
+        client_party = DealParty(
+            deal_id=deal.id,
+            party_role=PartyRole.CLIENT,
+            party_type="external",
+            display_name_snapshot=deal.client_name or "Клиент",
+            phone_snapshot=deal.client_phone,
+            signing_required=True,
+            signing_order=1,
+        )
+        db.add(client_party)
+        await db.flush()
+
+    if not client_party:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No client phone number for deal"
+        )
+
+    # Create signing token
+    phone = client_party.phone_snapshot or deal.client_phone
+    if not phone:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Client phone number is required"
+        )
+
+    signing_token = await create_signing_token(
+        db=db,
+        document_id=document.id,
+        party_id=client_party.id,
+        phone=phone
+    )
+
+    # Build signing URL
+    base_url = "https://lk.housler.ru"  # TODO: get from settings
+    signing_url = f"{base_url}/sign/{signing_token.token}"
+
+    # Send SMS
+    notification = NotificationService()
+    sms_sent = await notification.send_signing_link(
+        phone=phone,
+        signing_url=signing_url,
+        client_name=deal.client_name
+    )
+
+    # Update deal status
+    deal.status = DealStatus.AWAITING_SIGNATURES
+    await db.commit()
+
+    return {
+        "success": True,
+        "document_id": str(document.id),
+        "signing_token": signing_token.token,
+        "signing_url": signing_url,
+        "sms_sent": sms_sent,
+        "message": "Signing link sent to client" if sms_sent else "Signing link created (SMS failed)"
+    }
 

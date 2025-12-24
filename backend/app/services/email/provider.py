@@ -65,15 +65,16 @@ class MockEmailProvider(EmailProvider):
         html: bool = False,
         reply_to: Optional[str] = None
     ) -> bool:
-        """Mock send - just log"""
-        logger.info(f"[Email Mock] To: {to_email} | Subject: {subject}")
+        """Mock send - log without exposing sensitive content (OTP codes)"""
+        # SECURITY: Never log email body as it may contain OTP codes
+        logger.info(f"[Email Mock] Email sent to: {to_email} | Subject: {subject}")
         print(f"\n{'='*60}")
-        print(f"[Email Mock] To: {to_email}")
+        print(f"[Email Mock] Email sent to: {to_email}")
         print(f"[Email Mock] Subject: {subject}")
         if reply_to:
             print(f"[Email Mock] Reply-To: {reply_to}")
         print(f"[Email Mock] HTML: {html}")
-        print(f"[Email Mock] Body:\n{body[:500]}{'...' if len(body) > 500 else ''}")
+        print(f"[Email Mock] Body: (hidden for security)")
         print(f"{'='*60}\n")
         return True
 
