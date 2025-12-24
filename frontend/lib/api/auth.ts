@@ -19,7 +19,8 @@ interface AgentAuthResponse {
   token?: string;
   user?: User;
   isNewUser?: boolean;
-  message: string;
+  message?: string;
+  error?: string;
 }
 
 // Unified auth response for frontend
@@ -34,14 +35,14 @@ export interface AuthResponse {
 
 export async function sendSMS(phone: string): Promise<{ success: boolean; message: string }> {
   const { data } = await authClient.post<AgentAuthResponse>('/auth/request-sms', { phone });
-  return { success: data.success, message: data.message };
+  return { success: data.success, message: data.message || data.error || '' };
 }
 
 export async function verifySMS(phone: string, code: string): Promise<AuthResponse> {
   const { data } = await authClient.post<AgentAuthResponse>('/auth/verify-sms', { phone, code });
 
   if (!data.success || !data.token || !data.user) {
-    throw new Error(data.message || 'Authentication failed');
+    throw new Error(data.error || data.message || 'Ошибка авторизации');
   }
 
   // If new user, they need to register first
@@ -61,14 +62,14 @@ export async function verifySMS(phone: string, code: string): Promise<AuthRespon
 
 export async function sendEmail(email: string): Promise<{ success: boolean; message: string }> {
   const { data } = await authClient.post<AgentAuthResponse>('/auth/request-code', { email });
-  return { success: data.success, message: data.message };
+  return { success: data.success, message: data.message || data.error || '' };
 }
 
 export async function verifyEmail(email: string, code: string): Promise<AuthResponse> {
   const { data } = await authClient.post<AgentAuthResponse>('/auth/verify-code', { email, code });
 
   if (!data.success || !data.token || !data.user) {
-    throw new Error(data.message || 'Authentication failed');
+    throw new Error(data.error || data.message || 'Ошибка авторизации');
   }
 
   return {
@@ -85,7 +86,7 @@ export async function loginAgency(email: string, password: string): Promise<Auth
   const { data } = await authClient.post<AgentAuthResponse>('/auth/login-agency', { email, password });
 
   if (!data.success || !data.token || !data.user) {
-    throw new Error(data.message || 'Invalid credentials');
+    throw new Error(data.error || data.message || 'Неверные данные');
   }
 
   return {
@@ -140,7 +141,7 @@ export async function registerAgent(data: AgentRegisterData): Promise<AuthRespon
   const { data: response } = await authClient.post<AgentAuthResponse>('/auth/register-realtor', data);
 
   if (!response.success || !response.token || !response.user) {
-    throw new Error(response.message || 'Registration failed');
+    throw new Error(response.error || response.message || 'Ошибка регистрации');
   }
 
   return {
@@ -153,7 +154,7 @@ export async function registerAgency(data: AgencyRegisterData): Promise<AuthResp
   const { data: response } = await authClient.post<AgentAuthResponse>('/auth/register-agency', data);
 
   if (!response.success || !response.token || !response.user) {
-    throw new Error(response.message || 'Registration failed');
+    throw new Error(response.error || response.message || 'Ошибка регистрации');
   }
 
   return {
