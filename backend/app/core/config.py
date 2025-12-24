@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     COMPANY_OGRN: str = "1255100001496"
     COMPANY_ADDRESS: str = "183008, Мурманская область, г. Мурманск, ул. Олега Кошевого, д. 6 к. 1, помещ. 1"
     COMPANY_EMAIL: str = "hello@housler.ru"
+    COMPANY_PHONE: str = "+7 (800) 555-35-35"
     
     # Database
     DATABASE_URL: str
