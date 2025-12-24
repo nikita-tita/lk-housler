@@ -4,6 +4,8 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 import json
+import random
+import string
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +14,80 @@ from app.models.document import Document, ContractTemplate, DocumentStatus
 from app.models.deal import Deal
 from app.services.document.generator import DocumentGenerator, ContractTemplates
 from app.services.storage.service import StorageService
+from app.core.config import settings
+
+
+def number_to_words_ru(n: int) -> str:
+    """Convert number to Russian words (simplified version for common amounts)"""
+    if n == 0:
+        return "ноль рублей"
+
+    units = ["", "один", "два", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять"]
+    teens = ["десять", "одиннадцать", "двенадцать", "тринадцать", "четырнадцать",
+             "пятнадцать", "шестнадцать", "семнадцать", "восемнадцать", "девятнадцать"]
+    tens = ["", "", "двадцать", "тридцать", "сорок", "пятьдесят",
+            "шестьдесят", "семьдесят", "восемьдесят", "девяносто"]
+    hundreds = ["", "сто", "двести", "триста", "четыреста", "пятьсот",
+                "шестьсот", "семьсот", "восемьсот", "девятьсот"]
+
+    def get_form(n, forms):
+        """Get correct Russian word form based on number"""
+        n = abs(n) % 100
+        if 10 < n < 20:
+            return forms[2]
+        n = n % 10
+        if n == 1:
+            return forms[0]
+        if 2 <= n <= 4:
+            return forms[1]
+        return forms[2]
+
+    result = []
+
+    # Millions
+    millions = n // 1000000
+    if millions:
+        if millions == 1:
+            result.append("один миллион")
+        elif millions == 2:
+            result.append("два миллиона")
+        else:
+            result.append(f"{millions} " + get_form(millions, ["миллион", "миллиона", "миллионов"]))
+
+    # Thousands
+    thousands = (n % 1000000) // 1000
+    if thousands:
+        if thousands == 1:
+            result.append("одна тысяча")
+        elif thousands == 2:
+            result.append("две тысячи")
+        elif 3 <= thousands <= 4:
+            result.append(f"{units[thousands] if thousands < 10 else thousands} тысячи")
+        else:
+            result.append(f"{thousands} " + get_form(thousands, ["тысяча", "тысячи", "тысяч"]))
+
+    # Hundreds, tens, units
+    remainder = n % 1000
+    if remainder:
+        h = remainder // 100
+        if h:
+            result.append(hundreds[h])
+
+        t = (remainder % 100) // 10
+        u = remainder % 10
+
+        if t == 1:
+            result.append(teens[u])
+        else:
+            if t:
+                result.append(tens[t])
+            if u:
+                result.append(units[u])
+
+    words = " ".join(result)
+    rubles_form = get_form(n, ["рубль", "рубля", "рублей"])
+
+    return f"{words} {rubles_form}".strip()
 
 
 class DocumentService:
@@ -57,6 +133,13 @@ class DocumentService:
         
         return document
     
+    def _generate_contract_number(self, deal: Deal) -> str:
+        """Generate unique contract number"""
+        year = datetime.now().year
+        # Use last 6 chars of deal UUID for uniqueness
+        deal_suffix = str(deal.id).replace("-", "")[-6:].upper()
+        return f"ДУ-{year}-{deal_suffix}"
+
     async def _prepare_contract_context(self, deal: Deal) -> dict:
         """Prepare context for contract rendering"""
         # Get parties if available (full deal flow)
@@ -67,54 +150,93 @@ class DocumentService:
         # Get terms if available (full deal flow)
         terms = getattr(deal, 'terms', None)
 
-        # Payment plan rows (only if terms exist)
+        # Determine commission amount (as number)
+        if terms and terms.commission_total:
+            commission_amount = int(terms.commission_total)
+        else:
+            commission_amount = int(deal.commission_agent or 0)
+
+        # Payment plan rows
         payment_plan_rows = ""
         if terms and terms.payment_plan:
             for idx, step in enumerate(terms.payment_plan, 1):
                 amount = step.get("amount", 0)
-                trigger = step.get("trigger", "immediate")
+                trigger_label = {
+                    "immediate": "При подписании договора",
+                    "after_viewing": "После показа объекта",
+                    "after_deal": "После регистрации сделки",
+                    "after_keys": "После передачи ключей",
+                }.get(step.get("trigger", "immediate"), step.get("trigger", ""))
                 payment_plan_rows += f"""
                 <tr>
-                    <td>Платеж {idx}</td>
-                    <td>{amount} руб.</td>
-                    <td>{trigger}</td>
+                    <td>Этап {idx}</td>
+                    <td>{amount:,.0f}</td>
+                    <td>{trigger_label}</td>
                 </tr>
                 """
         else:
             # Simplified deal - single payment
-            commission = deal.commission_agent or 0
             payment_plan_rows = f"""
             <tr>
-                <td>Платеж 1</td>
-                <td>{commission:,.0f} руб.</td>
-                <td>При подписании</td>
+                <td>Этап 1</td>
+                <td>{commission_amount:,.0f}</td>
+                <td>При подписании договора</td>
             </tr>
             """
 
-        # Determine commission amount
-        if terms:
-            commission_total = f"{terms.commission_total:,.2f}"
-        else:
-            commission_total = f"{deal.commission_agent or 0:,.0f}"
+        # Commission formatted
+        commission_total = f"{commission_amount:,.0f}".replace(",", " ")
+        commission_words = number_to_words_ru(commission_amount)
 
-        # Determine deal type label
+        # Deal type label
         deal_type_label = {
             "secondary_buy": "Покупка вторичного жилья",
             "secondary_sell": "Продажа вторичного жилья",
             "newbuild_booking": "Бронирование новостройки",
         }.get(str(deal.type.value) if hasattr(deal.type, 'value') else str(deal.type), str(deal.type))
 
+        # Contract number
+        contract_number = self._generate_contract_number(deal)
+
+        # Client info
+        client_name = deal.client_name or "Клиент"
+        client_phone = deal.client_phone or ""
+        if client_party:
+            client_name = client_party.display_name_snapshot
+            client_phone = client_party.phone_snapshot or client_phone
+
+        # Executor info (from settings or party)
+        executor_name = getattr(settings, 'COMPANY_NAME', 'Исполнитель')
+        executor_inn = getattr(settings, 'COMPANY_INN', 'не указан') or 'не указан'
+        executor_phone = getattr(settings, 'COMPANY_PHONE', '') or ''
+        if executor_party:
+            executor_name = executor_party.display_name_snapshot
+
         context = {
+            # Contract info
+            "contract_number": contract_number,
             "contract_date": datetime.now().strftime("%d.%m.%Y"),
+
+            # Deal info
             "deal_type": deal_type_label,
             "property_address": deal.property_address or "не указан",
-            "client_name": client_party.display_name_snapshot if client_party else (deal.client_name or "Клиент"),
-            "client_phone": client_party.phone_snapshot if client_party else (deal.client_phone or ""),
-            "executor_name": executor_party.display_name_snapshot if executor_party else "Исполнитель",
-            "executor_inn": "не указан",  # TODO: get from Organization/User
+
+            # Client info
+            "client_name": client_name,
+            "client_phone": client_phone,
+
+            # Executor info
+            "executor_name": executor_name,
+            "executor_inn": executor_inn,
+            "executor_phone": executor_phone,
+
+            # Financial info
             "commission_total": commission_total,
+            "commission_words": commission_words,
             "payment_plan_rows": payment_plan_rows,
-            "document_hash": "generating...",  # Will be updated after generation
+
+            # Document hash (placeholder, will be replaced after PDF generation)
+            "document_hash": "generating...",
         }
 
         return context
