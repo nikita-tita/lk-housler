@@ -31,6 +31,22 @@ interface RealtorFormData {
   };
 }
 
+// Format date for display
+function formatCodeSentDate(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) {
+    return `сегодня в ${date.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}`;
+  } else if (diffDays === 1) {
+    return `вчера в ${date.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}`;
+  } else {
+    return date.toLocaleDateString('ru', { day: 'numeric', month: 'long' });
+  }
+}
+
 export default function RealtorLoginPage() {
   const router = useRouter();
   const { isAuthenticated, setAuth } = useAuthStore();
@@ -41,18 +57,23 @@ export default function RealtorLoginPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // State for resend cooldown
+  // State for existing code
+  const [existingCode, setExistingCode] = useState(false);
+  const [codeSentAt, setCodeSentAt] = useState<string | null>(null);
+
+  // State for resend cooldown (24 hours)
   const [canResendAt, setCanResendAt] = useState<Date | null>(null);
   const [resendCountdown, setResendCountdown] = useState(0);
 
-  // Countdown timer
+  // Countdown timer (shows hours if > 60 min)
   useEffect(() => {
     if (!canResendAt) return;
 
     const updateCountdown = () => {
       const now = new Date();
-      const diff = Math.max(0, Math.ceil((canResendAt.getTime() - now.getTime()) / 1000));
-      setResendCountdown(diff);
+      const diffMs = canResendAt.getTime() - now.getTime();
+      const diffSec = Math.max(0, Math.ceil(diffMs / 1000));
+      setResendCountdown(diffSec);
     };
 
     updateCountdown();
@@ -87,8 +108,20 @@ export default function RealtorLoginPage() {
     return phone.replace(/\D/g, '');
   };
 
-  // Request SMS code
-  const handleRequestCode = async (e: React.FormEvent) => {
+  // Format countdown for display
+  const formatCountdown = (seconds: number): string => {
+    if (seconds >= 3600) {
+      const hours = Math.ceil(seconds / 3600);
+      return `${hours} ч.`;
+    } else if (seconds >= 60) {
+      const minutes = Math.ceil(seconds / 60);
+      return `${minutes} мин.`;
+    }
+    return `${seconds} сек.`;
+  };
+
+  // Continue to code entry (without sending SMS)
+  const handleContinueToCode = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -98,30 +131,31 @@ export default function RealtorLoginPage() {
       return;
     }
 
-    setIsLoading(true);
-
-    try {
-      await sendSMS(cleanPhone);
-      setFormData(prev => ({ ...prev, phone: cleanPhone }));
-      setCanResendAt(new Date(Date.now() + 60 * 1000));
-      setStep('code');
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Ошибка отправки SMS');
-    } finally {
-      setIsLoading(false);
-    }
+    setFormData(prev => ({ ...prev, phone: cleanPhone }));
+    setExistingCode(true); // Assume code was sent before
+    setStep('code');
   };
 
-  // Resend SMS code
-  const handleResendCode = async () => {
+  // Request new SMS code (explicit user action)
+  const handleRequestNewCode = async () => {
     setError('');
     setIsLoading(true);
 
     try {
-      await sendSMS(formData.phone);
-      setCanResendAt(new Date(Date.now() + 60 * 1000));
+      const result = await sendSMS(formData.phone);
+      if (result.existingCode) {
+        // Code already exists
+        setExistingCode(true);
+        if (result.codeSentAt) setCodeSentAt(result.codeSentAt);
+        if (result.canResendAt) setCanResendAt(new Date(result.canResendAt));
+      } else {
+        // New code sent
+        setExistingCode(false);
+        if (result.codeSentAt) setCodeSentAt(result.codeSentAt);
+        if (result.canResendAt) setCanResendAt(new Date(result.canResendAt));
+      }
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Ошибка отправки SMS');
+      setError(err.response?.data?.error || err.message || 'Ошибка отправки SMS');
     } finally {
       setIsLoading(false);
     }
@@ -210,7 +244,7 @@ export default function RealtorLoginPage() {
       <RegistrationStepper steps={STEPS} currentStep={currentStepIndex} />
 
       {step === 'phone' && (
-        <form onSubmit={handleRequestCode} className="space-y-6">
+        <form onSubmit={handleContinueToCode} className="space-y-6">
           <div>
             <label className="block text-sm font-medium mb-2">Номер телефона</label>
             <PhoneInput
@@ -226,10 +260,10 @@ export default function RealtorLoginPage() {
 
           <button
             type="submit"
-            disabled={isLoading || getCleanPhone().length !== 11}
+            disabled={getCleanPhone().length !== 11}
             className="btn btn-primary btn-block"
           >
-            {isLoading ? 'Отправка...' : 'Получить код'}
+            Продолжить
           </button>
 
           <p className="text-xs text-[var(--color-text-light)] text-center">
@@ -248,7 +282,18 @@ export default function RealtorLoginPage() {
       {step === 'code' && (
         <form onSubmit={handleVerifyCode} className="space-y-6">
           <div className="text-center text-sm text-[var(--color-text-light)] mb-4">
-            Код отправлен на <strong>+{formData.phone}</strong>
+            {existingCode ? (
+              <>
+                Введите код, который вы получали ранее
+                {codeSentAt && (
+                  <> ({formatCodeSentDate(codeSentAt)})</>
+                )}
+                <br />
+                на <strong>+{formData.phone}</strong>
+              </>
+            ) : (
+              <>Код отправлен на <strong>+{formData.phone}</strong></>
+            )}
           </div>
 
           <div>
@@ -271,20 +316,20 @@ export default function RealtorLoginPage() {
             {isLoading ? 'Проверка...' : 'Продолжить'}
           </button>
 
-          {/* Resend code button */}
+          {/* Request new code button */}
           <div className="text-center">
             {resendCountdown > 0 ? (
               <span className="text-sm text-[var(--color-text-light)]">
-                Отправить повторно через {resendCountdown} сек.
+                Запросить новый код через {formatCountdown(resendCountdown)}
               </span>
             ) : (
               <button
                 type="button"
-                onClick={handleResendCode}
+                onClick={handleRequestNewCode}
                 disabled={isLoading}
                 className="text-sm text-[var(--color-accent)] hover:underline"
               >
-                Отправить новый код
+                {existingCode ? 'Забыли код? Запросить новый' : 'Отправить новый код'}
               </button>
             )}
           </div>
@@ -296,6 +341,8 @@ export default function RealtorLoginPage() {
               setCode('');
               setError('');
               setCanResendAt(null);
+              setExistingCode(false);
+              setCodeSentAt(null);
             }}
             className="w-full py-2 text-sm text-[var(--color-text-light)] hover:text-[var(--color-text)]"
           >

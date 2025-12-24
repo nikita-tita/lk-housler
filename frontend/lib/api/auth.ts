@@ -35,13 +35,25 @@ interface RequestSmsData {
   message: string;
   existingCode?: boolean;
   canResendAt?: string;
+  codeSentAt?: string;
 }
 
-export async function sendSMS(phone: string): Promise<{ success: boolean; message: string }> {
+export interface SendSmsResult {
+  success: boolean;
+  message: string;
+  existingCode?: boolean;
+  canResendAt?: string;
+  codeSentAt?: string;
+}
+
+export async function sendSMS(phone: string): Promise<SendSmsResult> {
   const { data } = await authClient.post<ApiResponse<RequestSmsData>>('/auth/request-sms', { phone });
   return {
     success: data.success,
-    message: data.data?.message || data.error || ''
+    message: data.data?.message || data.error || '',
+    existingCode: data.data?.existingCode,
+    canResendAt: data.data?.canResendAt,
+    codeSentAt: data.data?.codeSentAt
   };
 }
 
@@ -84,13 +96,25 @@ interface RequestCodeData {
   message: string;
   existingCode?: boolean;
   canResendAt?: string;
+  codeSentAt?: string;
 }
 
-export async function sendEmail(email: string): Promise<{ success: boolean; message: string }> {
+export interface SendEmailResult {
+  success: boolean;
+  message: string;
+  existingCode?: boolean;
+  canResendAt?: string;
+  codeSentAt?: string;
+}
+
+export async function sendEmail(email: string): Promise<SendEmailResult> {
   const { data } = await authClient.post<ApiResponse<RequestCodeData>>('/auth/request-code', { email });
   return {
     success: data.success,
-    message: data.data?.message || data.error || ''
+    message: data.data?.message || data.error || '',
+    existingCode: data.data?.existingCode,
+    canResendAt: data.data?.canResendAt,
+    codeSentAt: data.data?.codeSentAt
   };
 }
 
