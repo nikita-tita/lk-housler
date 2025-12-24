@@ -6,9 +6,8 @@ Frontend uses agent.housler.ru/api/auth/* directly.
 """
 
 from datetime import datetime
-from typing import Tuple, Optional
+from typing import Tuple
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import (
@@ -17,9 +16,6 @@ from app.core.security import (
     verify_password
 )
 from app.models.user import User
-from app.services.auth.otp import OTPService
-from app.services.sms.provider import get_sms_provider
-from app.services.email.provider import send_otp_email
 from app.services.user.service import UserService
 
 
@@ -29,92 +25,38 @@ class AuthServiceExtended:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.user_service = UserService(db)
-        self.otp_service = OTPService(db, get_sms_provider())
 
     # ==========================================
-    # 1. SMS Auth (Agents)
+    # 1. SMS Auth (Agents) - NOT IMPLEMENTED
     # ==========================================
 
     async def send_sms_otp(self, phone: str) -> None:
-        """Send SMS OTP for agent login"""
-        await self.otp_service.send_otp(phone, "login")
+        """Send SMS OTP for agent login - NOT IMPLEMENTED"""
+        raise ValueError("Authentication is handled by agent.housler.ru")
 
     async def verify_sms_otp(
         self,
         phone: str,
         code: str
     ) -> Tuple[User, str, str]:
-        """Verify SMS OTP and login agent (must exist in agent.housler.ru)"""
-        # Verify OTP
-        verified = await self.otp_service.verify_otp(phone, code, "login")
-
-        if not verified:
-            raise ValueError("Invalid OTP code")
-
-        # Get user (must exist - created via agent.housler.ru)
-        user = await self.user_service.get_by_phone(phone)
-
-        if not user:
-            raise ValueError("User not found. Please register via agent.housler.ru")
-
-        if not user.is_active:
-            raise ValueError("Account is not active")
-
-        # Update last login
-        user.last_login_at = datetime.utcnow()
-        await self.db.flush()
-
-        # Generate tokens
-        tokens = self._generate_tokens(user)
-        return user, tokens[0], tokens[1]
+        """Verify SMS OTP - NOT IMPLEMENTED"""
+        raise ValueError("Authentication is handled by agent.housler.ru")
 
     # ==========================================
-    # 2. Email Auth (Clients)
+    # 2. Email Auth (Clients) - NOT IMPLEMENTED
     # ==========================================
 
     async def send_email_otp(self, email: str) -> None:
-        """Send Email OTP for client login"""
-        from app.core.config import settings
-        from app.core.security import generate_otp
-        from datetime import timedelta
-
-        # Generate OTP
-        if settings.EMAIL_TEST_MODE or settings.EMAIL_PROVIDER == "mock":
-            code = "123456"
-        else:
-            code = generate_otp(settings.OTP_LENGTH)
-
-        # Send email
-        await send_otp_email(email, code)
+        """Send Email OTP for client login - NOT IMPLEMENTED"""
+        raise ValueError("Authentication is handled by agent.housler.ru")
 
     async def verify_email_otp(
         self,
         email: str,
         code: str
     ) -> Tuple[User, str, str]:
-        """Verify Email OTP and login client (must exist in agent.housler.ru)"""
-        # Verify OTP
-        verified = await self.otp_service.verify_otp(email, code, "email_login")
-
-        if not verified:
-            raise ValueError("Invalid OTP code")
-
-        # Get user (must exist - created via agent.housler.ru)
-        user = await self.user_service.get_by_email(email)
-
-        if not user:
-            raise ValueError("User not found. Please register via agent.housler.ru")
-
-        if not user.is_active:
-            raise ValueError("Account is not active")
-
-        # Update last login
-        user.last_login_at = datetime.utcnow()
-        await self.db.flush()
-
-        # Generate tokens
-        tokens = self._generate_tokens(user)
-        return user, tokens[0], tokens[1]
+        """Verify Email OTP - NOT IMPLEMENTED"""
+        raise ValueError("Authentication is handled by agent.housler.ru")
 
     # ==========================================
     # 3. Agency Auth (Email + Password)
