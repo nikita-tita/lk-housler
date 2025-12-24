@@ -4,6 +4,7 @@ Revision ID: 001_add_deal_mvp_fields
 Revises:
 Create Date: 2024-12-24 10:00:00.000000
 
+Note: Uses INTEGER for user foreign keys because agent.housler.ru users table uses INTEGER IDs
 """
 from typing import Sequence, Union
 
@@ -21,17 +22,18 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Create deals table
+    # Note: user IDs are INTEGER in agent.housler.ru database
     op.create_table(
         'deals',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
         sa.Column('type', sa.String(50), nullable=False),
-        sa.Column('created_by_user_id', UUID(as_uuid=True), sa.ForeignKey('users.id'), nullable=False),
-        sa.Column('agent_user_id', UUID(as_uuid=True), sa.ForeignKey('users.id'), nullable=False),
+        sa.Column('created_by_user_id', sa.Integer, sa.ForeignKey('users.id'), nullable=False),
+        sa.Column('agent_user_id', sa.Integer, sa.ForeignKey('users.id'), nullable=False),
         sa.Column('executor_type', sa.String(20), server_default='user', nullable=False),
-        sa.Column('executor_id', UUID(as_uuid=True), nullable=True),
-        sa.Column('client_id', UUID(as_uuid=True), nullable=True),
+        sa.Column('executor_id', sa.Integer, nullable=True),  # Can reference user or org
+        sa.Column('client_id', sa.Integer, nullable=True),
         sa.Column('client_name', sa.String(255), nullable=True),
         sa.Column('client_phone', sa.String(20), nullable=True),
         sa.Column('status', sa.String(50), server_default='draft', nullable=False, index=True),
@@ -51,7 +53,7 @@ def upgrade() -> None:
         sa.Column('deal_id', UUID(as_uuid=True), sa.ForeignKey('deals.id'), nullable=False),
         sa.Column('party_role', sa.String(50), nullable=False),
         sa.Column('party_type', sa.String(50), nullable=False),
-        sa.Column('party_id', UUID(as_uuid=True), nullable=True),
+        sa.Column('party_id', sa.Integer, nullable=True),  # User or org ID
         sa.Column('display_name_snapshot', sa.String(255), nullable=False),
         sa.Column('phone_snapshot', sa.String(20), nullable=True),
         sa.Column('passport_snapshot_hash', sa.String(64), nullable=True),

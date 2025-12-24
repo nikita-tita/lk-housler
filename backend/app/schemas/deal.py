@@ -75,7 +75,7 @@ class DealSimpleResponse(BaseModel):
     price: int
     commission_agent: int
     client_name: Optional[str] = None
-    agent_user_id: UUID
+    agent_user_id: int  # Integer - compatible with agent.housler.ru users table
     created_at: datetime
     updated_at: datetime
 
@@ -115,7 +115,7 @@ class DealPartyBase(BaseModel):
 
 class DealPartyCreate(DealPartyBase):
     """Deal party creation schema"""
-    party_id: Optional[UUID] = None  # For registered users
+    party_id: Optional[int] = None  # For registered users (Integer ID)
 
 
 class DealParty(DealPartyBase):
@@ -123,8 +123,8 @@ class DealParty(DealPartyBase):
     id: UUID
     deal_id: UUID
     party_type: str
-    party_id: Optional[UUID] = None
-    
+    party_id: Optional[int] = None
+
     class Config:
         from_attributes = True
 
@@ -138,7 +138,7 @@ class DealBase(BaseModel):
 class DealCreate(DealBase):
     """Deal creation schema"""
     executor_type: ExecutorType
-    executor_id: UUID
+    executor_id: int  # Integer - compatible with agent.housler.ru
     client_phone: str
     client_name: str
     terms: DealTermsBase
@@ -154,19 +154,19 @@ class DealUpdate(BaseModel):
 class Deal(DealBase):
     """Deal response schema"""
     id: UUID
-    created_by_user_id: UUID
-    agent_user_id: UUID
+    created_by_user_id: int  # Integer - compatible with agent.housler.ru users table
+    agent_user_id: int
     executor_type: ExecutorType
-    executor_id: UUID
-    client_id: Optional[UUID] = None
+    executor_id: int
+    client_id: Optional[int] = None
     status: DealStatus
     created_at: datetime
     updated_at: datetime
-    
+
     # Relationships (optional, can be loaded separately)
     parties: Optional[List[DealParty]] = None
     terms: Optional[DealTermsBase] = None
-    
+
     class Config:
         from_attributes = True
 

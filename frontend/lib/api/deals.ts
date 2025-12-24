@@ -32,7 +32,7 @@ export interface Deal {
   price: number;
   commission_agent: number;
   client_name?: string;
-  agent_user_id: string;
+  agent_user_id: number;  // Integer - compatible with agent.housler.ru users table
   created_at: string;
   updated_at: string;
 }
