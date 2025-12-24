@@ -14,17 +14,20 @@ from app.schemas.deal import (
     DealCreate,
     DealUpdate,
     DealList,
+    DealCreateSimple,
+    DealSimpleResponse,
+    DealListSimple,
 )
 from app.services.deal.service import DealService
 
 router = APIRouter()
 
 
-@router.get("/", response_model=DealList)
+@router.get("/", response_model=DealListSimple)
 async def list_deals(
     status: Optional[DealStatus] = None,
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -34,29 +37,58 @@ async def list_deals(
         current_user,
         status=status,
         page=page,
-        page_size=page_size
+        page_size=size
     )
-    
-    return DealList(
-        deals=deals,
+
+    # Convert to simplified response
+    items = []
+    for deal in deals:
+        items.append(DealSimpleResponse(
+            id=deal.id,
+            type=deal.type,
+            status=deal.status,
+            address=deal.property_address or "",
+            price=int(deal.price or 0),
+            commission_agent=int(deal.commission_agent or 0),
+            client_name=deal.client_name,
+            agent_user_id=deal.agent_user_id,
+            created_at=deal.created_at,
+            updated_at=deal.updated_at,
+        ))
+
+    return DealListSimple(
+        items=items,
         total=total,
         page=page,
-        page_size=page_size
+        size=size
     )
 
 
-@router.post("/", response_model=DealSchema, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=DealSimpleResponse, status_code=status.HTTP_201_CREATED)
 async def create_deal(
-    deal_in: DealCreate,
+    deal_in: DealCreateSimple,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Create new deal"""
+    """Create new deal (simplified)"""
     deal_service = DealService(db)
-    
+
     try:
-        deal = await deal_service.create(deal_in, current_user)
-        return deal
+        deal = await deal_service.create_simple(deal_in, current_user)
+        await db.commit()
+
+        return DealSimpleResponse(
+            id=deal.id,
+            type=deal.type,
+            status=deal.status,
+            address=deal.property_address or "",
+            price=int(deal.price or 0),
+            commission_agent=int(deal.commission_agent or 0),
+            client_name=deal.client_name,
+            agent_user_id=deal.agent_user_id,
+            created_at=deal.created_at,
+            updated_at=deal.updated_at,
+        )
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

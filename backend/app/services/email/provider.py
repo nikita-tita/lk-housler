@@ -17,6 +17,7 @@ from typing import Optional, List
 import smtplib
 import ssl
 import logging
+import httpx
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
@@ -235,12 +236,100 @@ class SMTPEmailProvider(EmailProvider):
         return success_count
 
 
+class SendGridEmailProvider(EmailProvider):
+    """
+    SendGrid HTTP API provider
+
+    Используется когда SMTP порты заблокированы хостингом.
+    Работает через HTTPS (порт 443).
+
+    Free tier: 100 emails/day
+    """
+
+    def __init__(
+        self,
+        api_key: str,
+        from_email: str,
+        from_name: str = "Housler",
+        timeout: int = 30
+    ):
+        self.api_key = api_key
+        self.from_email = from_email
+        self.from_name = from_name
+        self.timeout = timeout
+        self.api_url = "https://api.sendgrid.com/v3/mail/send"
+
+    async def send(
+        self,
+        to_email: str,
+        subject: str,
+        body: str,
+        html: bool = False,
+        reply_to: Optional[str] = None
+    ) -> bool:
+        """Send email via SendGrid API"""
+        try:
+            content_type = "text/html" if html else "text/plain"
+
+            payload = {
+                "personalizations": [{"to": [{"email": to_email}]}],
+                "from": {"email": self.from_email, "name": self.from_name},
+                "subject": subject,
+                "content": [{"type": content_type, "value": body}]
+            }
+
+            if reply_to:
+                payload["reply_to"] = {"email": reply_to}
+
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(
+                    self.api_url,
+                    json=payload,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json"
+                    }
+                )
+
+            if response.status_code in (200, 202):
+                logger.info(f"[SendGrid] Sent to {to_email}, Subject: {subject}")
+                return True
+            else:
+                logger.error(f"[SendGrid Error] {response.status_code}: {response.text}")
+                return False
+
+        except Exception as e:
+            logger.error(f"[SendGrid Error] {type(e).__name__}: {e}")
+            return False
+
+    async def send_bulk(
+        self,
+        to_emails: List[str],
+        subject: str,
+        body: str,
+        html: bool = False
+    ) -> int:
+        """Send bulk emails via SendGrid"""
+        success_count = 0
+        for email in to_emails:
+            if await self.send(email, subject, body, html):
+                success_count += 1
+        return success_count
+
+
 def get_email_provider() -> EmailProvider:
-    """Get email provider based on settings"""
+    """Get email provider based on settings
+
+    Supported providers:
+    - mock: Development (logs to console)
+    - smtp: Yandex 360 / any SMTP server (requires open ports 465/587)
+    - sendgrid: SendGrid HTTP API (works when SMTP ports are blocked)
+    """
     email_provider = getattr(settings, 'EMAIL_PROVIDER', 'mock')
 
     if email_provider == "mock":
         return MockEmailProvider()
+
     elif email_provider == "smtp":
         # Yandex 360: use SSL for port 465, TLS for port 587
         use_ssl = getattr(settings, 'SMTP_USE_SSL', settings.SMTP_PORT == 465)
@@ -256,6 +345,20 @@ def get_email_provider() -> EmailProvider:
             use_ssl=use_ssl,
             use_tls=use_tls
         )
+
+    elif email_provider == "sendgrid":
+        # SendGrid HTTP API - works when SMTP ports are blocked
+        api_key = getattr(settings, 'SENDGRID_API_KEY', '')
+        if not api_key:
+            logger.error("[Email] SendGrid API key not configured, using Mock")
+            return MockEmailProvider()
+
+        return SendGridEmailProvider(
+            api_key=api_key,
+            from_email=settings.SMTP_FROM_EMAIL,
+            from_name=settings.SMTP_FROM_NAME
+        )
+
     else:
         logger.warning(f"Unknown email provider: {email_provider}, using Mock")
         return MockEmailProvider()

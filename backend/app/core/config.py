@@ -67,8 +67,8 @@ class Settings(BaseSettings):
     SMS_TEST_MODE: bool = False  # Test mode: accept 79999xxxxxx phones
     SMS_SENDER_NAME: str = "Housler"
     
-    # Email (Yandex 360 SMTP)
-    EMAIL_PROVIDER: str = "mock"  # mock or smtp
+    # Email (Yandex 360 SMTP or SendGrid)
+    EMAIL_PROVIDER: str = "mock"  # mock, smtp, or sendgrid
     EMAIL_TEST_MODE: bool = False  # Test mode: use fixed code 123456
     SMTP_HOST: str = "smtp.yandex.ru"
     SMTP_PORT: int = 465  # 465 for SSL, 587 for STARTTLS
@@ -78,6 +78,9 @@ class Settings(BaseSettings):
     SMTP_FROM_NAME: str = "Housler"
     SMTP_USE_SSL: bool = True  # True for port 465
     SMTP_USE_TLS: bool = False  # True for port 587
+
+    # SendGrid (альтернатива если SMTP порты заблокированы)
+    SENDGRID_API_KEY: str = ""  # API key from sendgrid.com
     
     # KYC
     FNS_API_KEY: str = ""

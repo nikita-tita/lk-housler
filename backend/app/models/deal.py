@@ -53,34 +53,40 @@ class PartyType(str, PyEnum):
 
 class Deal(BaseModel):
     """Deal"""
-    
+
     __tablename__ = "deals"
-    
+
     type = Column(Enum(DealType), nullable=False)
-    
+
     # Создатель сделки
     created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    
+
     # Агент (исполнитель сделки)
     agent_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    
+
     # Исполнитель (кто получает деньги: агент или агентство)
-    executor_type = Column(Enum(ExecutorType), nullable=False)
-    executor_id = Column(UUID(as_uuid=True), nullable=False)  # user.id или organization.id
-    
-    # Клиент
+    executor_type = Column(Enum(ExecutorType), default=ExecutorType.USER, nullable=False)
+    executor_id = Column(UUID(as_uuid=True), nullable=True)  # user.id или organization.id
+
+    # Клиент (для MVP - просто текстовые поля)
     client_id = Column(UUID(as_uuid=True), nullable=True)  # Может быть external party
-    
+    client_name = Column(String(255), nullable=True)
+    client_phone = Column(String(20), nullable=True)
+
     status = Column(
         Enum(DealStatus),
         default=DealStatus.DRAFT,
         nullable=False,
         index=True
     )
-    
+
     # Адрес объекта недвижимости
     property_address = Column(Text, nullable=True)
-    
+
+    # Финансы (для MVP - простые поля)
+    price = Column(Numeric(15, 2), nullable=True)
+    commission_agent = Column(Numeric(15, 2), nullable=True)
+
     # Relationships
     creator = relationship("User", foreign_keys=[created_by_user_id], back_populates="deals_created")
     agent = relationship("User", foreign_keys=[agent_user_id], back_populates="deals_as_agent")

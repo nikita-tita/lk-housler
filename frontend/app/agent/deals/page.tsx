@@ -4,8 +4,28 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { getDeals, Deal } from '@/lib/api/deals';
+import { getDeals, Deal, DealStatus } from '@/lib/api/deals';
 import { formatPrice, formatDate } from '@/lib/utils/format';
+
+const STATUS_LABELS: Record<DealStatus, string> = {
+  draft: 'Черновик',
+  awaiting_signatures: 'Ожидает подписания',
+  signed: 'Подписано',
+  payment_pending: 'Ожидает оплаты',
+  in_progress: 'В работе',
+  closed: 'Закрыта',
+  dispute: 'Спор',
+  cancelled: 'Отменена',
+};
+
+const FILTER_OPTIONS = [
+  { value: 'all', label: 'Все' },
+  { value: 'draft', label: 'Черновики' },
+  { value: 'awaiting_signatures', label: 'На подписании' },
+  { value: 'signed', label: 'Подписаны' },
+  { value: 'in_progress', label: 'В работе' },
+  { value: 'closed', label: 'Закрыты' },
+];
 
 export default function DealsPage() {
   const [deals, setDeals] = useState<Deal[]>([]);
@@ -54,18 +74,18 @@ export default function DealsPage() {
 
       <Card className="mb-6">
         <CardContent className="p-4">
-          <div className="flex gap-2">
-            {['all', 'draft', 'awaiting_signatures', 'signed', 'paid', 'closed'].map((status) => (
+          <div className="flex gap-2 flex-wrap">
+            {FILTER_OPTIONS.map((option) => (
               <button
-                key={status}
-                onClick={() => setFilter(status)}
+                key={option.value}
+                onClick={() => setFilter(option.value)}
                 className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-                  filter === status
+                  filter === option.value
                     ? 'bg-black text-white'
                     : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
                 }`}
               >
-                {status === 'all' ? 'Все' : status}
+                {option.label}
               </button>
             ))}
           </div>
@@ -112,7 +132,7 @@ export default function DealsPage() {
                             : 'bg-gray-100 text-gray-900'
                         }`}
                       >
-                        {deal.status}
+                        {STATUS_LABELS[deal.status]}
                       </span>
                     </div>
                   </div>
