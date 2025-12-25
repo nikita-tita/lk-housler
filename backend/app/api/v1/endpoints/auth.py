@@ -4,6 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
+from app.core.rate_limit import (
+    rate_limit_otp_send,
+    rate_limit_otp_verify,
+    rate_limit_login
+)
+from app.core.audit import log_audit_event, AuditEvent
 from app.schemas.auth import (
     # Legacy
     OTPRequest, OTPVerify,
@@ -27,19 +33,35 @@ router = APIRouter()
 @router.post("/agent/sms/send", status_code=status.HTTP_200_OK)
 async def send_agent_sms(
     request: SMSOTPRequest,
-    db: AsyncSession = Depends(get_db)
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(rate_limit_otp_send)
 ):
     """Send SMS OTP for agent login"""
+    ip_address = http_request.client.host if http_request.client else None
     try:
         auth_service = AuthServiceExtended(db)
         await auth_service.send_sms_otp(request.phone)
+        log_audit_event(
+            AuditEvent.OTP_SENT,
+            ip_address=ip_address,
+            resource=f"phone:{request.phone[-4:]}",
+            details={"method": "sms"}
+        )
         return {"message": "SMS code sent"}
     except ValueError as e:
+        log_audit_event(
+            AuditEvent.OTP_FAILED,
+            ip_address=ip_address,
+            resource=f"phone:{request.phone[-4:]}",
+            details={"reason": str(e)},
+            success=False
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to send SMS"
@@ -49,21 +71,39 @@ async def send_agent_sms(
 @router.post("/agent/sms/verify", response_model=Token)
 async def verify_agent_sms(
     request: SMSOTPVerify,
-    db: AsyncSession = Depends(get_db)
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(rate_limit_otp_verify)
 ):
     """Verify SMS OTP and login/register agent"""
+    ip_address = http_request.client.host if http_request.client else None
+    user_agent = http_request.headers.get("user-agent")
     try:
         auth_service = AuthServiceExtended(db)
         user, access_token, refresh_token = await auth_service.verify_sms_otp(
             request.phone,
             request.code
         )
-        
+        log_audit_event(
+            AuditEvent.LOGIN_SUCCESS,
+            user_id=str(user.id),
+            ip_address=ip_address,
+            user_agent=user_agent,
+            details={"method": "sms", "role": user.role}
+        )
         return Token(
             access_token=access_token,
             refresh_token=refresh_token
         )
     except ValueError as e:
+        log_audit_event(
+            AuditEvent.LOGIN_FAILED,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            resource=f"phone:{request.phone[-4:]}",
+            details={"reason": str(e), "method": "sms"},
+            success=False
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
@@ -77,7 +117,8 @@ async def verify_agent_sms(
 @router.post("/client/email/send", status_code=status.HTTP_200_OK)
 async def send_client_email(
     request: EmailOTPRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(rate_limit_otp_send)
 ):
     """Send Email OTP for client login"""
     try:
@@ -99,7 +140,8 @@ async def send_client_email(
 @router.post("/client/email/verify", response_model=Token)
 async def verify_client_email(
     request: EmailOTPVerify,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(rate_limit_otp_verify)
 ):
     """Verify Email OTP and login/register client"""
     try:
@@ -127,21 +169,39 @@ async def verify_client_email(
 @router.post("/agency/login", response_model=Token)
 async def login_agency(
     request: AgencyLoginRequest,
-    db: AsyncSession = Depends(get_db)
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(rate_limit_login)
 ):
     """Agency admin login with email + password"""
+    ip_address = http_request.client.host if http_request.client else None
+    user_agent = http_request.headers.get("user-agent")
     try:
         auth_service = AuthServiceExtended(db)
         user, access_token, refresh_token = await auth_service.login_agency(
             request.email,
             request.password
         )
-        
+        log_audit_event(
+            AuditEvent.LOGIN_SUCCESS,
+            user_id=str(user.id),
+            ip_address=ip_address,
+            user_agent=user_agent,
+            details={"method": "password", "role": user.role}
+        )
         return Token(
             access_token=access_token,
             refresh_token=refresh_token
         )
     except ValueError as e:
+        log_audit_event(
+            AuditEvent.LOGIN_FAILED,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            resource=f"email:{request.email}",
+            details={"reason": "invalid_credentials", "method": "password"},
+            success=False
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e)
@@ -234,7 +294,8 @@ async def register_agency(
 @router.post("/otp/send", status_code=status.HTTP_200_OK)
 async def send_otp(
     request: OTPRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(rate_limit_otp_send)
 ):
     """Send OTP code (legacy)"""
     try:
@@ -256,7 +317,8 @@ async def send_otp(
 @router.post("/otp/verify", response_model=Token)
 async def verify_otp(
     request: OTPVerify,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(rate_limit_otp_verify)
 ):
     """Verify OTP and login/register (legacy)"""
     try:

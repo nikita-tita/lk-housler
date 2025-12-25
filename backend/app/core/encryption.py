@@ -18,13 +18,22 @@ class PIIEncryption:
     """PII (Personal Identifiable Information) encryption service"""
 
     def __init__(self):
-        # Derive Fernet key from ENCRYPTION_KEY
+        # Validate ENCRYPTION_KEY
         if not settings.ENCRYPTION_KEY:
             raise ValueError("ENCRYPTION_KEY not set in environment")
 
-        key_bytes = bytes.fromhex(settings.ENCRYPTION_KEY)
+        # Validate ENCRYPTION_SALT
+        if not settings.ENCRYPTION_SALT:
+            raise ValueError("ENCRYPTION_SALT not set in environment")
 
-        # Get salt from settings (configurable for production)
+        # SECURITY: Block insecure default salt in production
+        if settings.APP_ENV == "production" and "housler_salt" in settings.ENCRYPTION_SALT.lower():
+            raise ValueError(
+                "ENCRYPTION_SALT contains insecure default value. "
+                "Generate a unique salt: openssl rand -base64 32"
+            )
+
+        key_bytes = bytes.fromhex(settings.ENCRYPTION_KEY)
         salt = settings.ENCRYPTION_SALT.encode('utf-8')
 
         # Use PBKDF2HMAC to derive a Fernet-compatible key

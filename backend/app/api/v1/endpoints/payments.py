@@ -1,5 +1,6 @@
 """Payment endpoints"""
 
+import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,8 @@ from app.db.session import get_db
 from app.models.user import User
 from app.services.payment.service import PaymentService
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -59,9 +62,10 @@ async def create_payment_intent(
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"Failed to create payment intent: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create payment intent: {str(e)}"
+            detail="Failed to create payment. Please try again later."
         )
 
 
@@ -95,9 +99,10 @@ async def get_payment(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Failed to get payment {payment_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get payment: {str(e)}"
+            detail="Failed to retrieve payment information."
         )
 
 
@@ -150,6 +155,6 @@ async def payment_webhook(
         raise
     except Exception as e:
         # Log error but return 200 to avoid webhook retry storms
-        print(f"[Payment Webhook Error] {str(e)}")
-        return {"status": "error", "message": str(e)}
+        logger.error(f"Payment webhook error: {e}", exc_info=True)
+        return {"status": "error", "message": "Webhook processing failed"}
 

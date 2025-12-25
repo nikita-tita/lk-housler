@@ -1,5 +1,6 @@
 """Document endpoints"""
 
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,7 @@ from app.models.user import User
 from app.services.document.service import DocumentService
 from app.services.deal.service import DealService
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -44,9 +46,10 @@ async def generate_contract(
             "hash": document.document_hash
         }
     except Exception as e:
+        logger.error(f"Failed to generate document for deal {deal_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate document: {str(e)}"
+            detail="Failed to generate document. Please try again later."
         )
 
 

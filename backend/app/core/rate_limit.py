@@ -1,0 +1,101 @@
+"""Redis-based rate limiting for auth endpoints"""
+
+from typing import Optional
+from fastapi import Request, HTTPException, status
+import redis.asyncio as aioredis
+
+from app.core.config import settings
+
+
+class RateLimiter:
+    """Simple Redis-based rate limiter"""
+
+    def __init__(self):
+        self._redis: Optional[aioredis.Redis] = None
+
+    async def _get_redis(self) -> aioredis.Redis:
+        """Get Redis connection"""
+        if self._redis is None:
+            self._redis = aioredis.from_url(
+                settings.REDIS_URL,
+                encoding="utf-8",
+                decode_responses=True
+            )
+        return self._redis
+
+    def _make_key(self, identifier: str, endpoint: str) -> str:
+        """Create Redis key for rate limit tracking"""
+        return f"ratelimit:{endpoint}:{identifier}"
+
+    async def check_rate_limit(
+        self,
+        identifier: str,
+        endpoint: str,
+        max_requests: int,
+        window_seconds: int
+    ) -> bool:
+        """
+        Check if request is within rate limit.
+        Returns True if allowed, raises HTTPException if rate limited.
+        """
+        redis = await self._get_redis()
+        key = self._make_key(identifier, endpoint)
+
+        # Get current count
+        current = await redis.get(key)
+
+        if current is None:
+            # First request in window
+            await redis.setex(key, window_seconds, 1)
+            return True
+
+        count = int(current)
+        if count >= max_requests:
+            # Rate limit exceeded
+            ttl = await redis.ttl(key)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Too many requests. Try again in {ttl} seconds.",
+                headers={"Retry-After": str(ttl)}
+            )
+
+        # Increment counter
+        await redis.incr(key)
+        return True
+
+
+# Global instance
+rate_limiter = RateLimiter()
+
+
+async def rate_limit_otp_send(request: Request):
+    """Rate limit for OTP send endpoints: 3 requests per 60 seconds per IP"""
+    client_ip = request.client.host if request.client else "unknown"
+    await rate_limiter.check_rate_limit(
+        identifier=client_ip,
+        endpoint="otp_send",
+        max_requests=3,
+        window_seconds=60
+    )
+
+
+async def rate_limit_otp_verify(request: Request):
+    """Rate limit for OTP verify endpoints: 5 requests per 60 seconds per IP"""
+    client_ip = request.client.host if request.client else "unknown"
+    await rate_limiter.check_rate_limit(
+        identifier=client_ip,
+        endpoint="otp_verify",
+        max_requests=5,
+        window_seconds=60
+    )
+
+
+async def rate_limit_login(request: Request):
+    """Rate limit for password login: 5 requests per 60 seconds per IP"""
+    client_ip = request.client.host if request.client else "unknown"
+    await rate_limiter.check_rate_limit(
+        identifier=client_ip,
+        endpoint="login",
+        max_requests=5,
+        window_seconds=60
+    )
