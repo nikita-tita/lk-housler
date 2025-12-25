@@ -482,7 +482,7 @@ async def send_welcome_email(email: str, name: str) -> bool:
     <li>История платежей</li>
     <li>Связь с вашим агентом</li>
 </ul>
-<a href="https://lk.housler.ru" class="button">Войти в личный кабинет</a>
+<a href="{settings.FRONTEND_URL}" class="button">Войти в личный кабинет</a>
 """
     html = _get_html_wrapper(html_content)
 
@@ -507,7 +507,7 @@ async def send_deal_status_email(
 <p>Статус вашей сделки <strong>#{deal_id}</strong> изменился.</p>
 <p><strong>Новый статус:</strong> {status}</p>
 <p>{message}</p>
-<a href="https://lk.housler.ru/deals/{deal_id}" class="button">Подробнее о сделке</a>
+<a href="{settings.FRONTEND_URL}/deals/{deal_id}" class="button">Подробнее о сделке</a>
 """
     html = _get_html_wrapper(html_content)
 
@@ -530,7 +530,7 @@ async def send_document_ready_email(
 <p>Здравствуйте, {name}!</p>
 <p>Документ <strong>{document_name}</strong> готов к подписанию.</p>
 <p>Вы можете подписать его в личном кабинете с помощью СМС-кода.</p>
-<a href="https://lk.housler.ru/deals/{deal_id}/documents" class="button">Перейти к документам</a>
+<a href="{settings.FRONTEND_URL}/deals/{deal_id}/documents" class="button">Перейти к документам</a>
 """
     html = _get_html_wrapper(html_content)
 
@@ -554,7 +554,7 @@ async def send_payment_received_email(
 <p>Здравствуйте, {name}!</p>
 <p>Мы получили ваш платеж на сумму <strong>{formatted_amount} руб.</strong></p>
 <p>Средства будут зачислены в течение 1-2 рабочих дней.</p>
-<a href="https://lk.housler.ru/deals/{deal_id}/payments" class="button">История платежей</a>
+<a href="{settings.FRONTEND_URL}/deals/{deal_id}/payments" class="button">История платежей</a>
 """
     html = _get_html_wrapper(html_content)
 

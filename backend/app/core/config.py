@@ -2,27 +2,60 @@
 
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
 
 
 class Settings(BaseSettings):
     """Application settings"""
-    
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore"
     )
+
+    @model_validator(mode="after")
+    def validate_settings(self) -> "Settings":
+        """Validate settings based on environment"""
+        # Validate APP_ENV
+        valid_envs = {"development", "staging", "production"}
+        if self.APP_ENV not in valid_envs:
+            raise ValueError(f"APP_ENV must be one of {valid_envs}, got '{self.APP_ENV}'")
+
+        # Validate ENCRYPTION_KEY length (should be 64 hex chars = 32 bytes)
+        if len(self.ENCRYPTION_KEY) != 64:
+            raise ValueError("ENCRYPTION_KEY must be 64 hex characters (32 bytes)")
+
+        # Production-specific validations
+        if self.APP_ENV == "production":
+            if self.DEBUG:
+                raise ValueError("DEBUG must be False in production")
+            if self.SMS_TEST_MODE:
+                raise ValueError("SMS_TEST_MODE must be False in production")
+            if self.EMAIL_TEST_MODE:
+                raise ValueError("EMAIL_TEST_MODE must be False in production")
+            if "localhost" in self.FRONTEND_URL:
+                raise ValueError("FRONTEND_URL cannot contain 'localhost' in production")
+
+        return self
     
     # Application
     APP_NAME: str = "Housler LK"
     APP_VERSION: str = "0.1.0"
+    APP_ENV: str = "development"  # development | staging | production
     DEBUG: bool = False
     SECRET_KEY: str
-    
+
+    # Frontend URL (for links in emails, SMS, etc.)
+    FRONTEND_URL: str = "http://localhost:3000"
+
     # PII Encryption (152-ФЗ)
+    # IMPORTANT: Both keys are REQUIRED. Generate with:
+    #   ENCRYPTION_KEY: openssl rand -hex 32
+    #   ENCRYPTION_SALT: openssl rand -base64 32
     ENCRYPTION_KEY: str  # 32 bytes hex key for AES-256
-    ENCRYPTION_SALT: str = "housler_salt_v1"  # Salt for key derivation (change in production!)
+    ENCRYPTION_SALT: str  # Unique salt for PBKDF2 key derivation (NO DEFAULT!)
     
     # Company Info (ООО "Сектор ИТ")
     COMPANY_NAME: str = 'ООО "Сектор ИТ"'

@@ -83,9 +83,11 @@ export function SMSAuthForm() {
           {loading ? 'Отправка...' : 'Получить код'}
         </button>
 
-        <p className="footer" style={{ marginTop: '24px', padding: 0 }}>
-          Тест: номера 79999xxxxxx, коды 111111-666666
-        </p>
+        {process.env.NODE_ENV === 'development' && (
+          <p className="footer" style={{ marginTop: '24px', padding: 0 }}>
+            Тест: номера 79999xxxxxx, коды 111111-666666
+          </p>
+        )}
       </form>
     );
   }

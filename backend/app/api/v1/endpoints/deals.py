@@ -1,11 +1,13 @@
 """Deal endpoints"""
 
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, require_deal_access, require_deal_owner
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
 from app.models.deal import DealStatus
@@ -20,6 +22,7 @@ from app.schemas.deal import (
 )
 from app.services.deal.service import DealService
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -238,9 +241,10 @@ async def send_deal_for_signing(
     try:
         document = await doc_service.generate_contract(deal)
     except Exception as e:
+        logger.error(f"Failed to generate document for deal {deal_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate document: {str(e)}"
+            detail="Failed to generate document. Please try again later."
         )
 
     # Find client party
@@ -287,8 +291,7 @@ async def send_deal_for_signing(
     )
 
     # Build signing URL
-    base_url = "https://lk.housler.ru"  # TODO: get from settings
-    signing_url = f"{base_url}/sign/{signing_token.token}"
+    signing_url = f"{settings.FRONTEND_URL}/sign/{signing_token.token}"
 
     # Send SMS
     notification = NotificationService()
