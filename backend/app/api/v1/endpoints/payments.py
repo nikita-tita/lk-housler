@@ -51,8 +51,8 @@ async def create_payment_intent(
         
         return PaymentIntentResponse(
             payment_intent_id=str(intent.id),
-            payment_url=intent.payment_url or "",
-            amount=intent.amount,
+            payment_url=intent.sbp_link or "",
+            amount=int(intent.amount),
             status=intent.status.value
         )
         
@@ -78,24 +78,28 @@ async def get_payment(
     """Get payment status"""
     try:
         payment_service = PaymentService(db)
-        payment = await payment_service.get_payment(payment_id)
-        
+        payment = await payment_service.get_payment_with_details(payment_id)
+
         if not payment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Payment not found"
             )
-        
+
+        # Get deal_id through relationships: payment -> intent -> schedule -> deal_id
+        deal_id = None
+        if payment.intent and payment.intent.schedule:
+            deal_id = str(payment.intent.schedule.deal_id)
+
         return {
             "id": str(payment.id),
-            "deal_id": str(payment.deal_id),
-            "amount": payment.amount,
+            "deal_id": deal_id,
+            "amount": int(payment.gross_amount),
             "status": payment.status.value,
-            "payment_method": payment.payment_method.value if payment.payment_method else None,
             "created_at": payment.created_at.isoformat(),
-            "completed_at": payment.completed_at.isoformat() if payment.completed_at else None
+            "paid_at": payment.paid_at.isoformat() if payment.paid_at else None
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -112,14 +116,26 @@ async def payment_webhook(
     db: AsyncSession = Depends(get_db)
 ):
     """Payment provider webhook
-    
-    This endpoint receives payment status updates from the payment provider (СБП).
-    Should validate webhook signature in production.
+
+    This endpoint receives payment status updates from the payment provider.
+    Expects: provider_intent_id, provider_tx_id, status, metadata (optional)
     """
     try:
-        # Validate webhook secret
+        # Validate webhook secret (required in production)
         webhook_secret = request.headers.get("X-Webhook-Secret")
-        if settings.PAYMENT_WEBHOOK_SECRET:
+        if settings.APP_ENV == "production":
+            if not settings.PAYMENT_WEBHOOK_SECRET:
+                logger.error("PAYMENT_WEBHOOK_SECRET not configured in production")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Server configuration error"
+                )
+            if not webhook_secret or webhook_secret != settings.PAYMENT_WEBHOOK_SECRET:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid webhook secret"
+                )
+        elif settings.PAYMENT_WEBHOOK_SECRET:
             if not webhook_secret or webhook_secret != settings.PAYMENT_WEBHOOK_SECRET:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -130,29 +146,51 @@ async def payment_webhook(
         data = await request.json()
 
         payment_service = PaymentService(db)
-        
-        # Process webhook
-        payment_id = data.get("payment_id")
+
+        # Extract required fields
+        provider_intent_id = data.get("provider_intent_id")
+        provider_tx_id = data.get("provider_tx_id")
         status_value = data.get("status")
-        provider_payment_id = data.get("provider_payment_id")
-        
-        if not payment_id or not status_value:
+        metadata = data.get("metadata")
+
+        if not provider_intent_id or not status_value:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Missing payment_id or status"
+                detail="Missing provider_intent_id or status"
             )
-        
-        # Update payment status
-        await payment_service.update_payment_status(
-            payment_id=payment_id,
+
+        if status_value == "paid" and not provider_tx_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing provider_tx_id for paid status"
+            )
+
+        # Check for duplicate webhook (idempotency)
+        if provider_tx_id:
+            existing = await payment_service.get_payment_by_provider_tx_id(provider_tx_id)
+            if existing:
+                logger.info(f"Duplicate webhook for provider_tx_id={provider_tx_id}, skipping")
+                return {"status": "ok", "message": "Already processed"}
+
+        # Process webhook
+        await payment_service.process_payment_webhook(
+            provider_intent_id=provider_intent_id,
+            provider_tx_id=provider_tx_id or "",
             status=status_value,
-            provider_payment_id=provider_payment_id
+            metadata=metadata
         )
-        
+
+        await db.commit()
         return {"status": "ok"}
-        
+
     except HTTPException:
         raise
+    except ValueError as e:
+        logger.warning(f"Payment webhook validation error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
     except Exception as e:
         # Log error but return 200 to avoid webhook retry storms
         logger.error(f"Payment webhook error: {e}", exc_info=True)

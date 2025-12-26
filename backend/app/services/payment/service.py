@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 from decimal import Decimal
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.payment import (
@@ -187,11 +188,32 @@ class PaymentService:
         """Get payment by ID"""
         from uuid import UUID
         payment_uuid = UUID(payment_id)
-        
+
         stmt = select(Payment).where(Payment.id == payment_uuid)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
-    
+
+    async def get_payment_with_details(self, payment_id: str) -> Optional[Payment]:
+        """Get payment by ID with related intent and schedule loaded"""
+        from uuid import UUID
+        payment_uuid = UUID(payment_id)
+
+        stmt = (
+            select(Payment)
+            .where(Payment.id == payment_uuid)
+            .options(
+                selectinload(Payment.intent).selectinload(PaymentIntent.schedule)
+            )
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_payment_by_provider_tx_id(self, provider_tx_id: str) -> Optional[Payment]:
+        """Get payment by provider transaction ID (for deduplication)"""
+        stmt = select(Payment).where(Payment.provider_tx_id == provider_tx_id)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def update_payment_status(
         self,
         payment_id: str,

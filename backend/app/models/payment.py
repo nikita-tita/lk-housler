@@ -41,6 +41,7 @@ class PaymentStatus(str, PyEnum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     REFUNDED = "refunded"
+    CANCELED = "canceled"
 
 
 class PaymentSchedule(BaseModel):

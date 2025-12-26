@@ -99,7 +99,8 @@ class OTPService:
         redis = await self._get_redis()
         key = self._make_key(phone, purpose)
 
-        # Check existing session
+        # Check existing session and preserve attempt count
+        existing_attempts = 0
         existing_data = await redis.get(key)
         if existing_data:
             existing = OTPData.from_dict(json.loads(existing_data))
@@ -120,6 +121,9 @@ class OTPService:
                 )
                 raise ValueError("Too many attempts. Blocked for 10 minutes.")
 
+            # Preserve attempt count for resend (prevents rate limit bypass)
+            existing_attempts = existing.attempts
+
         # Generate new OTP
         normalized_phone = phone.lstrip('+')
         if settings.SMS_TEST_MODE and normalized_phone.startswith('79999'):
@@ -129,12 +133,13 @@ class OTPService:
 
         expires_at = datetime.utcnow() + timedelta(minutes=settings.OTP_EXPIRE_MINUTES)
 
-        # Create OTP data
+        # Create OTP data, preserving attempt count from previous session
         otp_data = OTPData(
             phone=phone,
             code=code,
             purpose=purpose,
             expires_at=expires_at,
+            attempts=existing_attempts,
             ip_address=ip_address,
             user_agent=user_agent,
         )
