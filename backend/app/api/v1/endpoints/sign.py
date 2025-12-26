@@ -10,8 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.session import get_db
-from app.models.document import Document, SigningToken, Signature, SignatureMethod, DocumentStatus
-from app.models.deal import Deal, DealParty
+from app.models.document import Document, SigningToken, Signature
 from app.schemas.signature import (
     SigningInfoResponse,
     RequestOTPRequest,
@@ -19,8 +18,7 @@ from app.schemas.signature import (
     VerifySignatureRequest,
     VerifySignatureResponse,
 )
-from app.services.auth.otp import OTPService
-from app.services.sms.provider import get_sms_provider
+from app.services.signature.service import SignatureService
 from app.core.config import settings
 
 router = APIRouter()
@@ -151,13 +149,13 @@ async def request_otp(
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
 
-    # Send OTP
-    otp_service = OTPService(db, get_sms_provider())
+    # Send OTP via SignatureService
+    signature_service = SignatureService(db)
 
     try:
-        await otp_service.send_otp(
+        await signature_service.request_otp_for_signing(
+            document_id=signing_token.document_id,
             phone=signing_token.phone,
-            purpose=f"sign_{signing_token.document_id}",
             ip_address=ip_address,
             user_agent=user_agent
         )
@@ -190,27 +188,6 @@ async def verify_and_sign(
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
 
-    # Verify OTP
-    otp_service = OTPService(db, get_sms_provider())
-
-    try:
-        verified = await otp_service.verify_otp(
-            phone=signing_token.phone,
-            code=body.code,
-            purpose=f"sign_{signing_token.document_id}"
-        )
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-
-    if not verified:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid OTP code"
-        )
-
     # Get document
     stmt = select(Document).where(Document.id == signing_token.document_id)
     result = await db.execute(stmt)
@@ -222,79 +199,39 @@ async def verify_and_sign(
             detail="Document not found"
         )
 
-    # Create signature with evidence
-    now = datetime.utcnow()
-    evidence = {
-        "ip": ip_address,
-        "user_agent": user_agent,
-        "timestamp": now.isoformat(),
-        "document_hash": document.document_hash,
-        "signing_token": token,
-        "consent_personal_data": True,
-        "consent_pep": True,
-        "otp_verified": True,
-        "phone": signing_token.phone,
-    }
+    # Verify OTP and create signature via SignatureService
+    signature_service = SignatureService(db)
 
-    signature = Signature(
-        document_id=document.id,
-        signer_party_id=signing_token.party_id,
-        method=SignatureMethod.PEP_SMS,
-        phone=signing_token.phone,
-        signed_at=now,
-        evidence=evidence
-    )
-    db.add(signature)
+    try:
+        signature = await signature_service.verify_and_sign(
+            document=document,
+            party_id=signing_token.party_id,
+            phone=signing_token.phone,
+            otp_code=body.code,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            signing_token=token,
+            consent_personal_data=True,
+            consent_pep=True
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
 
     # Mark token as used
     signing_token.used = True
-    signing_token.used_at = now
-
-    # Check if all signatures collected
-    await _check_document_fully_signed(db, document)
+    signing_token.used_at = signature.signed_at
 
     await db.commit()
 
     return VerifySignatureResponse(
         success=True,
         message="Document signed successfully",
-        signed_at=now,
+        signed_at=signature.signed_at,
         document_url=document.file_url
     )
-
-
-async def _check_document_fully_signed(db: AsyncSession, document: Document):
-    """Check if all required signatures are collected"""
-    # Get deal with parties
-    stmt = (
-        select(Deal)
-        .where(Deal.id == document.deal_id)
-        .options(selectinload(Deal.parties))
-    )
-    result = await db.execute(stmt)
-    deal = result.scalar_one_or_none()
-
-    if not deal:
-        return
-
-    # Count required signatures
-    required_parties = [p for p in deal.parties if p.signing_required]
-
-    # Get all signatures for this document
-    stmt_sigs = select(Signature).where(
-        Signature.document_id == document.id,
-        Signature.signed_at.isnot(None)
-    )
-    result_sigs = await db.execute(stmt_sigs)
-    signatures = list(result_sigs.scalars().all())
-
-    # Check if all required parties have signed
-    signed_party_ids = {s.signer_party_id for s in signatures}
-    required_party_ids = {p.id for p in required_parties}
-
-    if required_party_ids.issubset(signed_party_ids):
-        document.status = DocumentStatus.SIGNED
-        await db.flush()
 
 
 # Helper function to create signing token (called from deal creation)
