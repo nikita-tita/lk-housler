@@ -281,7 +281,12 @@ a {
 
 .sidebar-item.active {
   background: var(--gray-900);
-  color: var(--white);
+  color: var(--white) !important;
+}
+
+.sidebar-item.active:hover {
+  background: var(--gray-800);
+  color: var(--white) !important;
 }
 
 /* === AUTH LAYOUT === */
