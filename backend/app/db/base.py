@@ -2,13 +2,38 @@
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
-from sqlalchemy import Column, DateTime
+from sqlalchemy import Column, DateTime, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, declared_attr
 
 Base = declarative_base()
+
+
+class SoftDeleteMixin:
+    """Mixin for soft delete functionality.
+
+    Models using this mixin will have a deleted_at column.
+    When "deleted", records are marked with a timestamp instead of being removed.
+
+    Note: Queries must explicitly filter by deleted_at IS NULL to exclude deleted records.
+    """
+
+    deleted_at = Column(DateTime, nullable=True, default=None, index=True)
+
+    @property
+    def is_deleted(self) -> bool:
+        """Check if record is soft-deleted"""
+        return self.deleted_at is not None
+
+    def soft_delete(self) -> None:
+        """Mark record as deleted"""
+        self.deleted_at = datetime.utcnow()
+
+    def restore(self) -> None:
+        """Restore soft-deleted record"""
+        self.deleted_at = None
 
 
 class BaseModel(Base):

@@ -28,9 +28,14 @@ class AuditEvent(str, Enum):
 
     # Deal/Document actions
     DEAL_CREATED = "deal_created"
+    DEAL_CANCELLED = "deal_cancelled"
+    DOCUMENT_GENERATED = "document_generated"
+    DOCUMENT_GENERATION_FAILED = "document_generation_failed"
     DOCUMENT_SIGNED = "document_signed"
     PAYMENT_CREATED = "payment_created"
     PAYMENT_COMPLETED = "payment_completed"
+    PAYOUT_PROCESSED = "payout_processed"
+    PAYOUT_FAILED = "payout_failed"
 
 
 # Separate audit logger for security events

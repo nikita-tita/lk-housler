@@ -46,7 +46,8 @@ class SignatureService:
         user_agent: Optional[str] = None,
         signing_token: Optional[str] = None,
         consent_personal_data: bool = False,
-        consent_pep: bool = False
+        consent_pep: bool = False,
+        geolocation: Optional[dict] = None
     ) -> Signature:
         """Verify OTP and create signature"""
         # Check if already signed
@@ -76,6 +77,7 @@ class SignatureService:
             "consent_pep": consent_pep,
             "otp_verified": True,
             "phone": phone,
+            "geolocation": geolocation,  # Optional: {lat, lon, accuracy}
         }
 
         # Create or update signature record

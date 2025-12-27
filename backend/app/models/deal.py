@@ -6,7 +6,7 @@ from sqlalchemy import Column, String, Enum, Integer, ForeignKey, Text, Numeric,
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 
-from app.db.base import BaseModel
+from app.db.base import BaseModel, SoftDeleteMixin
 
 
 class DealType(str, PyEnum):
@@ -51,8 +51,8 @@ class PartyType(str, PyEnum):
     EXTERNAL = "external"  # Клиент без регистрации
 
 
-class Deal(BaseModel):
-    """Deal"""
+class Deal(BaseModel, SoftDeleteMixin):
+    """Deal with soft delete support"""
 
     __tablename__ = "deals"
 

@@ -15,6 +15,7 @@ from app.models.deal import Deal
 from app.services.document.generator import DocumentGenerator, ContractTemplates
 from app.services.storage.service import StorageService
 from app.core.config import settings
+from app.core.audit import log_audit_event, AuditEvent
 
 
 def number_to_words_ru(n: int) -> str:
@@ -135,41 +136,67 @@ class DocumentService:
 
     async def generate_contract(self, deal: Deal) -> Document:
         """Generate contract document for deal"""
-        # Validate required data before generation
-        self._validate_deal_for_contract(deal)
+        try:
+            # Validate required data before generation
+            self._validate_deal_for_contract(deal)
 
-        # Prepare context
-        context = await self._prepare_contract_context(deal)
-        
-        # Get template
-        template_html = ContractTemplates.get_template(deal.type.value)
-        
-        # Render HTML
-        rendered_html = self.generator.render_template(template_html, context)
-        
-        # Generate PDF
-        pdf_bytes = self.generator.html_to_pdf(rendered_html)
-        
-        # Compute hash
-        doc_hash = self.generator.compute_hash(pdf_bytes)
-        
-        # Upload to storage
-        file_key = f"contracts/{deal.id}/v1.pdf"
-        file_url = await self.storage.upload(file_key, pdf_bytes, "application/pdf")
-        
-        # Create document record
-        document = Document(
-            deal_id=deal.id,
-            version_no=1,
-            status=DocumentStatus.GENERATED,
-            file_url=file_url,
-            document_hash=doc_hash,
-        )
-        self.db.add(document)
-        await self.db.flush()
-        await self.db.refresh(document)
-        
-        return document
+            # Prepare context
+            context = await self._prepare_contract_context(deal)
+
+            # Get template
+            template_html = ContractTemplates.get_template(deal.type.value)
+
+            # Render HTML
+            rendered_html = self.generator.render_template(template_html, context)
+
+            # Generate PDF
+            pdf_bytes = self.generator.html_to_pdf(rendered_html)
+
+            # Compute hash
+            doc_hash = self.generator.compute_hash(pdf_bytes)
+
+            # Upload to storage
+            file_key = f"contracts/{deal.id}/v1.pdf"
+            file_url = await self.storage.upload(file_key, pdf_bytes, "application/pdf")
+
+            # Create document record
+            document = Document(
+                deal_id=deal.id,
+                version_no=1,
+                status=DocumentStatus.GENERATED,
+                file_url=file_url,
+                document_hash=doc_hash,
+            )
+            self.db.add(document)
+            await self.db.flush()
+            await self.db.refresh(document)
+
+            # Audit log success
+            log_audit_event(
+                event=AuditEvent.DOCUMENT_GENERATED,
+                resource=f"deal:{deal.id}",
+                details={
+                    "document_id": str(document.id),
+                    "document_hash": doc_hash,
+                    "deal_type": deal.type.value if deal.type else None,
+                },
+                success=True
+            )
+
+            return document
+
+        except Exception as e:
+            # Audit log failure
+            log_audit_event(
+                event=AuditEvent.DOCUMENT_GENERATION_FAILED,
+                resource=f"deal:{deal.id}",
+                details={
+                    "error": str(e),
+                    "deal_type": deal.type.value if deal.type else None,
+                },
+                success=False
+            )
+            raise
     
     def _generate_contract_number(self, deal: Deal) -> str:
         """Generate unique contract number"""

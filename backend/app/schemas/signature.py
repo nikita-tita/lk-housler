@@ -49,10 +49,19 @@ class RequestOTPResponse(BaseModel):
     expires_in_seconds: int = 300
 
 
+class Geolocation(BaseModel):
+    """Geolocation data for signature evidence"""
+
+    lat: float = Field(..., ge=-90, le=90, description="Latitude")
+    lon: float = Field(..., ge=-180, le=180, description="Longitude")
+    accuracy: Optional[float] = Field(None, ge=0, description="Accuracy in meters")
+
+
 class VerifySignatureRequest(BaseModel):
     """Verify OTP and sign document"""
 
     code: str = Field(..., min_length=6, max_length=6)
+    geolocation: Optional[Geolocation] = Field(None, description="Optional geolocation for enhanced evidence")
 
 
 class VerifySignatureResponse(BaseModel):

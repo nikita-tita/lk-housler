@@ -34,7 +34,7 @@ class DealService:
         self.db = db
         self.user_service = UserService(db)
     
-    async def get_by_id(self, deal_id: UUID) -> Optional[Deal]:
+    async def get_by_id(self, deal_id: UUID, include_deleted: bool = False) -> Optional[Deal]:
         """Get deal by ID"""
         stmt = (
             select(Deal)
@@ -44,6 +44,8 @@ class DealService:
                 selectinload(Deal.terms)
             )
         )
+        if not include_deleted:
+            stmt = stmt.where(Deal.deleted_at.is_(None))
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
     
@@ -52,7 +54,8 @@ class DealService:
         user: User,
         status: Optional[DealStatus] = None,
         page: int = 1,
-        page_size: int = 20
+        page_size: int = 20,
+        include_deleted: bool = False
     ) -> Tuple[List[Deal], int]:
         """List deals for user"""
         # Base query: deals where user is creator or agent
@@ -63,7 +66,11 @@ class DealService:
                 (Deal.agent_user_id == user.id)
             )
         )
-        
+
+        # Exclude soft-deleted by default
+        if not include_deleted:
+            stmt = stmt.where(Deal.deleted_at.is_(None))
+
         if status:
             stmt = stmt.where(Deal.status == status)
         
@@ -210,13 +217,41 @@ class DealService:
         return deal
     
     async def cancel(self, deal: Deal, reason: Optional[str] = None) -> Deal:
-        """Cancel deal"""
+        """Cancel deal (sets status to CANCELLED, does not delete)"""
         if deal.status in [DealStatus.CLOSED, DealStatus.CANCELLED]:
             raise ValueError("Deal already closed or cancelled")
 
         # TODO: Handle refunds if payments made
 
         deal.status = DealStatus.CANCELLED
+        await self.db.flush()
+        await self.db.refresh(deal)
+
+        return deal
+
+    async def delete(self, deal: Deal) -> Deal:
+        """Soft delete a deal (archive instead of physical delete)
+
+        Only draft deals can be deleted. Deals with payments must be cancelled instead.
+        """
+        if deal.status != DealStatus.DRAFT:
+            raise ValueError("Only draft deals can be deleted. Use cancel() for other deals.")
+
+        if deal.is_deleted:
+            raise ValueError("Deal is already deleted")
+
+        deal.soft_delete()
+        await self.db.flush()
+        await self.db.refresh(deal)
+
+        return deal
+
+    async def restore(self, deal: Deal) -> Deal:
+        """Restore a soft-deleted deal"""
+        if not deal.is_deleted:
+            raise ValueError("Deal is not deleted")
+
+        deal.restore()
         await self.db.flush()
         await self.db.refresh(deal)
 
