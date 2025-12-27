@@ -14,6 +14,19 @@ from app.schemas.deal import DealCreate, DealUpdate, DealCreateSimple
 from app.services.user.service import UserService
 
 
+# Valid state transitions for Deal
+VALID_TRANSITIONS: dict[DealStatus, set[DealStatus]] = {
+    DealStatus.DRAFT: {DealStatus.AWAITING_SIGNATURES, DealStatus.CANCELLED},
+    DealStatus.AWAITING_SIGNATURES: {DealStatus.SIGNED, DealStatus.CANCELLED},
+    DealStatus.SIGNED: {DealStatus.PAYMENT_PENDING, DealStatus.CANCELLED},
+    DealStatus.PAYMENT_PENDING: {DealStatus.IN_PROGRESS, DealStatus.CANCELLED, DealStatus.DISPUTE},
+    DealStatus.IN_PROGRESS: {DealStatus.CLOSED, DealStatus.DISPUTE, DealStatus.CANCELLED},
+    DealStatus.DISPUTE: {DealStatus.IN_PROGRESS, DealStatus.CANCELLED},
+    DealStatus.CLOSED: set(),  # Terminal state
+    DealStatus.CANCELLED: set(),  # Terminal state
+}
+
+
 class DealService:
     """Deal service"""
     
@@ -200,12 +213,49 @@ class DealService:
         """Cancel deal"""
         if deal.status in [DealStatus.CLOSED, DealStatus.CANCELLED]:
             raise ValueError("Deal already closed or cancelled")
-        
+
         # TODO: Handle refunds if payments made
-        
+
         deal.status = DealStatus.CANCELLED
         await self.db.flush()
         await self.db.refresh(deal)
-        
+
+        return deal
+
+    def _validate_transition(self, deal: Deal, new_status: DealStatus) -> None:
+        """Validate state transition is allowed"""
+        allowed = VALID_TRANSITIONS.get(deal.status, set())
+        if new_status not in allowed:
+            raise ValueError(
+                f"Invalid transition: {deal.status.value} -> {new_status.value}. "
+                f"Allowed: {[s.value for s in allowed]}"
+            )
+
+    async def transition_to_signed(self, deal: Deal) -> Deal:
+        """Transition deal to SIGNED after all signatures collected"""
+        self._validate_transition(deal, DealStatus.SIGNED)
+        deal.status = DealStatus.SIGNED
+        await self.db.flush()
+        return deal
+
+    async def transition_to_payment_pending(self, deal: Deal) -> Deal:
+        """Transition deal to PAYMENT_PENDING when payment is initiated"""
+        self._validate_transition(deal, DealStatus.PAYMENT_PENDING)
+        deal.status = DealStatus.PAYMENT_PENDING
+        await self.db.flush()
+        return deal
+
+    async def transition_to_in_progress(self, deal: Deal) -> Deal:
+        """Transition deal to IN_PROGRESS after successful payment"""
+        self._validate_transition(deal, DealStatus.IN_PROGRESS)
+        deal.status = DealStatus.IN_PROGRESS
+        await self.db.flush()
+        return deal
+
+    async def transition_to_closed(self, deal: Deal) -> Deal:
+        """Transition deal to CLOSED when completed"""
+        self._validate_transition(deal, DealStatus.CLOSED)
+        deal.status = DealStatus.CLOSED
+        await self.db.flush()
         return deal
 

@@ -78,29 +78,35 @@ class LedgerService:
     
     async def _create_splits(self, payment: Payment) -> List[Split]:
         """Create payment splits based on deal terms"""
-        # Get deal
+        # Get deal with terms
         from app.models.payment import PaymentSchedule, PaymentIntent
+        from sqlalchemy.orm import selectinload
+
         stmt = (
             select(Deal)
             .join(PaymentSchedule)
             .join(PaymentIntent)
             .join(Payment)
             .where(Payment.id == payment.id)
+            .options(selectinload(Deal.terms))
         )
         result = await self.db.execute(stmt)
         deal = result.scalar_one()
-        
-        # Get split rule
-        split_rule = deal.terms.split_rule
-        
+
+        # For simple deals without terms, default to 100% agent split
+        if not deal.terms or not deal.terms.split_rule:
+            split_rule = {"agent": 100}
+        else:
+            split_rule = deal.terms.split_rule
+
         # Net amount after fees
         net_amount = payment.gross_amount * Decimal(0.98)  # After 2% acquirer fee
-        
+
         splits = []
-        
+
         for role, percent in split_rule.items():
             split_amount = net_amount * Decimal(percent / 100)
-            
+
             # Determine recipient
             if role == "agent":
                 recipient_type = "user"
@@ -110,7 +116,7 @@ class LedgerService:
                 recipient_id = deal.executor_id
             else:
                 continue
-            
+
             split = Split(
                 payment_id=payment.id,
                 recipient_type=recipient_type,
@@ -120,11 +126,11 @@ class LedgerService:
             )
             splits.append(split)
             self.db.add(split)
-        
+
         await self.db.flush()
-        
+
         # TODO: Schedule payouts or hold based on antifraud
-        
+
         return splits
     
     async def get_payment_ledger(self, payment_id: UUID) -> List[LedgerEntry]:

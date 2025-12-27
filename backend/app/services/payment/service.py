@@ -35,7 +35,7 @@ class PaymentService:
         """Create payment intent for schedule step"""
         if schedule.status != PaymentScheduleStatus.AVAILABLE:
             raise ValueError("Payment schedule step is not available")
-        
+
         # Check if already has pending intent
         stmt = (
             select(PaymentIntent)
@@ -49,13 +49,13 @@ class PaymentService:
         )
         result = await self.db.execute(stmt)
         existing = result.scalar_one_or_none()
-        
+
         if existing:
             return existing
-        
+
         # Create intent via provider
         idempotency_key = f"{schedule.deal_id}_{schedule.step_no}_{uuid4().hex[:8]}"
-        
+
         provider_result = await self.provider.create_payment_intent(
             amount=schedule.amount,
             currency=schedule.currency,
@@ -64,7 +64,7 @@ class PaymentService:
                 "step_no": schedule.step_no,
             }
         )
-        
+
         # Create intent record
         intent = PaymentIntent(
             schedule_id=schedule.id,
@@ -76,11 +76,26 @@ class PaymentService:
             provider_intent_id=provider_result["provider_intent_id"],
             idempotency_key=idempotency_key,
         )
-        
+
         self.db.add(intent)
         await self.db.flush()
+
+        # Transition deal to PAYMENT_PENDING (first payment intent)
+        stmt_deal = select(Deal).where(Deal.id == schedule.deal_id)
+        result_deal = await self.db.execute(stmt_deal)
+        deal = result_deal.scalar_one_or_none()
+
+        if deal:
+            from app.services.deal.service import DealService
+            deal_service = DealService(self.db)
+            try:
+                await deal_service.transition_to_payment_pending(deal)
+            except ValueError:
+                # Deal may already be in PAYMENT_PENDING or later state
+                pass
+
         await self.db.refresh(intent)
-        
+
         return intent
     
     async def process_payment_webhook(
@@ -112,24 +127,42 @@ class PaymentService:
                 provider_meta=metadata,
             )
             self.db.add(payment)
-            
+
             # Update intent status
             intent.status = PaymentIntentStatus.PAID
-            
+
             # Update schedule status
-            stmt_schedule = select(PaymentSchedule).where(
-                PaymentSchedule.id == intent.schedule_id
+            stmt_schedule = (
+                select(PaymentSchedule)
+                .where(PaymentSchedule.id == intent.schedule_id)
             )
             result_schedule = await self.db.execute(stmt_schedule)
             schedule = result_schedule.scalar_one()
             schedule.status = PaymentScheduleStatus.PAID
-            
+
             await self.db.flush()
-            
-            # TODO: Create ledger entries
-            # TODO: Create splits
+
+            # Create ledger entries and splits
+            from app.services.ledger.service import LedgerService
+            ledger_service = LedgerService(self.db)
+            await ledger_service.process_payment(payment)
+
+            # Transition deal to IN_PROGRESS
+            stmt_deal = select(Deal).where(Deal.id == schedule.deal_id)
+            result_deal = await self.db.execute(stmt_deal)
+            deal = result_deal.scalar_one_or_none()
+
+            if deal:
+                from app.services.deal.service import DealService
+                deal_service = DealService(self.db)
+                try:
+                    await deal_service.transition_to_in_progress(deal)
+                except ValueError:
+                    # Deal may not be in correct state yet (needs signatures first)
+                    pass
+
             # TODO: Trigger next payment schedule step if needed
-            
+
             await self.db.refresh(payment)
             return payment
         
