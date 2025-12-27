@@ -269,7 +269,9 @@ export default function RealtorLoginPage() {
           </div>
 
           {error && (
-            <div className="text-[var(--color-text)] text-sm text-center">{error}</div>
+            <div className="p-3 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg text-[var(--color-text)] text-sm text-center">
+              {error}
+            </div>
           )}
 
           <button
@@ -319,7 +321,9 @@ export default function RealtorLoginPage() {
           </div>
 
           {error && (
-            <div className="text-[var(--color-text)] text-sm text-center">{error}</div>
+            <div className="p-3 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg text-[var(--color-text)] text-sm text-center">
+              {error}
+            </div>
           )}
 
           <button
@@ -488,7 +492,9 @@ export default function RealtorLoginPage() {
           </div>
 
           {error && (
-            <div className="text-[var(--color-text)] text-sm text-center">{error}</div>
+            <div className="p-3 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg text-[var(--color-text)] text-sm text-center">
+              {error}
+            </div>
           )}
 
           <button
