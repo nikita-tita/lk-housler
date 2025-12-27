@@ -116,7 +116,7 @@ class SignatureService:
         return result.scalar_one_or_none()
     
     async def check_document_fully_signed(self, document: Document) -> bool:
-        """Check if all required signatures are collected and update document status"""
+        """Check if all required signatures are collected and update document/deal status"""
         # Get deal with parties
         stmt_deal = (
             select(Deal)
@@ -146,6 +146,16 @@ class SignatureService:
 
         if required_party_ids.issubset(signed_party_ids):
             document.status = DocumentStatus.SIGNED
+
+            # Transition deal to SIGNED status
+            from app.services.deal.service import DealService
+            deal_service = DealService(self.db)
+            try:
+                await deal_service.transition_to_signed(deal)
+            except ValueError:
+                # Deal may already be in a later state (e.g., payment started)
+                pass
+
             await self.db.flush()
             return True
 
