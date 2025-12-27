@@ -202,6 +202,15 @@ async def verify_and_sign(
     # Verify OTP and create signature via SignatureService
     signature_service = SignatureService(db)
 
+    # Extract geolocation if provided
+    geolocation = None
+    if body.geolocation:
+        geolocation = {
+            "lat": body.geolocation.lat,
+            "lon": body.geolocation.lon,
+            "accuracy": body.geolocation.accuracy,
+        }
+
     try:
         signature = await signature_service.verify_and_sign(
             document=document,
@@ -212,7 +221,8 @@ async def verify_and_sign(
             user_agent=user_agent,
             signing_token=token,
             consent_personal_data=True,
-            consent_pep=True
+            consent_pep=True,
+            geolocation=geolocation
         )
     except ValueError as e:
         raise HTTPException(
