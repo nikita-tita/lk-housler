@@ -92,14 +92,52 @@ def number_to_words_ru(n: int) -> str:
 
 class DocumentService:
     """Document service"""
-    
+
     def __init__(self, db: AsyncSession, storage: Optional[StorageService] = None):
         self.db = db
         self.storage = storage or StorageService()
         self.generator = DocumentGenerator()
-    
+
+    def _validate_deal_for_contract(self, deal: Deal) -> None:
+        """Validate deal has required data for contract generation"""
+        errors = []
+
+        # Check client info
+        parties = getattr(deal, 'parties', None) or []
+        client_party = next((p for p in parties if str(p.party_role) == "client"), None)
+
+        client_name = None
+        if client_party:
+            client_name = client_party.display_name_snapshot
+        elif deal.client_name:
+            client_name = deal.client_name
+
+        if not client_name or client_name.strip() == "":
+            errors.append("Client name is required")
+
+        # Check property address
+        if not deal.property_address or deal.property_address.strip() == "":
+            errors.append("Property address is required")
+
+        # Check commission
+        terms = getattr(deal, 'terms', None)
+        commission = None
+        if terms and terms.commission_total:
+            commission = terms.commission_total
+        elif deal.commission_agent:
+            commission = deal.commission_agent
+
+        if not commission or commission <= 0:
+            errors.append("Commission amount is required")
+
+        if errors:
+            raise ValueError(f"Cannot generate contract: {'; '.join(errors)}")
+
     async def generate_contract(self, deal: Deal) -> Document:
         """Generate contract document for deal"""
+        # Validate required data before generation
+        self._validate_deal_for_contract(deal)
+
         # Prepare context
         context = await self._prepare_contract_context(deal)
         

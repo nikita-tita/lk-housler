@@ -16,9 +16,20 @@ from app.models.payment import (
     PaymentScheduleStatus,
     PaymentIntentStatus,
     PaymentStatus,
+    TriggerType,
 )
 from app.models.deal import Deal
 from app.services.payment.provider import get_payment_provider
+
+
+# Valid state transitions for PaymentSchedule
+SCHEDULE_TRANSITIONS: dict[PaymentScheduleStatus, set[PaymentScheduleStatus]] = {
+    PaymentScheduleStatus.LOCKED: {PaymentScheduleStatus.AVAILABLE, PaymentScheduleStatus.CANCELLED},
+    PaymentScheduleStatus.AVAILABLE: {PaymentScheduleStatus.PAID, PaymentScheduleStatus.CANCELLED},
+    PaymentScheduleStatus.PAID: {PaymentScheduleStatus.REFUNDED},
+    PaymentScheduleStatus.REFUNDED: set(),  # Terminal
+    PaymentScheduleStatus.CANCELLED: set(),  # Terminal
+}
 
 
 class PaymentService:
@@ -131,21 +142,22 @@ class PaymentService:
             # Update intent status
             intent.status = PaymentIntentStatus.PAID
 
-            # Update schedule status
+            # Update schedule status with validation
             stmt_schedule = (
                 select(PaymentSchedule)
                 .where(PaymentSchedule.id == intent.schedule_id)
             )
             result_schedule = await self.db.execute(stmt_schedule)
             schedule = result_schedule.scalar_one()
-            schedule.status = PaymentScheduleStatus.PAID
-
-            await self.db.flush()
+            await self._set_schedule_status(schedule, PaymentScheduleStatus.PAID)
 
             # Create ledger entries and splits
             from app.services.ledger.service import LedgerService
             ledger_service = LedgerService(self.db)
             await ledger_service.process_payment(payment)
+
+            # Activate next payment step if exists
+            await self.activate_next_step(schedule.deal_id, schedule.step_no)
 
             # Transition deal to IN_PROGRESS
             stmt_deal = select(Deal).where(Deal.id == schedule.deal_id)
@@ -160,8 +172,6 @@ class PaymentService:
                 except ValueError:
                     # Deal may not be in correct state yet (needs signatures first)
                     pass
-
-            # TODO: Trigger next payment schedule step if needed
 
             await self.db.refresh(payment)
             return payment
@@ -275,6 +285,53 @@ class PaymentService:
         
         if provider_payment_id:
             payment.provider_tx_id = provider_payment_id
-        
+
         await self.db.flush()
+
+    def _validate_schedule_transition(
+        self,
+        schedule: PaymentSchedule,
+        new_status: PaymentScheduleStatus
+    ) -> None:
+        """Validate payment schedule status transition"""
+        allowed = SCHEDULE_TRANSITIONS.get(schedule.status, set())
+        if new_status not in allowed:
+            raise ValueError(
+                f"Invalid schedule transition: {schedule.status.value} -> {new_status.value}"
+            )
+
+    async def _set_schedule_status(
+        self,
+        schedule: PaymentSchedule,
+        new_status: PaymentScheduleStatus
+    ) -> None:
+        """Set schedule status with validation"""
+        self._validate_schedule_transition(schedule, new_status)
+        schedule.status = new_status
+        await self.db.flush()
+
+    async def activate_next_step(self, deal_id: UUID, current_step_no: int) -> Optional[PaymentSchedule]:
+        """Activate next payment step after current step is paid"""
+        # Find next step
+        stmt = (
+            select(PaymentSchedule)
+            .where(
+                PaymentSchedule.deal_id == deal_id,
+                PaymentSchedule.step_no == current_step_no + 1,
+                PaymentSchedule.status == PaymentScheduleStatus.LOCKED
+            )
+        )
+        result = await self.db.execute(stmt)
+        next_step = result.scalar_one_or_none()
+
+        if not next_step:
+            return None
+
+        # Check trigger type - only activate immediate triggers automatically
+        if next_step.trigger_type == TriggerType.IMMEDIATE:
+            await self._set_schedule_status(next_step, PaymentScheduleStatus.AVAILABLE)
+            return next_step
+
+        # For MILESTONE/DATE triggers, leave as LOCKED until triggered externally
+        return None
 

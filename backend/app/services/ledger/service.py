@@ -7,6 +7,8 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from datetime import datetime, timedelta
+
 from app.models.ledger import (
     LedgerEntry,
     Split,
@@ -14,10 +16,15 @@ from app.models.ledger import (
     EntryType,
     Account,
     SplitStatus,
+    PayoutStatus,
 )
 from app.models.payment import Payment
 from app.models.deal import Deal
 from app.core.config import settings
+
+
+# Antifraud hold period in days (can be configured per risk level)
+DEFAULT_HOLD_DAYS = 3
 
 
 class LedgerService:
@@ -122,16 +129,34 @@ class LedgerService:
                 recipient_type=recipient_type,
                 recipient_id=recipient_id,
                 amount=split_amount,
-                status=SplitStatus.SCHEDULED,
+                status=SplitStatus.HELD,  # Start in HELD status
             )
             splits.append(split)
             self.db.add(split)
 
         await self.db.flush()
 
-        # TODO: Schedule payouts or hold based on antifraud
+        # Schedule payouts with antifraud hold period
+        await self._schedule_payouts(splits)
 
         return splits
+
+    async def _schedule_payouts(self, splits: List[Split]) -> List[Payout]:
+        """Schedule payouts for splits with antifraud hold"""
+        payouts = []
+        hold_until = datetime.utcnow() + timedelta(days=DEFAULT_HOLD_DAYS)
+
+        for split in splits:
+            payout = Payout(
+                split_id=split.id,
+                status=PayoutStatus.INITIATED,
+                hold_until=hold_until,
+            )
+            payouts.append(payout)
+            self.db.add(payout)
+
+        await self.db.flush()
+        return payouts
     
     async def get_payment_ledger(self, payment_id: UUID) -> List[LedgerEntry]:
         """Get ledger entries for payment"""
