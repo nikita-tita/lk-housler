@@ -1,0 +1,11 @@
+# ===========================================
+# Cron configuration for lk.housler.ru backups
+# ===========================================
+# Install: sudo cp /var/www/lk.housler.ru/scripts/cron/backup-cron /etc/cron.d/lk-backup
+# Or:      sudo crontab -l | cat - /var/www/lk.housler.ru/scripts/cron/backup-cron | sudo crontab -
+
+# PostgreSQL + MinIO backup: every day at 3:00 AM
+0 3 * * * root /var/www/lk.housler.ru/scripts/backup.sh --auto --production >> /var/www/lk.housler.ru/logs/backup.log 2>&1
+
+# Weekly full backup with verification: Sunday at 4:00 AM
+0 4 * * 0 root /var/www/lk.housler.ru/scripts/backup.sh --auto --production && /var/www/lk.housler.ru/scripts/verify-backup.sh >> /var/www/lk.housler.ru/logs/backup.log 2>&1
