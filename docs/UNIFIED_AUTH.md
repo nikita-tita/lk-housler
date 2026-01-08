@@ -167,7 +167,7 @@ lkhouslerru_lk-network
 ### Проверить подключение lk-backend к agent-postgres:
 
 ```bash
-ssh -i ~/.ssh/id_housler root@91.229.8.221
+ssh -i ~/.ssh/id_housler root@95.163.227.26
 docker exec lk-backend python -c "
 from app.db.session import engine
 from sqlalchemy import text
@@ -227,3 +227,7 @@ curl -X POST https://agent.housler.ru/api/auth/verify-sms \
 При проблемах с авторизацией проверять ОБА проекта:
 - `agent.housler.ru` - основной auth provider
 - `lk.housler.ru` - использует auth через API
+
+## Связанные документы
+
+- [housler_pervichka/docs/SHARED/AUTH_API.md](../../housler_pervichka/docs/SHARED/AUTH_API.md) — Полный API reference авторизации
