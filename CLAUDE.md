@@ -171,9 +171,12 @@ docker-compose -f docker-compose.prod.yml up -d --build
 
 ## Сервер
 
-- **IP:** 91.229.8.221
-- **SSH:** `ssh -i ~/.ssh/id_housler root@91.229.8.221`
+- **IP:** 95.163.227.26
+- **SSH:** `ssh -i ~/.ssh/id_housler root@95.163.227.26`
+- **Пароль:** `NsUurH93jSHNW8QS`
 - **Порт для lk.housler.ru:** 3090 (внутренний Nginx)
+
+> **Главный документ:** См. [housler_pervichka/DEPLOY.md](../housler_pervichka/DEPLOY.md)
 
 ## Переменные окружения
 
