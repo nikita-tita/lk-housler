@@ -144,4 +144,4 @@ networks:
   # External network to access agent-postgres
   agent-network:
     external: true
-    name: agenthouslerru_agent-network
+    name: housler_agent_network  # Must match agent.housler.ru network name
