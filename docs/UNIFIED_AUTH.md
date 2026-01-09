@@ -118,8 +118,8 @@ lk.housler.ru/login
 ```env
 DB_HOST=postgres
 DB_NAME=housler_agent
-JWT_SECRET=***REMOVED***
-ENCRYPTION_KEY=***REMOVED***
+JWT_SECRET=<из 1Password: "Housler JWT Secret">
+ENCRYPTION_KEY=<из 1Password: "Housler Encryption Key">
 ```
 
 ### lk.housler.ru (.env)
@@ -129,12 +129,14 @@ ENCRYPTION_KEY=***REMOVED***
 DB_HOST=agent-postgres
 DB_NAME=housler_agent
 DB_USER=housler
-DB_PASSWORD=***REMOVED***
+DB_PASSWORD=<из 1Password: "Housler PostgreSQL">
 
 # ВАЖНО: Должны совпадать с agent.housler.ru
-JWT_SECRET=***REMOVED***
-ENCRYPTION_KEY=***REMOVED***
+JWT_SECRET=<из 1Password: "Housler JWT Secret">
+ENCRYPTION_KEY=<из 1Password: "Housler Encryption Key">
 ```
+
+> **Security:** Никогда не коммитьте реальные секреты. Все credentials хранятся в 1Password.
 
 ### lk.housler.ru (frontend)
 
