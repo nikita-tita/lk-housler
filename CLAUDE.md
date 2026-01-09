@@ -81,6 +81,12 @@ lk.housler.ru (frontend) ──> agent.housler.ru/api/auth/* ──> housler_age
 | AI Calendar | `/Users/fatbookpro/Desktop/AI-Calendar-Project/ai-calendar-assistant` | Python + FastAPI |
 | Cian Analyzer | `/Users/fatbookpro/Desktop/cian` | Node.js |
 
+## SHARED Documentation
+
+Общая документация экосистемы: `/Users/fatbookpro/Desktop/housler_pervichka/docs/SHARED/`
+- `CRYPTO_LIBRARY.md` - housler-crypto (шифрование PII)
+- `DESIGN_SYSTEM.md` - единый дизайн экосистемы
+
 ## Правила разработки
 
 ### Design System (строго соблюдать!)
@@ -140,10 +146,10 @@ alembic revision --autogenerate -m "description"
 
 ```bash
 # Деплой
-ssh -i ~/.ssh/id_housler root@91.229.8.221
-cd /var/www/lk.housler.ru
+ssh -i ~/.ssh/id_housler root@95.163.227.26
+cd /root/lk-housler
 git pull origin main
-docker-compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 ## Важные файлы для изучения
@@ -173,18 +179,23 @@ docker-compose -f docker-compose.prod.yml up -d --build
 
 - **IP:** 95.163.227.26
 - **SSH:** `ssh -i ~/.ssh/id_housler root@95.163.227.26`
-- **Пароль:** `NsUurH93jSHNW8QS`
+- **Пароль:** В 1Password: `Housler Server Root`
+- **Путь на сервере:** `/root/lk-housler`
 - **Порт для lk.housler.ru:** 3090 (внутренний Nginx)
 
-> **Главный документ:** См. [housler_pervichka/DEPLOY.md](../housler_pervichka/DEPLOY.md)
+> **Главный документ:** См. [housler_pervichka/docs/SHARED/SERVER_ACCESS.md](../housler_pervichka/docs/SHARED/SERVER_ACCESS.md)
 
 ## Переменные окружения
 
 Смотри `.env.example` в корне проекта.
 
-Критичные:
-- `JWT_SECRET` — генерировать: `openssl rand -base64 32`
-- `ENCRYPTION_KEY` — генерировать: `openssl rand -hex 32`
+Критичные (все в 1Password):
+- `JWT_SECRET` — 1Password: `Housler LK JWT`
+- `ENCRYPTION_KEY` — 1Password: `Housler Encryption` (общий с agent!)
+- `ENCRYPTION_SALT` — 1Password: `Housler Encryption`
+- `DB_PASSWORD` — 1Password: `Housler PostgreSQL`
+- `REDIS_PASSWORD` — 1Password: `Housler Redis`
+- `MINIO_ROOT_PASSWORD` — 1Password: `Housler MinIO`
 - `SMS_RU_API_ID` — из SMS.RU кабинета
 
 ## Чеклист нового функционала
