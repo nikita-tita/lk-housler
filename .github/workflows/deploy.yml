@@ -6,56 +6,65 @@ on:
       - main
   workflow_dispatch:
 
+env:
+  SERVER_HOST: 95.163.227.26
+  SERVER_USER: root
+  DEPLOY_PATH: /root/lk-housler
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+    environment: production
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.8.0
+        uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-      
+
       - name: Add server to known hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
-      
+          ssh-keyscan -H ${{ env.SERVER_HOST }} >> ~/.ssh/known_hosts
+
       - name: Deploy to server
-        env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
-          ssh $SERVER_USER@$SERVER_HOST << 'ENDSSH'
-            cd /var/www/lk.housler.ru
-            
-            # Получение последних изменений
+          ssh ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} << 'ENDSSH'
+            cd /root/lk-housler
+
+            echo "==> Pulling latest changes..."
             git pull origin main
-            
-            # Создание backup
-            if docker ps | grep -q lk-postgres; then
-              mkdir -p backups
-              docker exec lk-postgres pg_dump -U lk_user lk_housler | gzip > backups/backup_$(date +%Y%m%d_%H%M%S).sql.gz
-            fi
-            
-            # Пересборка и перезапуск
-            docker-compose -f docker-compose.prod.yml up -d --build
-            
-            # Проверка здоровья
-            sleep 30
+
+            echo "==> Rebuilding containers..."
+            docker compose -f docker-compose.prod.yml build --no-cache backend
+
+            echo "==> Restarting services..."
+            docker compose -f docker-compose.prod.yml up -d
+
+            echo "==> Running migrations..."
+            docker compose -f docker-compose.prod.yml exec -T backend alembic upgrade head || true
+
+            echo "==> Checking health..."
+            sleep 15
             curl -f http://localhost:3090/health || exit 1
-            
-            echo "✅ Deployment successful!"
+
+            echo "==> Deploy complete!"
           ENDSSH
-      
-      - name: Notify on success
-        if: success()
-        run: echo "✅ Deployment to production completed successfully"
-      
-      - name: Notify on failure
-        if: failure()
-        run: echo "❌ Deployment to production failed"
+
+  smoke-test:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    needs: deploy
+
+    steps:
+      - name: Wait for deployment
+        run: sleep 30
+
+      - name: Check API health
+        run: |
+          curl -f https://lk.housler.ru/health || exit 1
+          echo "API is healthy!"
 
