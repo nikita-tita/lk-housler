@@ -87,10 +87,11 @@ export async function verifySMS(phone: string, code: string): Promise<AuthRespon
       access_token: token,
       user: user,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Re-throw with proper error message from API response
-    if (err.response?.data?.error) {
-      throw new Error(err.response.data.error);
+    const axiosError = err as { response?: { data?: { error?: string } } };
+    if (axiosError.response?.data?.error) {
+      throw new Error(axiosError.response.data.error);
     }
     throw err;
   }
@@ -143,9 +144,10 @@ export async function verifyEmail(email: string, code: string): Promise<AuthResp
       access_token: data.data.token,
       user: data.data.user,
     };
-  } catch (err: any) {
-    if (err.response?.data?.error) {
-      throw new Error(err.response.data.error);
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { data?: { error?: string } } };
+    if (axiosError.response?.data?.error) {
+      throw new Error(axiosError.response.data.error);
     }
     throw err;
   }
@@ -172,9 +174,10 @@ export async function loginAgency(email: string, password: string): Promise<Auth
       access_token: data.data.token,
       user: data.data.user,
     };
-  } catch (err: any) {
-    if (err.response?.data?.error) {
-      throw new Error(err.response.data.error);
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { data?: { error?: string } } };
+    if (axiosError.response?.data?.error) {
+      throw new Error(axiosError.response.data.error);
     }
     throw err;
   }
@@ -245,9 +248,10 @@ export async function registerAgent(data: AgentRegisterData): Promise<AuthRespon
       access_token: response.data.token,
       user: response.data.user,
     };
-  } catch (err: any) {
-    if (err.response?.data?.error) {
-      throw new Error(err.response.data.error);
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { data?: { error?: string } } };
+    if (axiosError.response?.data?.error) {
+      throw new Error(axiosError.response.data.error);
     }
     throw err;
   }
@@ -265,9 +269,10 @@ export async function registerAgency(data: AgencyRegisterData): Promise<AuthResp
       access_token: response.data.token,
       user: response.data.user,
     };
-  } catch (err: any) {
-    if (err.response?.data?.error) {
-      throw new Error(err.response.data.error);
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { data?: { error?: string } } };
+    if (axiosError.response?.data?.error) {
+      throw new Error(axiosError.response.data.error);
     }
     throw err;
   }

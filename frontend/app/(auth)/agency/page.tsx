@@ -37,8 +37,9 @@ export default function AgencyLoginPage() {
       const response = await loginAgency(loginEmail.toLowerCase().trim(), loginPassword);
       setAuth(response.access_token, response.user);
       router.push(getDashboardPath(response.user.role));
-    } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Ошибка авторизации');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(axiosError.response?.data?.error || axiosError.message || 'Ошибка авторизации');
     } finally {
       setIsLoading(false);
     }

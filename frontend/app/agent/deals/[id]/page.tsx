@@ -58,9 +58,10 @@ export default function DealDetailPage() {
       const result = await sendForSigning(deal.id);
       setSigningResult({ url: result.signing_url, smsSent: result.sms_sent });
       await loadDeal(deal.id);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to send for signing:', error);
-      alert(error.response?.data?.detail || 'Ошибка отправки на подпись');
+      const axiosError = error as { response?: { data?: { detail?: string } } };
+      alert(axiosError.response?.data?.detail || 'Ошибка отправки на подпись');
     } finally {
       setActionLoading(false);
     }

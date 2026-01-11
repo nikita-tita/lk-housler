@@ -48,8 +48,9 @@ export default function SigningPage() {
       } else {
         setStep('info');
       }
-    } catch (err: any) {
-      setError(err.message || 'Ссылка недействительна или истекла');
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      setError(error.message || 'Ссылка недействительна или истекла');
       setStep('error');
     }
   };
@@ -67,8 +68,9 @@ export default function SigningPage() {
       const result = await requestSigningOTP(token, consentData, consentPep);
       setPhoneMasked(result.phone_masked);
       setStep('code');
-    } catch (err: any) {
-      setError(err.message || 'Ошибка отправки кода');
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      setError(error.message || 'Ошибка отправки кода');
     } finally {
       setLoading(false);
     }
@@ -87,8 +89,9 @@ export default function SigningPage() {
       const result = await verifyAndSign(token, code);
       setSignedAt(result.signed_at);
       setStep('success');
-    } catch (err: any) {
-      setError(err.message || 'Неверный код');
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      setError(error.message || 'Неверный код');
     } finally {
       setLoading(false);
     }

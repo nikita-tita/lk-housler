@@ -32,8 +32,9 @@ export function SMSAuthForm() {
       await sendSMS(fullPhone);
       setPhone(fullPhone);
       setStep('code');
-    } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Ошибка отправки SMS');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(axiosError.response?.data?.error || axiosError.message || 'Ошибка отправки SMS');
     } finally {
       setLoading(false);
     }
@@ -48,11 +49,12 @@ export function SMSAuthForm() {
       const response = await verifySMS(phone, code);
       setAuth(response.access_token, response.user);
       router.push(getDashboardPath(response.user.role));
-    } catch (err: any) {
-      if (err.message === 'NEW_USER_NEEDS_REGISTRATION') {
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string } }; message?: string };
+      if (axiosError.message === 'NEW_USER_NEEDS_REGISTRATION') {
         setError('Номер не зарегистрирован. Пожалуйста, зарегистрируйтесь на agent.housler.ru');
       } else {
-        setError(err.response?.data?.error || err.message || 'Неверный код');
+        setError(axiosError.response?.data?.error || axiosError.message || 'Неверный код');
       }
     } finally {
       setLoading(false);

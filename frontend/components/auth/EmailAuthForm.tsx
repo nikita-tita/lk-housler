@@ -24,8 +24,9 @@ export function EmailAuthForm() {
     try {
       await sendEmail(email.toLowerCase().trim());
       setStep('code');
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Ошибка отправки письма');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { detail?: string } } };
+      setError(axiosError.response?.data?.detail || 'Ошибка отправки письма');
     } finally {
       setLoading(false);
     }
@@ -40,8 +41,9 @@ export function EmailAuthForm() {
       const response = await verifyEmail(email.toLowerCase().trim(), code);
       setAuth(response.access_token, response.user);
       router.push(getDashboardPath(response.user.role));
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Неверный код');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { message?: string } }; message?: string };
+      setError(axiosError.response?.data?.message || axiosError.message || 'Неверный код');
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { InternalAxiosRequestConfig } from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || 'https://agent.housler.ru/api';
@@ -20,7 +20,7 @@ export const authClient = axios.create({
 });
 
 // Add token to both clients
-const addAuthToken = (config: any) => {
+const addAuthToken = (config: InternalAxiosRequestConfig) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('housler_token');
     if (token) {

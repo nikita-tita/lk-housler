@@ -24,8 +24,9 @@ export function PasswordAuthForm() {
       const response = await loginAgency(email.toLowerCase().trim(), password);
       setAuth(response.access_token, response.user);
       router.push(getDashboardPath(response.user.role));
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Неверный email или пароль');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { message?: string } }; message?: string };
+      setError(axiosError.response?.data?.message || axiosError.message || 'Неверный email или пароль');
     } finally {
       setLoading(false);
     }

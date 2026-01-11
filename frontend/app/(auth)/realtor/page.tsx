@@ -154,8 +154,9 @@ export default function RealtorLoginPage() {
         if (result.codeSentAt) setCodeSentAt(result.codeSentAt);
         if (result.canResendAt) setCanResendAt(new Date(result.canResendAt));
       }
-    } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Ошибка отправки SMS');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(axiosError.response?.data?.error || axiosError.message || 'Ошибка отправки SMS');
     } finally {
       setIsLoading(false);
     }
@@ -172,13 +173,14 @@ export default function RealtorLoginPage() {
       // User exists - login successful
       setAuth(response.access_token, response.user);
       router.push(getDashboardPath(response.user.role));
-    } catch (err: any) {
-      if (err.message === 'NEW_USER_NEEDS_REGISTRATION') {
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string; message?: string } }; message?: string };
+      if (axiosError.message === 'NEW_USER_NEEDS_REGISTRATION') {
         // New user - show registration form
         setStep('registration');
       } else {
         // API returns error in 'error' field, not 'message'
-        const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message;
+        const errorMessage = axiosError.response?.data?.error || axiosError.response?.data?.message || axiosError.message;
         // Map common errors to user-friendly messages
         if (errorMessage?.includes('Invalid code') || errorMessage?.includes('Неверный код')) {
           setError('Неверный код. Проверьте код и попробуйте снова.');
@@ -228,8 +230,9 @@ export default function RealtorLoginPage() {
       });
       setAuth(response.access_token, response.user);
       router.push(getDashboardPath(response.user.role));
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message;
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string; message?: string } }; message?: string };
+      const errorMessage = axiosError.response?.data?.error || axiosError.response?.data?.message || axiosError.message;
       setError(errorMessage || 'Ошибка регистрации');
     } finally {
       setIsLoading(false);

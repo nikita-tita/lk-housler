@@ -9,7 +9,7 @@ export default function AuthLayout({
         {children}
 
         <div className="text-center mt-8 text-sm text-[var(--color-text-light)]">
-          <p>OOO "Сектор ИТ" (ИНН 5190237491)</p>
+          <p>OOO &ldquo;Сектор ИТ&rdquo; (ИНН 5190237491)</p>
           <p>hello@housler.ru</p>
         </div>
       </div>

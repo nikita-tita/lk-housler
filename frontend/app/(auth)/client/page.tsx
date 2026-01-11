@@ -55,8 +55,9 @@ export default function ClientLoginPage() {
       await sendEmail(email.toLowerCase().trim());
       setCanResendAt(new Date(Date.now() + 60 * 1000));
       setStep('code');
-    } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Ошибка отправки кода');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(axiosError.response?.data?.error || axiosError.message || 'Ошибка отправки кода');
     } finally {
       setIsLoading(false);
     }
@@ -69,8 +70,9 @@ export default function ClientLoginPage() {
     try {
       await sendEmail(email.toLowerCase().trim());
       setCanResendAt(new Date(Date.now() + 60 * 1000));
-    } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Ошибка повторной отправки');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(axiosError.response?.data?.error || axiosError.message || 'Ошибка повторной отправки');
     } finally {
       setIsLoading(false);
     }
@@ -85,8 +87,9 @@ export default function ClientLoginPage() {
       const response = await verifyEmail(email.toLowerCase().trim(), code);
       setAuth(response.access_token, response.user);
       router.push(getDashboardPath(response.user.role));
-    } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Неверный код');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(axiosError.response?.data?.error || axiosError.message || 'Неверный код');
     } finally {
       setIsLoading(false);
     }
