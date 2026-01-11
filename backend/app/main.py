@@ -100,11 +100,7 @@ async def health():
 
     # Check Redis
     try:
-        redis_client = aioredis.from_url(
-            settings.REDIS_URL,
-            encoding="utf-8",
-            decode_responses=True
-        )
+        redis_client = aioredis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
         await redis_client.ping()
         await redis_client.close()
         services["redis"] = "ok"
@@ -117,10 +113,7 @@ async def health():
         endpoint = settings.S3_ENDPOINT.replace("http://", "").replace("https://", "")
         secure = settings.S3_ENDPOINT.startswith("https://")
         minio_client = Minio(
-            endpoint,
-            access_key=settings.S3_ACCESS_KEY,
-            secret_key=settings.S3_SECRET_KEY,
-            secure=secure
+            endpoint, access_key=settings.S3_ACCESS_KEY, secret_key=settings.S3_SECRET_KEY, secure=secure
         )
         minio_client.bucket_exists(settings.S3_BUCKET_DOCUMENTS)
         services["s3"] = "ok"
@@ -128,10 +121,7 @@ async def health():
         services["s3"] = f"error: {str(e)[:100]}"
         all_healthy = False
 
-    response_data = {
-        "status": "healthy" if all_healthy else "unhealthy",
-        "services": services
-    }
+    response_data = {"status": "healthy" if all_healthy else "unhealthy", "services": services}
 
     if not all_healthy:
         return JSONResponse(status_code=503, content=response_data)
@@ -145,6 +135,7 @@ app.include_router(api_router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",

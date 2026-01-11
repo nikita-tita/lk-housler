@@ -8,12 +8,7 @@ from pydantic import model_validator
 class Settings(BaseSettings):
     """Application settings"""
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore")
 
     @model_validator(mode="after")
     def validate_settings(self) -> "Settings":
@@ -68,10 +63,10 @@ class Settings(BaseSettings):
     COMPANY_PHONE: str = "+7 (800) 555-35-35"
 
     # Bank Details (для реквизитов в договорах)
-    COMPANY_BANK_NAME: str = ""       # Название банка
-    COMPANY_BANK_BIK: str = ""        # БИК
-    COMPANY_BANK_ACCOUNT: str = ""    # Расчетный счет
-    COMPANY_BANK_CORR: str = ""       # Корр. счет
+    COMPANY_BANK_NAME: str = ""  # Название банка
+    COMPANY_BANK_BIK: str = ""  # БИК
+    COMPANY_BANK_ACCOUNT: str = ""  # Расчетный счет
+    COMPANY_BANK_CORR: str = ""  # Корр. счет
 
     # Database
     DATABASE_URL: str

@@ -32,24 +32,13 @@ class EmailProvider(ABC):
 
     @abstractmethod
     async def send(
-        self,
-        to_email: str,
-        subject: str,
-        body: str,
-        html: bool = False,
-        reply_to: Optional[str] = None
+        self, to_email: str, subject: str, body: str, html: bool = False, reply_to: Optional[str] = None
     ) -> bool:
         """Send email"""
         pass
 
     @abstractmethod
-    async def send_bulk(
-        self,
-        to_emails: List[str],
-        subject: str,
-        body: str,
-        html: bool = False
-    ) -> int:
+    async def send_bulk(self, to_emails: List[str], subject: str, body: str, html: bool = False) -> int:
         """Send bulk emails, returns count of successful sends"""
         pass
 
@@ -58,12 +47,7 @@ class MockEmailProvider(EmailProvider):
     """Mock email provider for development"""
 
     async def send(
-        self,
-        to_email: str,
-        subject: str,
-        body: str,
-        html: bool = False,
-        reply_to: Optional[str] = None
+        self, to_email: str, subject: str, body: str, html: bool = False, reply_to: Optional[str] = None
     ) -> bool:
         """Mock send - log without exposing sensitive content (OTP codes)"""
         # SECURITY: Never log email body as it may contain OTP codes
@@ -78,13 +62,7 @@ class MockEmailProvider(EmailProvider):
         print(f"{'='*60}\n")
         return True
 
-    async def send_bulk(
-        self,
-        to_emails: List[str],
-        subject: str,
-        body: str,
-        html: bool = False
-    ) -> int:
+    async def send_bulk(self, to_emails: List[str], subject: str, body: str, html: bool = False) -> int:
         """Mock bulk send"""
         for email in to_emails:
             await self.send(email, subject, body, html)
@@ -111,7 +89,7 @@ class SMTPEmailProvider(EmailProvider):
         from_name: str = "Housler",
         use_ssl: bool = True,
         use_tls: bool = False,
-        timeout: int = 30
+        timeout: int = 30,
     ):
         self.smtp_host = smtp_host
         self.smtp_port = smtp_port
@@ -124,31 +102,27 @@ class SMTPEmailProvider(EmailProvider):
         self.timeout = timeout
 
     def _create_message(
-        self,
-        to_email: str,
-        subject: str,
-        body: str,
-        html: bool = False,
-        reply_to: Optional[str] = None
+        self, to_email: str, subject: str, body: str, html: bool = False, reply_to: Optional[str] = None
     ) -> MIMEMultipart:
         """Create email message"""
-        msg = MIMEMultipart('alternative')
-        msg['From'] = formataddr((self.from_name, self.from_email))
-        msg['To'] = to_email
-        msg['Subject'] = subject
+        msg = MIMEMultipart("alternative")
+        msg["From"] = formataddr((self.from_name, self.from_email))
+        msg["To"] = to_email
+        msg["Subject"] = subject
 
         if reply_to:
-            msg['Reply-To'] = reply_to
+            msg["Reply-To"] = reply_to
 
         # Add plain text version
         if html:
             # Strip HTML for plain text fallback
             import re
-            plain_text = re.sub(r'<[^>]+>', '', body)
-            msg.attach(MIMEText(plain_text, 'plain', 'utf-8'))
-            msg.attach(MIMEText(body, 'html', 'utf-8'))
+
+            plain_text = re.sub(r"<[^>]+>", "", body)
+            msg.attach(MIMEText(plain_text, "plain", "utf-8"))
+            msg.attach(MIMEText(body, "html", "utf-8"))
         else:
-            msg.attach(MIMEText(body, 'plain', 'utf-8'))
+            msg.attach(MIMEText(body, "plain", "utf-8"))
 
         return msg
 
@@ -158,27 +132,13 @@ class SMTPEmailProvider(EmailProvider):
 
         if self.use_ssl:
             # Port 465 with SSL
-            return smtplib.SMTP_SSL(
-                self.smtp_host,
-                self.smtp_port,
-                context=context,
-                timeout=self.timeout
-            )
+            return smtplib.SMTP_SSL(self.smtp_host, self.smtp_port, context=context, timeout=self.timeout)
         else:
             # Port 587 with STARTTLS
-            return smtplib.SMTP(
-                self.smtp_host,
-                self.smtp_port,
-                timeout=self.timeout
-            )
+            return smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=self.timeout)
 
     async def send(
-        self,
-        to_email: str,
-        subject: str,
-        body: str,
-        html: bool = False,
-        reply_to: Optional[str] = None
+        self, to_email: str, subject: str, body: str, html: bool = False, reply_to: Optional[str] = None
     ) -> bool:
         """Send email via SMTP"""
         try:
@@ -204,13 +164,7 @@ class SMTPEmailProvider(EmailProvider):
             logger.error(f"[Email Error] {type(e).__name__}: {e}")
             return False
 
-    async def send_bulk(
-        self,
-        to_emails: List[str],
-        subject: str,
-        body: str,
-        html: bool = False
-    ) -> int:
+    async def send_bulk(self, to_emails: List[str], subject: str, body: str, html: bool = False) -> int:
         """Send bulk emails via single SMTP connection"""
         success_count = 0
 
@@ -247,13 +201,7 @@ class SendGridEmailProvider(EmailProvider):
     Free tier: 100 emails/day
     """
 
-    def __init__(
-        self,
-        api_key: str,
-        from_email: str,
-        from_name: str = "Housler",
-        timeout: int = 30
-    ):
+    def __init__(self, api_key: str, from_email: str, from_name: str = "Housler", timeout: int = 30):
         self.api_key = api_key
         self.from_email = from_email
         self.from_name = from_name
@@ -261,12 +209,7 @@ class SendGridEmailProvider(EmailProvider):
         self.api_url = "https://api.sendgrid.com/v3/mail/send"
 
     async def send(
-        self,
-        to_email: str,
-        subject: str,
-        body: str,
-        html: bool = False,
-        reply_to: Optional[str] = None
+        self, to_email: str, subject: str, body: str, html: bool = False, reply_to: Optional[str] = None
     ) -> bool:
         """Send email via SendGrid API"""
         try:
@@ -276,7 +219,7 @@ class SendGridEmailProvider(EmailProvider):
                 "personalizations": [{"to": [{"email": to_email}]}],
                 "from": {"email": self.from_email, "name": self.from_name},
                 "subject": subject,
-                "content": [{"type": content_type, "value": body}]
+                "content": [{"type": content_type, "value": body}],
             }
 
             if reply_to:
@@ -286,10 +229,7 @@ class SendGridEmailProvider(EmailProvider):
                 response = await client.post(
                     self.api_url,
                     json=payload,
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json"
-                    }
+                    headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
                 )
 
             if response.status_code in (200, 202):
@@ -303,13 +243,7 @@ class SendGridEmailProvider(EmailProvider):
             logger.error(f"[SendGrid Error] {type(e).__name__}: {e}")
             return False
 
-    async def send_bulk(
-        self,
-        to_emails: List[str],
-        subject: str,
-        body: str,
-        html: bool = False
-    ) -> int:
+    async def send_bulk(self, to_emails: List[str], subject: str, body: str, html: bool = False) -> int:
         """Send bulk emails via SendGrid"""
         success_count = 0
         for email in to_emails:
@@ -326,15 +260,15 @@ def get_email_provider() -> EmailProvider:
     - smtp: Yandex 360 / any SMTP server (requires open ports 465/587)
     - sendgrid: SendGrid HTTP API (works when SMTP ports are blocked)
     """
-    email_provider = getattr(settings, 'EMAIL_PROVIDER', 'mock')
+    email_provider = getattr(settings, "EMAIL_PROVIDER", "mock")
 
     if email_provider == "mock":
         return MockEmailProvider()
 
     elif email_provider == "smtp":
         # Yandex 360: use SSL for port 465, TLS for port 587
-        use_ssl = getattr(settings, 'SMTP_USE_SSL', settings.SMTP_PORT == 465)
-        use_tls = getattr(settings, 'SMTP_USE_TLS', settings.SMTP_PORT == 587)
+        use_ssl = getattr(settings, "SMTP_USE_SSL", settings.SMTP_PORT == 465)
+        use_tls = getattr(settings, "SMTP_USE_TLS", settings.SMTP_PORT == 587)
 
         return SMTPEmailProvider(
             smtp_host=settings.SMTP_HOST,
@@ -344,20 +278,18 @@ def get_email_provider() -> EmailProvider:
             from_email=settings.SMTP_FROM_EMAIL,
             from_name=settings.SMTP_FROM_NAME,
             use_ssl=use_ssl,
-            use_tls=use_tls
+            use_tls=use_tls,
         )
 
     elif email_provider == "sendgrid":
         # SendGrid HTTP API - works when SMTP ports are blocked
-        api_key = getattr(settings, 'SENDGRID_API_KEY', '')
+        api_key = getattr(settings, "SENDGRID_API_KEY", "")
         if not api_key:
             logger.error("[Email] SendGrid API key not configured, using Mock")
             return MockEmailProvider()
 
         return SendGridEmailProvider(
-            api_key=api_key,
-            from_email=settings.SMTP_FROM_EMAIL,
-            from_name=settings.SMTP_FROM_NAME
+            api_key=api_key, from_email=settings.SMTP_FROM_EMAIL, from_name=settings.SMTP_FROM_NAME
         )
 
     else:
@@ -368,6 +300,7 @@ def get_email_provider() -> EmailProvider:
 # =============================================================================
 # Email Templates
 # =============================================================================
+
 
 def _get_email_footer() -> str:
     """Common email footer"""
@@ -446,6 +379,7 @@ def _get_html_wrapper(content: str) -> str:
 # Email Helpers
 # =============================================================================
 
+
 async def send_otp_email(email: str, code: str) -> bool:
     """Send OTP code via email"""
     provider = get_email_provider()
@@ -489,13 +423,7 @@ async def send_welcome_email(email: str, name: str) -> bool:
     return await provider.send(email, subject, html, html=True)
 
 
-async def send_deal_status_email(
-    email: str,
-    name: str,
-    deal_id: int,
-    status: str,
-    message: str
-) -> bool:
+async def send_deal_status_email(email: str, name: str, deal_id: int, status: str, message: str) -> bool:
     """Send deal status update email"""
     provider = get_email_provider()
 
@@ -514,12 +442,7 @@ async def send_deal_status_email(
     return await provider.send(email, subject, html, html=True)
 
 
-async def send_document_ready_email(
-    email: str,
-    name: str,
-    document_name: str,
-    deal_id: int
-) -> bool:
+async def send_document_ready_email(email: str, name: str, document_name: str, deal_id: int) -> bool:
     """Send notification when document is ready"""
     provider = get_email_provider()
 
@@ -537,12 +460,7 @@ async def send_document_ready_email(
     return await provider.send(email, subject, html, html=True)
 
 
-async def send_payment_received_email(
-    email: str,
-    name: str,
-    amount: int,
-    deal_id: int
-) -> bool:
+async def send_payment_received_email(email: str, name: str, amount: int, deal_id: int) -> bool:
     """Send payment confirmation email"""
     provider = get_email_provider()
 

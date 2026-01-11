@@ -11,6 +11,7 @@ from app.db.base import BaseModel
 
 class OrganizationType(str, PyEnum):
     """Organization type"""
+
     AGENCY = "agency"
     DEVELOPER = "developer"
     PLATFORM = "platform"
@@ -18,6 +19,7 @@ class OrganizationType(str, PyEnum):
 
 class OrganizationStatus(str, PyEnum):
     """Organization status"""
+
     ACTIVE = "active"
     PENDING = "pending"
     BLOCKED = "blocked"
@@ -26,6 +28,7 @@ class OrganizationStatus(str, PyEnum):
 
 class KYCStatus(str, PyEnum):
     """KYC verification status"""
+
     PENDING = "pending"
     IN_REVIEW = "in_review"
     VERIFIED = "verified"
@@ -34,6 +37,7 @@ class KYCStatus(str, PyEnum):
 
 class MemberRole(str, PyEnum):
     """Organization member role"""
+
     ADMIN = "admin"
     AGENT = "agent"
     ACCOUNTANT = "accountant"
@@ -42,6 +46,7 @@ class MemberRole(str, PyEnum):
 
 class PayoutMethod(str, PyEnum):
     """Payout method"""
+
     SBP_PHONE = "sbp_phone"
     BANK_ACCOUNT = "bank_account"
     CARD = "card"
@@ -65,17 +70,9 @@ class Organization(BaseModel):
     # Банковские реквизиты (JSON для гибкости)
     bank_details = Column(JSONB, nullable=True)
 
-    status = Column(
-        Enum(OrganizationStatus),
-        default=OrganizationStatus.PENDING,
-        nullable=False
-    )
+    status = Column(Enum(OrganizationStatus), default=OrganizationStatus.PENDING, nullable=False)
 
-    kyc_status = Column(
-        Enum(KYCStatus),
-        default=KYCStatus.PENDING,
-        nullable=False
-    )
+    kyc_status = Column(Enum(KYCStatus), default=KYCStatus.PENDING, nullable=False)
 
     kyc_checked_at = Column(DateTime, nullable=True)
     kyc_meta = Column(JSONB, nullable=True)

@@ -14,8 +14,10 @@ from app.models.deal import DealType, DealStatus, ExecutorType, PartyRole
 # Address schemas
 # ============================================
 
+
 class AddressCreate(BaseModel):
     """Structured address for deal"""
+
     city: str = Field(..., min_length=1, max_length=100)
     street: str = Field(..., min_length=1, max_length=255)
     house: str = Field(..., min_length=1, max_length=20)
@@ -36,8 +38,10 @@ class AddressCreate(BaseModel):
 # Simplified deal creation (MVP)
 # ============================================
 
+
 class DealCreateSimple(BaseModel):
     """Simplified deal creation for MVP"""
+
     type: DealType
 
     # Address
@@ -51,23 +55,24 @@ class DealCreateSimple(BaseModel):
     client_name: str = Field(..., min_length=2, max_length=255)
     client_phone: str = Field(..., min_length=10, max_length=20)
 
-    @field_validator('client_phone')
+    @field_validator("client_phone")
     @classmethod
     def validate_phone(cls, v: str) -> str:
         # Remove all non-digits
-        digits = ''.join(filter(str.isdigit, v))
+        digits = "".join(filter(str.isdigit, v))
         if len(digits) < 10 or len(digits) > 11:
-            raise ValueError('Phone must have 10-11 digits')
+            raise ValueError("Phone must have 10-11 digits")
         # Normalize to 7XXXXXXXXXX format
-        if len(digits) == 11 and digits.startswith('8'):
-            digits = '7' + digits[1:]
+        if len(digits) == 11 and digits.startswith("8"):
+            digits = "7" + digits[1:]
         elif len(digits) == 10:
-            digits = '7' + digits
+            digits = "7" + digits
         return digits
 
 
 class DealSimpleResponse(BaseModel):
     """Simplified deal response for frontend"""
+
     id: UUID
     type: DealType
     status: DealStatus
@@ -85,6 +90,7 @@ class DealSimpleResponse(BaseModel):
 
 class DealListSimple(BaseModel):
     """Simplified deal list response"""
+
     items: List[DealSimpleResponse]
     total: int
     page: int
@@ -95,8 +101,10 @@ class DealListSimple(BaseModel):
 # Full deal schemas (for complex operations)
 # ============================================
 
+
 class DealTermsBase(BaseModel):
     """Base deal terms schema"""
+
     commission_total: Decimal = Field(..., description="Total commission", gt=0)
     payment_plan: List[Dict[str, Any]] = Field(..., description="Payment plan")
     split_rule: Dict[str, int] = Field(..., description="Split rule")
@@ -106,6 +114,7 @@ class DealTermsBase(BaseModel):
 
 class DealPartyBase(BaseModel):
     """Base deal party schema"""
+
     party_role: PartyRole
     display_name_snapshot: str
     phone_snapshot: Optional[str] = None
@@ -115,11 +124,13 @@ class DealPartyBase(BaseModel):
 
 class DealPartyCreate(DealPartyBase):
     """Deal party creation schema"""
+
     party_id: Optional[int] = None  # For registered users (Integer ID)
 
 
 class DealParty(DealPartyBase):
     """Deal party response schema"""
+
     id: UUID
     deal_id: UUID
     party_type: str
@@ -131,12 +142,14 @@ class DealParty(DealPartyBase):
 
 class DealBase(BaseModel):
     """Base deal schema"""
+
     type: DealType
     property_address: Optional[str] = None
 
 
 class DealCreate(DealBase):
     """Deal creation schema"""
+
     executor_type: ExecutorType
     executor_id: int  # Integer - compatible with agent.housler.ru
     client_phone: str
@@ -147,12 +160,14 @@ class DealCreate(DealBase):
 
 class DealUpdate(BaseModel):
     """Deal update schema"""
+
     property_address: Optional[str] = None
     status: Optional[DealStatus] = None
 
 
 class Deal(DealBase):
     """Deal response schema"""
+
     id: UUID
     created_by_user_id: int  # Integer - compatible with agent.housler.ru users table
     agent_user_id: int
@@ -173,6 +188,7 @@ class Deal(DealBase):
 
 class DealList(BaseModel):
     """Deal list response"""
+
     deals: List[Deal]
     total: int
     page: int

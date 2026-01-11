@@ -27,80 +27,53 @@ def mask_phone(phone: str) -> str:
     """Mask phone number: +7 (999) ***-**-67"""
     if len(phone) < 10:
         return phone
-    digits = phone.lstrip('+')
+    digits = phone.lstrip("+")
     if len(digits) == 11:
         return f"+7 ({digits[1:4]}) ***-**-{digits[-2:]}"
     return f"***{phone[-4:]}"
 
 
-async def get_signing_token(
-    token: str,
-    db: AsyncSession
-) -> SigningToken:
+async def get_signing_token(token: str, db: AsyncSession) -> SigningToken:
     """Get and validate signing token"""
     stmt = (
         select(SigningToken)
         .where(SigningToken.token == token)
-        .options(
-            selectinload(SigningToken.document),
-            selectinload(SigningToken.party)
-        )
+        .options(selectinload(SigningToken.document), selectinload(SigningToken.party))
     )
     result = await db.execute(stmt)
     signing_token = result.scalar_one_or_none()
 
     if not signing_token:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Signing link not found or expired"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signing link not found or expired")
 
     if signing_token.expires_at < datetime.utcnow():
-        raise HTTPException(
-            status_code=status.HTTP_410_GONE,
-            detail="Signing link has expired"
-        )
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Signing link has expired")
 
     if signing_token.used:
-        raise HTTPException(
-            status_code=status.HTTP_410_GONE,
-            detail="Document has already been signed"
-        )
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Document has already been signed")
 
     return signing_token
 
 
 @router.get("/{token}", response_model=SigningInfoResponse)
-async def get_signing_info(
-    token: str,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_signing_info(token: str, db: AsyncSession = Depends(get_db)):
     """Get document info for signing (public, no auth)"""
     signing_token = await get_signing_token(token, db)
 
     # Get document with deal
-    stmt = (
-        select(Document)
-        .where(Document.id == signing_token.document_id)
-        .options(selectinload(Document.deal))
-    )
+    stmt = select(Document).where(Document.id == signing_token.document_id).options(selectinload(Document.deal))
     result = await db.execute(stmt)
     document = result.scalar_one_or_none()
 
     if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
     deal = document.deal
     party = signing_token.party
 
     # Check if already signed
     stmt_sig = select(Signature).where(
-        Signature.document_id == document.id,
-        Signature.signer_party_id == party.id,
-        Signature.signed_at.isnot(None)
+        Signature.document_id == document.id, Signature.signer_party_id == party.id, Signature.signed_at.isnot(None)
     )
     result_sig = await db.execute(stmt_sig)
     existing_signature = result_sig.scalar_one_or_none()
@@ -123,23 +96,16 @@ async def get_signing_info(
 
 
 @router.post("/{token}/request-otp", response_model=RequestOTPResponse)
-async def request_otp(
-    token: str,
-    request: Request,
-    body: RequestOTPRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def request_otp(token: str, request: Request, body: RequestOTPRequest, db: AsyncSession = Depends(get_db)):
     """Request OTP for signing"""
     if not body.consent_personal_data:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Consent to personal data processing is required"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Consent to personal data processing is required"
         )
 
     if not body.consent_pep:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Consent to use electronic signature is required"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Consent to use electronic signature is required"
         )
 
     signing_token = await get_signing_token(token, db)
@@ -156,29 +122,23 @@ async def request_otp(
             document_id=signing_token.document_id,
             phone=signing_token.phone,
             ip_address=ip_address,
-            user_agent=user_agent
+            user_agent=user_agent,
         )
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(e))
 
     await db.commit()
 
     return RequestOTPResponse(
         message="OTP code sent",
         phone_masked=mask_phone(signing_token.phone),
-        expires_in_seconds=settings.OTP_EXPIRE_MINUTES * 60
+        expires_in_seconds=settings.OTP_EXPIRE_MINUTES * 60,
     )
 
 
 @router.post("/{token}/verify", response_model=VerifySignatureResponse)
 async def verify_and_sign(
-    token: str,
-    request: Request,
-    body: VerifySignatureRequest,
-    db: AsyncSession = Depends(get_db)
+    token: str, request: Request, body: VerifySignatureRequest, db: AsyncSession = Depends(get_db)
 ):
     """Verify OTP and sign document"""
     signing_token = await get_signing_token(token, db)
@@ -193,10 +153,7 @@ async def verify_and_sign(
     document = result.scalar_one_or_none()
 
     if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
     # Verify OTP and create signature via SignatureService
     signature_service = SignatureService(db)
@@ -221,13 +178,10 @@ async def verify_and_sign(
             signing_token=token,
             consent_personal_data=True,
             consent_pep=True,
-            geolocation=geolocation
+            geolocation=geolocation,
         )
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
     # Mark token as used
     signing_token.used = True
@@ -239,17 +193,13 @@ async def verify_and_sign(
         success=True,
         message="Document signed successfully",
         signed_at=signature.signed_at,
-        document_url=document.file_url
+        document_url=document.file_url,
     )
 
 
 # Helper function to create signing token (called from deal creation)
 async def create_signing_token(
-    db: AsyncSession,
-    document_id,
-    party_id,
-    phone: str,
-    expires_days: int = 7
+    db: AsyncSession, document_id, party_id, phone: str, expires_days: int = 7
 ) -> SigningToken:
     """Create signing token for a party"""
     token = secrets.token_urlsafe(16)  # ~22 chars, URL safe
@@ -259,7 +209,7 @@ async def create_signing_token(
         document_id=document_id,
         party_id=party_id,
         phone=phone,
-        expires_at=datetime.utcnow() + timedelta(days=expires_days)
+        expires_at=datetime.utcnow() + timedelta(days=expires_days),
     )
     db.add(signing_token)
     await db.flush()

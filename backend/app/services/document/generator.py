@@ -6,6 +6,7 @@ from typing import Dict, Any
 # WeasyPrint requires system libraries, make it optional
 try:
     from weasyprint import HTML
+
     WEASYPRINT_AVAILABLE = True
 except ImportError:
     HTML = None
@@ -185,13 +186,16 @@ class ContractTemplates:
     # =========================================================================
     # ДОГОВОР НА ПОДБОР ОБЪЕКТА (ПОКУПКА ВТОРИЧНОЙ НЕДВИЖИМОСТИ)
     # =========================================================================
-    SECONDARY_BUY_TEMPLATE = """
+    SECONDARY_BUY_TEMPLATE = (
+        """
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="utf-8">
     <title>Договор на оказание услуг</title>
-    <style>""" + BASE_STYLES + """</style>
+    <style>"""
+        + BASE_STYLES
+        + """</style>
 </head>
 <body>
     <h1>ДОГОВОР N {{contract_number}}<br>НА ОКАЗАНИЕ УСЛУГ ПО ПОДБОРУ ОБЪЕКТА НЕДВИЖИМОСТИ</h1>
@@ -326,17 +330,21 @@ class ContractTemplates:
 </body>
 </html>
 """
+    )
 
     # =========================================================================
     # ДОГОВОР НА ПРОДАЖУ ОБЪЕКТА (ПРОДАЖА ВТОРИЧНОЙ НЕДВИЖИМОСТИ)
     # =========================================================================
-    SECONDARY_SELL_TEMPLATE = """
+    SECONDARY_SELL_TEMPLATE = (
+        """
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="utf-8">
     <title>Договор на оказание услуг по продаже</title>
-    <style>""" + BASE_STYLES + """</style>
+    <style>"""
+        + BASE_STYLES
+        + """</style>
 </head>
 <body>
     <h1>ДОГОВОР N {{contract_number}}<br>НА ОКАЗАНИЕ УСЛУГ ПО ПРОДАЖЕ ОБЪЕКТА НЕДВИЖИМОСТИ</h1>
@@ -477,17 +485,21 @@ class ContractTemplates:
 </body>
 </html>
 """
+    )
 
     # =========================================================================
     # ДОГОВОР НА БРОНИРОВАНИЕ НОВОСТРОЙКИ
     # =========================================================================
-    NEWBUILD_BOOKING_TEMPLATE = """
+    NEWBUILD_BOOKING_TEMPLATE = (
+        """
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="utf-8">
     <title>Договор на услуги по бронированию</title>
-    <style>""" + BASE_STYLES + """</style>
+    <style>"""
+        + BASE_STYLES
+        + """</style>
 </head>
 <body>
     <h1>ДОГОВОР N {{contract_number}}<br>НА ОКАЗАНИЕ УСЛУГ ПО БРОНИРОВАНИЮ КВАРТИРЫ В НОВОСТРОЙКЕ</h1>
@@ -626,17 +638,21 @@ class ContractTemplates:
 </body>
 </html>
 """
+    )
 
     # =========================================================================
     # АКТ ОКАЗАННЫХ УСЛУГ
     # =========================================================================
-    ACT_TEMPLATE = """
+    ACT_TEMPLATE = (
+        """
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="utf-8">
     <title>Акт оказанных услуг</title>
-    <style>""" + BASE_STYLES + """</style>
+    <style>"""
+        + BASE_STYLES
+        + """</style>
 </head>
 <body>
     <h1>АКТ N {{act_number}}<br>СДАЧИ-ПРИЕМКИ ОКАЗАННЫХ УСЛУГ</h1>
@@ -719,6 +735,7 @@ class ContractTemplates:
 </body>
 </html>
 """
+    )
 
     @classmethod
     def get_template(cls, template_type: str) -> str:

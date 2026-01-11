@@ -11,6 +11,7 @@ from app.db.base import BaseModel
 
 class TemplateType(str, PyEnum):
     """Contract template type"""
+
     SECONDARY_BUY = "secondary_buy"
     SECONDARY_SELL = "secondary_sell"
     NEWBUILD_BOOKING = "newbuild_booking"
@@ -22,6 +23,7 @@ class TemplateType(str, PyEnum):
 
 class TemplateStatus(str, PyEnum):
     """Template workflow status"""
+
     DRAFT = "draft"
     PENDING_REVIEW = "pending_review"
     APPROVED = "approved"
@@ -31,6 +33,7 @@ class TemplateStatus(str, PyEnum):
 
 class DocumentStatus(str, PyEnum):
     """Document status"""
+
     GENERATED = "generated"
     SENT = "sent"
     SIGNED = "signed"
@@ -39,8 +42,9 @@ class DocumentStatus(str, PyEnum):
 
 class SignatureMethod(str, PyEnum):
     """Signature method"""
+
     PEP_SMS = "pep_sms"  # Простая электронная подпись (OTP по SMS)
-    UKEP = "ukep"        # Усиленная квалифицированная (Phase 2)
+    UKEP = "ukep"  # Усиленная квалифицированная (Phase 2)
 
 
 class ContractTemplate(BaseModel):
@@ -64,12 +68,7 @@ class ContractTemplate(BaseModel):
     effective_from = Column(Date, nullable=True)  # Effective date
 
     # Workflow status
-    status = Column(
-        Enum(TemplateStatus),
-        default=TemplateStatus.DRAFT,
-        nullable=False,
-        index=True
-    )
+    status = Column(Enum(TemplateStatus), default=TemplateStatus.DRAFT, nullable=False, index=True)
     active = Column(Boolean, default=False, nullable=False)  # Is used for new deals
     published_at = Column(DateTime, nullable=True)
 
@@ -93,12 +92,7 @@ class Document(BaseModel):
 
     version_no = Column(Integer, default=1, nullable=False)
 
-    status = Column(
-        Enum(DocumentStatus),
-        default=DocumentStatus.GENERATED,
-        nullable=False,
-        index=True
-    )
+    status = Column(Enum(DocumentStatus), default=DocumentStatus.GENERATED, nullable=False, index=True)
 
     # URL файла в S3
     file_url = Column(String(500), nullable=True)

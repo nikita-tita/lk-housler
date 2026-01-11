@@ -28,10 +28,7 @@ def process_pending_payouts(self):
             now = datetime.utcnow()
             stmt = (
                 select(Payout)
-                .where(
-                    Payout.status == PayoutStatus.INITIATED,
-                    Payout.hold_until <= now
-                )
+                .where(Payout.status == PayoutStatus.INITIATED, Payout.hold_until <= now)
                 .options(selectinload(Payout.split))
                 .limit(100)  # Process in batches
             )
@@ -84,11 +81,7 @@ def process_single_payout(payout_id: str):
 
     with SessionLocal() as db:
         try:
-            stmt = (
-                select(Payout)
-                .where(Payout.id == UUID(payout_id))
-                .options(selectinload(Payout.split))
-            )
+            stmt = select(Payout).where(Payout.id == UUID(payout_id)).options(selectinload(Payout.split))
             result = db.execute(stmt)
             payout = result.scalar_one_or_none()
 

@@ -37,10 +37,10 @@ class SMSRuProvider(SMSProvider):
         import httpx
 
         # Remove + from phone if present
-        phone = phone.lstrip('+')
+        phone = phone.lstrip("+")
 
         # Test mode: accept test phone numbers 79999000000-79999999999
-        if self.test_mode and phone.startswith('79999'):
+        if self.test_mode and phone.startswith("79999"):
             # SECURITY: Never log OTP codes, only log the fact of sending
             print(f"[SMS.RU Test Mode] SMS sent to: {phone} (message content hidden)")
             return True
@@ -55,7 +55,7 @@ class SMSRuProvider(SMSProvider):
                         "msg": message,
                         "json": 1,
                     },
-                    timeout=10.0
+                    timeout=10.0,
                 )
 
                 result = response.json()
@@ -79,11 +79,7 @@ class SMSRuProvider(SMSProvider):
 
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{self.base_url}/my/balance",
-                    params={"api_id": self.api_id},
-                    timeout=10.0
-                )
+                response = await client.get(f"{self.base_url}/my/balance", params={"api_id": self.api_id}, timeout=10.0)
                 result = response.json()
 
                 if result.get("status") == "OK":
@@ -102,10 +98,7 @@ def get_sms_provider() -> SMSProvider:
     if settings.SMS_PROVIDER == "mock":
         return MockSMSProvider()
     elif settings.SMS_PROVIDER == "sms_ru":
-        return SMSRuProvider(
-            api_id=settings.SMS_RU_API_ID,
-            test_mode=settings.SMS_TEST_MODE
-        )
+        return SMSRuProvider(api_id=settings.SMS_RU_API_ID, test_mode=settings.SMS_TEST_MODE)
     else:
         # Fallback to mock if provider unknown
         print(f"[Warning] Unknown SMS provider: {settings.SMS_PROVIDER}, using Mock")

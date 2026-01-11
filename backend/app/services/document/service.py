@@ -21,12 +21,20 @@ def number_to_words_ru(n: int) -> str:
         return "ноль рублей"
 
     units = ["", "один", "два", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять"]
-    teens = ["десять", "одиннадцать", "двенадцать", "тринадцать", "четырнадцать",
-             "пятнадцать", "шестнадцать", "семнадцать", "восемнадцать", "девятнадцать"]
-    tens = ["", "", "двадцать", "тридцать", "сорок", "пятьдесят",
-            "шестьдесят", "семьдесят", "восемьдесят", "девяносто"]
-    hundreds = ["", "сто", "двести", "триста", "четыреста", "пятьсот",
-                "шестьсот", "семьсот", "восемьсот", "девятьсот"]
+    teens = [
+        "десять",
+        "одиннадцать",
+        "двенадцать",
+        "тринадцать",
+        "четырнадцать",
+        "пятнадцать",
+        "шестнадцать",
+        "семнадцать",
+        "восемнадцать",
+        "девятнадцать",
+    ]
+    tens = ["", "", "двадцать", "тридцать", "сорок", "пятьдесят", "шестьдесят", "семьдесят", "восемьдесят", "девяносто"]
+    hundreds = ["", "сто", "двести", "триста", "четыреста", "пятьсот", "шестьсот", "семьсот", "восемьсот", "девятьсот"]
 
     def get_form(n, forms):
         """Get correct Russian word form based on number"""
@@ -101,7 +109,7 @@ class DocumentService:
         errors = []
 
         # Check client info
-        parties = getattr(deal, 'parties', None) or []
+        parties = getattr(deal, "parties", None) or []
         client_party = next((p for p in parties if str(p.party_role) == "client"), None)
 
         client_name = None
@@ -118,7 +126,7 @@ class DocumentService:
             errors.append("Property address is required")
 
         # Check commission
-        terms = getattr(deal, 'terms', None)
+        terms = getattr(deal, "terms", None)
         commission = None
         if terms and terms.commission_total:
             commission = terms.commission_total
@@ -177,7 +185,7 @@ class DocumentService:
                     "document_hash": doc_hash,
                     "deal_type": deal.type.value if deal.type else None,
                 },
-                success=True
+                success=True,
             )
 
             return document
@@ -191,7 +199,7 @@ class DocumentService:
                     "error": str(e),
                     "deal_type": deal.type.value if deal.type else None,
                 },
-                success=False
+                success=False,
             )
             raise
 
@@ -205,12 +213,12 @@ class DocumentService:
     async def _prepare_contract_context(self, deal: Deal) -> dict:
         """Prepare context for contract rendering"""
         # Get parties if available (full deal flow)
-        parties = getattr(deal, 'parties', None) or []
+        parties = getattr(deal, "parties", None) or []
         client_party = next((p for p in parties if str(p.party_role) == "client"), None)
         executor_party = next((p for p in parties if str(p.party_role) == "executor"), None)
 
         # Get terms if available (full deal flow)
-        terms = getattr(deal, 'terms', None)
+        terms = getattr(deal, "terms", None)
 
         # Determine commission amount (as number)
         if terms and terms.commission_total:
@@ -255,7 +263,7 @@ class DocumentService:
             "secondary_buy": "Покупка вторичного жилья",
             "secondary_sell": "Продажа вторичного жилья",
             "newbuild_booking": "Бронирование новостройки",
-        }.get(str(deal.type.value) if hasattr(deal.type, 'value') else str(deal.type), str(deal.type))
+        }.get(str(deal.type.value) if hasattr(deal.type, "value") else str(deal.type), str(deal.type))
 
         # Contract number
         contract_number = self._generate_contract_number(deal)
@@ -268,19 +276,19 @@ class DocumentService:
             client_phone = client_party.phone_snapshot or client_phone
 
         # Executor info (from settings or party)
-        executor_name = getattr(settings, 'COMPANY_NAME', 'Исполнитель')
-        executor_inn = getattr(settings, 'COMPANY_INN', 'не указан') or 'не указан'
-        executor_kpp = getattr(settings, 'COMPANY_KPP', '') or ''
-        executor_ogrn = getattr(settings, 'COMPANY_OGRN', '') or ''
-        executor_address = getattr(settings, 'COMPANY_ADDRESS', '') or ''
-        executor_phone = getattr(settings, 'COMPANY_PHONE', '') or ''
-        executor_email = getattr(settings, 'COMPANY_EMAIL', '') or ''
+        executor_name = getattr(settings, "COMPANY_NAME", "Исполнитель")
+        executor_inn = getattr(settings, "COMPANY_INN", "не указан") or "не указан"
+        executor_kpp = getattr(settings, "COMPANY_KPP", "") or ""
+        executor_ogrn = getattr(settings, "COMPANY_OGRN", "") or ""
+        executor_address = getattr(settings, "COMPANY_ADDRESS", "") or ""
+        executor_phone = getattr(settings, "COMPANY_PHONE", "") or ""
+        executor_email = getattr(settings, "COMPANY_EMAIL", "") or ""
 
         # Bank details
-        bank_name = getattr(settings, 'COMPANY_BANK_NAME', '') or ''
-        bank_bik = getattr(settings, 'COMPANY_BANK_BIK', '') or ''
-        bank_account = getattr(settings, 'COMPANY_BANK_ACCOUNT', '') or ''
-        bank_corr = getattr(settings, 'COMPANY_BANK_CORR', '') or ''
+        bank_name = getattr(settings, "COMPANY_BANK_NAME", "") or ""
+        bank_bik = getattr(settings, "COMPANY_BANK_BIK", "") or ""
+        bank_account = getattr(settings, "COMPANY_BANK_ACCOUNT", "") or ""
+        bank_corr = getattr(settings, "COMPANY_BANK_CORR", "") or ""
 
         # Build bank details block (only if filled)
         executor_bank_block = ""
@@ -302,15 +310,12 @@ class DocumentService:
             # Contract info
             "contract_number": contract_number,
             "contract_date": datetime.now().strftime("%d.%m.%Y"),
-
             # Deal info
             "deal_type": deal_type_label,
             "property_address": deal.property_address or "не указан",
-
             # Client info
             "client_name": client_name,
             "client_phone": client_phone,
-
             # Executor info (full requisites)
             "executor_name": executor_name,
             "executor_inn": executor_inn,
@@ -320,12 +325,10 @@ class DocumentService:
             "executor_phone": executor_phone,
             "executor_email": executor_email or "-",
             "executor_bank_block": executor_bank_block,
-
             # Financial info
             "commission_total": commission_total,
             "commission_words": commission_words,
             "payment_plan_rows": payment_plan_rows,
-
             # Document hash (placeholder, will be replaced after PDF generation)
             "document_hash": "generating...",
         }
@@ -340,10 +343,6 @@ class DocumentService:
 
     async def get_deal_documents(self, deal_id: UUID) -> list[Document]:
         """Get all documents for deal"""
-        stmt = (
-            select(Document)
-            .where(Document.deal_id == deal_id)
-            .order_by(Document.version_no.desc())
-        )
+        stmt = select(Document).where(Document.deal_id == deal_id).order_by(Document.version_no.desc())
         result = await self.db.execute(stmt)
         return list(result.scalars().all())

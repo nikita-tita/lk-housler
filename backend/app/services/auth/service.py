@@ -24,10 +24,6 @@ class AuthService:
         """Send OTP for authentication - NOT IMPLEMENTED"""
         raise ValueError("Authentication is handled by agent.housler.ru")
 
-    async def login_with_otp(
-        self,
-        phone: str,
-        code: str
-    ) -> Tuple[User, str, str]:
+    async def login_with_otp(self, phone: str, code: str) -> Tuple[User, str, str]:
         """Login with OTP - NOT IMPLEMENTED"""
         raise ValueError("Authentication is handled by agent.housler.ru")

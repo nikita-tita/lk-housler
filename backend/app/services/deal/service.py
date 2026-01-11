@@ -35,14 +35,7 @@ class DealService:
 
     async def get_by_id(self, deal_id: UUID, include_deleted: bool = False) -> Optional[Deal]:
         """Get deal by ID"""
-        stmt = (
-            select(Deal)
-            .where(Deal.id == deal_id)
-            .options(
-                selectinload(Deal.parties),
-                selectinload(Deal.terms)
-            )
-        )
+        stmt = select(Deal).where(Deal.id == deal_id).options(selectinload(Deal.parties), selectinload(Deal.terms))
         if not include_deleted:
             stmt = stmt.where(Deal.deleted_at.is_(None))
         result = await self.db.execute(stmt)
@@ -54,17 +47,11 @@ class DealService:
         status: Optional[DealStatus] = None,
         page: int = 1,
         page_size: int = 20,
-        include_deleted: bool = False
+        include_deleted: bool = False,
     ) -> Tuple[List[Deal], int]:
         """List deals for user"""
         # Base query: deals where user is creator or agent
-        stmt = (
-            select(Deal)
-            .where(
-                (Deal.created_by_user_id == user.id)
-                | (Deal.agent_user_id == user.id)
-            )
-        )
+        stmt = select(Deal).where((Deal.created_by_user_id == user.id) | (Deal.agent_user_id == user.id))
 
         # Exclude soft-deleted by default
         if not include_deleted:
@@ -79,23 +66,14 @@ class DealService:
         total = total_result.scalar()
 
         # Paginate
-        stmt = (
-            stmt
-            .order_by(Deal.created_at.desc())
-            .offset((page - 1) * page_size)
-            .limit(page_size)
-        )
+        stmt = stmt.order_by(Deal.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
 
         result = await self.db.execute(stmt)
         deals = list(result.scalars().all())
 
         return deals, total
 
-    async def create(
-        self,
-        deal_in: DealCreate,
-        creator: User
-    ) -> Deal:
+    async def create(self, deal_in: DealCreate, creator: User) -> Deal:
         """Create new deal"""
         # Validate split rule percentages add up to 100
         split_total = sum(deal_in.terms.split_rule.values())
@@ -155,11 +133,7 @@ class DealService:
 
         return deal
 
-    async def create_simple(
-        self,
-        deal_in: DealCreateSimple,
-        creator: User
-    ) -> Deal:
+    async def create_simple(self, deal_in: DealCreateSimple, creator: User) -> Deal:
         """Create deal with simplified schema (MVP)"""
         # Build full address from structured input
         full_address = deal_in.address.to_full_address()
@@ -184,11 +158,7 @@ class DealService:
 
         return deal
 
-    async def update(
-        self,
-        deal: Deal,
-        deal_in: DealUpdate
-    ) -> Deal:
+    async def update(self, deal: Deal, deal_in: DealUpdate) -> Deal:
         """Update deal"""
         # Only allow updates to draft deals or specific fields
         if deal.status not in [DealStatus.DRAFT, DealStatus.AWAITING_SIGNATURES]:

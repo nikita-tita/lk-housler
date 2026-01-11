@@ -30,7 +30,7 @@ class TemplateService:
         status: Optional[TemplateStatus] = None,
         active_only: bool = False,
         limit: int = 50,
-        offset: int = 0
+        offset: int = 0,
     ) -> Tuple[List[ContractTemplate], int]:
         """List templates with filters"""
         conditions = []
@@ -76,7 +76,7 @@ class TemplateService:
             and_(
                 ContractTemplate.code == code,
                 ContractTemplate.active.is_(True),
-                ContractTemplate.status == TemplateStatus.PUBLISHED
+                ContractTemplate.status == TemplateStatus.PUBLISHED,
             )
         )
         result = await self.db.execute(stmt)
@@ -93,7 +93,7 @@ class TemplateService:
         description: Optional[str] = None,
         legal_basis: Optional[str] = None,
         effective_from: Optional[datetime] = None,
-        created_by: Optional[User] = None
+        created_by: Optional[User] = None,
     ) -> ContractTemplate:
         """Create new template"""
         template = ContractTemplate(
@@ -108,7 +108,7 @@ class TemplateService:
             effective_from=effective_from,
             status=TemplateStatus.DRAFT,
             active=False,
-            created_by_user_id=created_by.id if created_by else None
+            created_by_user_id=created_by.id if created_by else None,
         )
         self.db.add(template)
         await self.db.flush()
@@ -123,7 +123,7 @@ class TemplateService:
         template_body: Optional[str] = None,
         placeholders_schema: Optional[Dict[str, Any]] = None,
         legal_basis: Optional[str] = None,
-        effective_from: Optional[datetime] = None
+        effective_from: Optional[datetime] = None,
     ) -> ContractTemplate:
         """Update template (only drafts can be updated)"""
         if template.status != TemplateStatus.DRAFT:
@@ -174,11 +174,7 @@ class TemplateService:
         await self.db.refresh(template)
         return template
 
-    async def approve(
-        self,
-        template: ContractTemplate,
-        approved_by: User
-    ) -> ContractTemplate:
+    async def approve(self, template: ContractTemplate, approved_by: User) -> ContractTemplate:
         """Approve template (requires legal role)"""
         if template.status != TemplateStatus.PENDING_REVIEW:
             raise ValueError("Only pending templates can be approved")
@@ -207,14 +203,11 @@ class TemplateService:
             raise ValueError("Only published templates can be activated")
 
         # Deactivate other templates with same code
-        stmt = (
-            select(ContractTemplate)
-            .where(
-                and_(
-                    ContractTemplate.code == template.code,
-                    ContractTemplate.id != template.id,
-                    ContractTemplate.active.is_(True)
-                )
+        stmt = select(ContractTemplate).where(
+            and_(
+                ContractTemplate.code == template.code,
+                ContractTemplate.id != template.id,
+                ContractTemplate.active.is_(True),
             )
         )
         result = await self.db.execute(stmt)
@@ -240,17 +233,13 @@ class TemplateService:
     # Validation & Preview
     # =========================================================================
 
-    def validate_template(
-        self,
-        template_body: str,
-        placeholders_schema: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def validate_template(self, template_body: str, placeholders_schema: Dict[str, Any]) -> Dict[str, Any]:
         """Validate template HTML and placeholders"""
         errors = []
         warnings = []
 
         # Find all placeholders in template
-        placeholders_found = set(re.findall(r'\{\{(\w+)\}\}', template_body))
+        placeholders_found = set(re.findall(r"\{\{(\w+)\}\}", template_body))
 
         # Check required placeholders from schema
         required = placeholders_schema.get("required", [])
@@ -278,17 +267,13 @@ class TemplateService:
             "valid": len(errors) == 0,
             "errors": errors,
             "warnings": warnings,
-            "placeholders_found": list(placeholders_found)
+            "placeholders_found": list(placeholders_found),
         }
 
-    def preview_template(
-        self,
-        template_body: str,
-        test_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def preview_template(self, template_body: str, test_data: Dict[str, Any]) -> Dict[str, Any]:
         """Preview template with test data"""
         # Find all placeholders
-        placeholders = set(re.findall(r'\{\{(\w+)\}\}', template_body))
+        placeholders = set(re.findall(r"\{\{(\w+)\}\}", template_body))
 
         # Check which are provided and which are missing
         provided = set(test_data.keys())
@@ -298,11 +283,7 @@ class TemplateService:
         # Render with test data
         html = self.generator.render_template(template_body, test_data)
 
-        return {
-            "html": html,
-            "placeholders_used": list(used),
-            "placeholders_missing": list(missing)
-        }
+        return {"html": html, "placeholders_used": list(used), "placeholders_missing": list(missing)}
 
     # =========================================================================
     # Seed Hardcoded Templates
@@ -316,28 +297,28 @@ class TemplateService:
                 "type": TemplateType.SECONDARY_BUY,
                 "name": "Договор на подбор объекта (покупка вторичной недвижимости)",
                 "template_body": ContractTemplates.SECONDARY_BUY_TEMPLATE,
-                "legal_basis": "ГК РФ глава 39, 63-ФЗ, 152-ФЗ"
+                "legal_basis": "ГК РФ глава 39, 63-ФЗ, 152-ФЗ",
             },
             {
                 "code": "secondary_sell",
                 "type": TemplateType.SECONDARY_SELL,
                 "name": "Договор на продажу объекта (продажа вторичной недвижимости)",
                 "template_body": ContractTemplates.SECONDARY_SELL_TEMPLATE,
-                "legal_basis": "ГК РФ глава 39, 63-ФЗ, 152-ФЗ"
+                "legal_basis": "ГК РФ глава 39, 63-ФЗ, 152-ФЗ",
             },
             {
                 "code": "newbuild_booking",
                 "type": TemplateType.NEWBUILD_BOOKING,
                 "name": "Договор на бронирование квартиры в новостройке",
                 "template_body": ContractTemplates.NEWBUILD_BOOKING_TEMPLATE,
-                "legal_basis": "ГК РФ глава 39, 63-ФЗ, 152-ФЗ, 214-ФЗ"
+                "legal_basis": "ГК РФ глава 39, 63-ФЗ, 152-ФЗ, 214-ФЗ",
             },
             {
                 "code": "act",
                 "type": TemplateType.ACT,
                 "name": "Акт сдачи-приемки оказанных услуг",
                 "template_body": ContractTemplates.ACT_TEMPLATE,
-                "legal_basis": "ГК РФ ст. 720"
+                "legal_basis": "ГК РФ ст. 720",
             },
         ]
 
@@ -352,7 +333,7 @@ class TemplateService:
                 "client_name",
                 "client_phone",
                 "property_address",
-                "commission_total"
+                "commission_total",
             ],
             "properties": {
                 "contract_number": {"type": "string"},
@@ -372,7 +353,7 @@ class TemplateService:
                 "commission_words": {"type": "string"},
                 "payment_plan_rows": {"type": "string"},
                 "document_hash": {"type": "string"},
-            }
+            },
         }
 
         created = []
@@ -389,7 +370,7 @@ class TemplateService:
                 template_body=data["template_body"],
                 placeholders_schema=default_schema,
                 version="1.0",
-                legal_basis=data["legal_basis"]
+                legal_basis=data["legal_basis"],
             )
             # Auto-publish and activate
             template.status = TemplateStatus.PUBLISHED

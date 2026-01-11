@@ -13,10 +13,7 @@ class PaymentProvider(ABC):
 
     @abstractmethod
     async def create_payment_intent(
-        self,
-        amount: Decimal,
-        currency: str = "RUB",
-        metadata: Optional[Dict[str, Any]] = None
+        self, amount: Decimal, currency: str = "RUB", metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Create payment intent and return payment link"""
         pass
@@ -27,11 +24,7 @@ class PaymentProvider(ABC):
         pass
 
     @abstractmethod
-    async def refund_payment(
-        self,
-        provider_tx_id: str,
-        amount: Optional[Decimal] = None
-    ) -> Dict[str, Any]:
+    async def refund_payment(self, provider_tx_id: str, amount: Optional[Decimal] = None) -> Dict[str, Any]:
         """Refund payment"""
         pass
 
@@ -40,10 +33,7 @@ class MockPaymentProvider(PaymentProvider):
     """Mock payment provider for development"""
 
     async def create_payment_intent(
-        self,
-        amount: Decimal,
-        currency: str = "RUB",
-        metadata: Optional[Dict[str, Any]] = None
+        self, amount: Decimal, currency: str = "RUB", metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Mock create payment intent"""
         intent_id = f"mock_intent_{uuid4().hex[:16]}"
@@ -67,11 +57,7 @@ class MockPaymentProvider(PaymentProvider):
             "status": "pending",
         }
 
-    async def refund_payment(
-        self,
-        provider_tx_id: str,
-        amount: Optional[Decimal] = None
-    ) -> Dict[str, Any]:
+    async def refund_payment(self, provider_tx_id: str, amount: Optional[Decimal] = None) -> Dict[str, Any]:
         """Mock refund"""
         print(f"[Payment Mock] Refund: {provider_tx_id}, amount: {amount}")
         return {
@@ -88,10 +74,7 @@ class RealPaymentProvider(PaymentProvider):
         # TODO: Initialize real provider client
 
     async def create_payment_intent(
-        self,
-        amount: Decimal,
-        currency: str = "RUB",
-        metadata: Optional[Dict[str, Any]] = None
+        self, amount: Decimal, currency: str = "RUB", metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Create real payment intent"""
         # TODO: Implement real СБП integration
@@ -108,11 +91,7 @@ class RealPaymentProvider(PaymentProvider):
     async def get_payment_status(self, provider_intent_id: str) -> Dict[str, Any]:
         raise NotImplementedError("Real payment provider not implemented yet")
 
-    async def refund_payment(
-        self,
-        provider_tx_id: str,
-        amount: Optional[Decimal] = None
-    ) -> Dict[str, Any]:
+    async def refund_payment(self, provider_tx_id: str, amount: Optional[Decimal] = None) -> Dict[str, Any]:
         raise NotImplementedError("Real payment provider not implemented yet")
 
 

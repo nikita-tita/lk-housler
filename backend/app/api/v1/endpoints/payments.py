@@ -19,6 +19,7 @@ router = APIRouter()
 
 class CreatePaymentIntentRequest(BaseModel):
     """Create payment intent request"""
+
     deal_id: str
     amount: int  # in kopeks
     description: Optional[str] = None
@@ -26,6 +27,7 @@ class CreatePaymentIntentRequest(BaseModel):
 
 class PaymentIntentResponse(BaseModel):
     """Payment intent response"""
+
     payment_intent_id: str
     payment_url: str
     amount: int
@@ -36,7 +38,7 @@ class PaymentIntentResponse(BaseModel):
 async def create_payment_intent(
     request: CreatePaymentIntentRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Create payment intent for deal"""
     try:
@@ -44,36 +46,29 @@ async def create_payment_intent(
 
         # Create payment intent
         intent = await payment_service.create_intent(
-            deal_id=request.deal_id,
-            amount=request.amount,
-            description=request.description
+            deal_id=request.deal_id, amount=request.amount, description=request.description
         )
 
         return PaymentIntentResponse(
             payment_intent_id=str(intent.id),
             payment_url=intent.sbp_link or "",
             amount=int(intent.amount),
-            status=intent.status.value
+            status=intent.status.value,
         )
 
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to create payment intent: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create payment. Please try again later."
+            detail="Failed to create payment. Please try again later.",
         )
 
 
 @router.get("/{payment_id}")
 async def get_payment(
-    payment_id: str,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    payment_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     """Get payment status"""
     try:
@@ -81,10 +76,7 @@ async def get_payment(
         payment = await payment_service.get_payment_with_details(payment_id)
 
         if not payment:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Payment not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
 
         # Get deal_id through relationships: payment -> intent -> schedule -> deal_id
         deal_id = None
@@ -97,7 +89,7 @@ async def get_payment(
             "amount": int(payment.gross_amount),
             "status": payment.status.value,
             "created_at": payment.created_at.isoformat(),
-            "paid_at": payment.paid_at.isoformat() if payment.paid_at else None
+            "paid_at": payment.paid_at.isoformat() if payment.paid_at else None,
         }
 
     except HTTPException:
@@ -105,16 +97,12 @@ async def get_payment(
     except Exception as e:
         logger.error(f"Failed to get payment {payment_id}: {e}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve payment information."
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve payment information."
         )
 
 
 @router.post("/webhooks")
-async def payment_webhook(
-    request: Request,
-    db: AsyncSession = Depends(get_db)
-):
+async def payment_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     """Payment provider webhook
 
     This endpoint receives payment status updates from the payment provider.
@@ -127,20 +115,13 @@ async def payment_webhook(
             if not settings.PAYMENT_WEBHOOK_SECRET:
                 logger.error("PAYMENT_WEBHOOK_SECRET not configured in production")
                 raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Server configuration error"
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Server configuration error"
                 )
             if not webhook_secret or webhook_secret != settings.PAYMENT_WEBHOOK_SECRET:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid webhook secret"
-                )
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook secret")
         elif settings.PAYMENT_WEBHOOK_SECRET:
             if not webhook_secret or webhook_secret != settings.PAYMENT_WEBHOOK_SECRET:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid webhook secret"
-                )
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook secret")
 
         # Get webhook data
         data = await request.json()
@@ -154,15 +135,11 @@ async def payment_webhook(
         metadata = data.get("metadata")
 
         if not provider_intent_id or not status_value:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Missing provider_intent_id or status"
-            )
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing provider_intent_id or status")
 
         if status_value == "paid" and not provider_tx_id:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Missing provider_tx_id for paid status"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Missing provider_tx_id for paid status"
             )
 
         # Check for duplicate webhook (idempotency)
@@ -177,7 +154,7 @@ async def payment_webhook(
             provider_intent_id=provider_intent_id,
             provider_tx_id=provider_tx_id or "",
             status=status_value,
-            metadata=metadata
+            metadata=metadata,
         )
 
         await db.commit()
@@ -187,10 +164,7 @@ async def payment_webhook(
         raise
     except ValueError as e:
         logger.warning(f"Payment webhook validation error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         # Log error but return 200 to avoid webhook retry storms
         logger.error(f"Payment webhook error: {e}", exc_info=True)

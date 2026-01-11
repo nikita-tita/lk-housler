@@ -11,6 +11,7 @@ from app.db.base import BaseModel, SoftDeleteMixin
 
 class DealType(str, PyEnum):
     """Deal type"""
+
     SECONDARY_BUY = "secondary_buy"
     SECONDARY_SELL = "secondary_sell"
     NEWBUILD_BOOKING = "newbuild_booking"
@@ -18,6 +19,7 @@ class DealType(str, PyEnum):
 
 class DealStatus(str, PyEnum):
     """Deal status"""
+
     DRAFT = "draft"
     AWAITING_SIGNATURES = "awaiting_signatures"
     SIGNED = "signed"
@@ -30,13 +32,15 @@ class DealStatus(str, PyEnum):
 
 class ExecutorType(str, PyEnum):
     """Executor type"""
-    USER = "user"           # Агент сам на себя
-    ORG = "org"            # Агентство
+
+    USER = "user"  # Агент сам на себя
+    ORG = "org"  # Агентство
     DEVELOPER = "developer"  # Застройщик (Phase 2)
 
 
 class PartyRole(str, PyEnum):
     """Deal party role"""
+
     CLIENT = "client"
     EXECUTOR = "executor"
     AGENT = "agent"
@@ -46,6 +50,7 @@ class PartyRole(str, PyEnum):
 
 class PartyType(str, PyEnum):
     """Party type"""
+
     USER = "user"
     ORG = "org"
     EXTERNAL = "external"  # Клиент без регистрации
@@ -73,12 +78,7 @@ class Deal(BaseModel, SoftDeleteMixin):
     client_name = Column(String(255), nullable=True)
     client_phone = Column(String(20), nullable=True)
 
-    status = Column(
-        Enum(DealStatus),
-        default=DealStatus.DRAFT,
-        nullable=False,
-        index=True
-    )
+    status = Column(Enum(DealStatus), default=DealStatus.DRAFT, nullable=False, index=True)
 
     # Адрес объекта недвижимости
     property_address = Column(Text, nullable=True)

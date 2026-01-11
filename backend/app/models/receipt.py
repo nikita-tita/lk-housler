@@ -11,6 +11,7 @@ from app.db.base import BaseModel
 
 class ReceiptType(str, PyEnum):
     """Receipt type"""
+
     KKT_54FZ = "kkt_54fz"
     BANK_RECEIPT = "bank_receipt"
     NPD_ATTACHMENT = "npd_attachment"
@@ -19,6 +20,7 @@ class ReceiptType(str, PyEnum):
 
 class ReceiptStatus(str, PyEnum):
     """Receipt status"""
+
     PENDING = "pending"
     READY = "ready"
     REJECTED = "rejected"
@@ -26,6 +28,7 @@ class ReceiptStatus(str, PyEnum):
 
 class NPDTaskStatus(str, PyEnum):
     """NPD task status"""
+
     OPEN = "open"
     SUBMITTED = "submitted"
     OVERDUE = "overdue"
@@ -42,11 +45,7 @@ class Receipt(BaseModel):
 
     url = Column(String(500), nullable=True)
 
-    status = Column(
-        Enum(ReceiptStatus),
-        default=ReceiptStatus.PENDING,
-        nullable=False
-    )
+    status = Column(Enum(ReceiptStatus), default=ReceiptStatus.PENDING, nullable=False)
 
     meta = Column(JSONB, nullable=True)
 
@@ -64,8 +63,4 @@ class NPDTask(BaseModel):
 
     due_at = Column(DateTime, nullable=False)
 
-    status = Column(
-        Enum(NPDTaskStatus),
-        default=NPDTaskStatus.OPEN,
-        nullable=False
-    )
+    status = Column(Enum(NPDTaskStatus), default=NPDTaskStatus.OPEN, nullable=False)

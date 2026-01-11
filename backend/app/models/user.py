@@ -14,6 +14,7 @@ from app.db.base import Base
 
 class UserRole(str, PyEnum):
     """User role in Housler ecosystem (matches DB enum 'user_role')"""
+
     CLIENT = "client"
     AGENT = "agent"
     AGENCY_ADMIN = "agency_admin"

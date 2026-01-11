@@ -11,6 +11,7 @@ from app.db.base import BaseModel
 
 class EntryType(str, PyEnum):
     """Ledger entry type"""
+
     PAYMENT_IN = "payment_in"
     ACQ_FEE = "acq_fee"
     BANK_REBATE = "bank_rebate"
@@ -22,6 +23,7 @@ class EntryType(str, PyEnum):
 
 class Account(str, PyEnum):
     """Ledger account"""
+
     PLATFORM = "platform"
     BANK = "bank"
     AGENCY = "agency"
@@ -32,6 +34,7 @@ class Account(str, PyEnum):
 
 class SplitStatus(str, PyEnum):
     """Split status"""
+
     SCHEDULED = "scheduled"
     HELD = "held"
     PAID = "paid"
@@ -40,6 +43,7 @@ class SplitStatus(str, PyEnum):
 
 class PayoutStatus(str, PyEnum):
     """Payout status"""
+
     INITIATED = "initiated"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
@@ -74,12 +78,7 @@ class Split(BaseModel):
 
     amount = Column(Numeric(15, 2), nullable=False)
 
-    status = Column(
-        Enum(SplitStatus),
-        default=SplitStatus.SCHEDULED,
-        nullable=False,
-        index=True
-    )
+    status = Column(Enum(SplitStatus), default=SplitStatus.SCHEDULED, nullable=False, index=True)
 
     # Relationships
     payment = relationship("Payment", back_populates="splits")
@@ -95,12 +94,7 @@ class Payout(BaseModel):
 
     provider_payout_id = Column(String(255), nullable=True, index=True)
 
-    status = Column(
-        Enum(PayoutStatus),
-        default=PayoutStatus.INITIATED,
-        nullable=False,
-        index=True
-    )
+    status = Column(Enum(PayoutStatus), default=PayoutStatus.INITIATED, nullable=False, index=True)
 
     error_code = Column(String(100), nullable=True)
     hold_until = Column(DateTime, nullable=True)

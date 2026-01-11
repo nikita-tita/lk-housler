@@ -11,6 +11,7 @@ from app.db.base import BaseModel
 
 class TriggerType(str, PyEnum):
     """Payment trigger type"""
+
     IMMEDIATE = "immediate"
     MILESTONE = "milestone"
     DATE = "date"
@@ -19,6 +20,7 @@ class TriggerType(str, PyEnum):
 
 class PaymentScheduleStatus(str, PyEnum):
     """Payment schedule status"""
+
     LOCKED = "locked"
     AVAILABLE = "available"
     PAID = "paid"
@@ -28,6 +30,7 @@ class PaymentScheduleStatus(str, PyEnum):
 
 class PaymentIntentStatus(str, PyEnum):
     """Payment intent status"""
+
     CREATED = "created"
     PENDING = "pending"
     PAID = "paid"
@@ -37,6 +40,7 @@ class PaymentIntentStatus(str, PyEnum):
 
 class PaymentStatus(str, PyEnum):
     """Payment status"""
+
     PENDING = "pending"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
@@ -59,12 +63,7 @@ class PaymentSchedule(BaseModel):
     trigger_meta = Column(JSONB, nullable=True)
     # Например: {"milestone": "registration_confirmed", "proof_required": true}
 
-    status = Column(
-        Enum(PaymentScheduleStatus),
-        default=PaymentScheduleStatus.LOCKED,
-        nullable=False,
-        index=True
-    )
+    status = Column(Enum(PaymentScheduleStatus), default=PaymentScheduleStatus.LOCKED, nullable=False, index=True)
 
     # Relationships
     deal = relationship("Deal", back_populates="payment_schedules")
@@ -85,12 +84,7 @@ class PaymentIntent(BaseModel):
 
     expires_at = Column(DateTime, nullable=True)
 
-    status = Column(
-        Enum(PaymentIntentStatus),
-        default=PaymentIntentStatus.CREATED,
-        nullable=False,
-        index=True
-    )
+    status = Column(Enum(PaymentIntentStatus), default=PaymentIntentStatus.CREATED, nullable=False, index=True)
 
     provider_intent_id = Column(String(255), nullable=True, index=True)
     idempotency_key = Column(String(255), nullable=False, unique=True, index=True)
@@ -112,12 +106,7 @@ class Payment(BaseModel):
     paid_at = Column(DateTime, nullable=False)
     gross_amount = Column(Numeric(15, 2), nullable=False)
 
-    status = Column(
-        Enum(PaymentStatus),
-        default=PaymentStatus.SUCCEEDED,
-        nullable=False,
-        index=True
-    )
+    status = Column(Enum(PaymentStatus), default=PaymentStatus.SUCCEEDED, nullable=False, index=True)
 
     # Метаданные от провайдера
     provider_meta = Column(JSONB, nullable=True)

@@ -38,24 +38,15 @@ class PaymentService:
         self.db = db
         self.provider = get_payment_provider()
 
-    async def create_payment_intent(
-        self,
-        schedule: PaymentSchedule
-    ) -> PaymentIntent:
+    async def create_payment_intent(self, schedule: PaymentSchedule) -> PaymentIntent:
         """Create payment intent for schedule step"""
         if schedule.status != PaymentScheduleStatus.AVAILABLE:
             raise ValueError("Payment schedule step is not available")
 
         # Check if already has pending intent
-        stmt = (
-            select(PaymentIntent)
-            .where(
-                PaymentIntent.schedule_id == schedule.id,
-                PaymentIntent.status.in_([
-                    PaymentIntentStatus.CREATED,
-                    PaymentIntentStatus.PENDING
-                ])
-            )
+        stmt = select(PaymentIntent).where(
+            PaymentIntent.schedule_id == schedule.id,
+            PaymentIntent.status.in_([PaymentIntentStatus.CREATED, PaymentIntentStatus.PENDING]),
         )
         result = await self.db.execute(stmt)
         existing = result.scalar_one_or_none()
@@ -72,7 +63,7 @@ class PaymentService:
             metadata={
                 "deal_id": str(schedule.deal_id),
                 "step_no": schedule.step_no,
-            }
+            },
         )
 
         # Create intent record
@@ -97,6 +88,7 @@ class PaymentService:
 
         if deal:
             from app.services.deal.service import DealService
+
             deal_service = DealService(self.db)
             try:
                 await deal_service.transition_to_payment_pending(deal)
@@ -109,17 +101,11 @@ class PaymentService:
         return intent
 
     async def process_payment_webhook(
-        self,
-        provider_intent_id: str,
-        provider_tx_id: str,
-        status: str,
-        metadata: Optional[dict] = None
+        self, provider_intent_id: str, provider_tx_id: str, status: str, metadata: Optional[dict] = None
     ) -> Payment:
         """Process payment webhook from provider"""
         # Find intent
-        stmt = select(PaymentIntent).where(
-            PaymentIntent.provider_intent_id == provider_intent_id
-        )
+        stmt = select(PaymentIntent).where(PaymentIntent.provider_intent_id == provider_intent_id)
         result = await self.db.execute(stmt)
         intent = result.scalar_one_or_none()
 
@@ -142,16 +128,14 @@ class PaymentService:
             intent.status = PaymentIntentStatus.PAID
 
             # Update schedule status with validation
-            stmt_schedule = (
-                select(PaymentSchedule)
-                .where(PaymentSchedule.id == intent.schedule_id)
-            )
+            stmt_schedule = select(PaymentSchedule).where(PaymentSchedule.id == intent.schedule_id)
             result_schedule = await self.db.execute(stmt_schedule)
             schedule = result_schedule.scalar_one()
             await self._set_schedule_status(schedule, PaymentScheduleStatus.PAID)
 
             # Create ledger entries and splits
             from app.services.ledger.service import LedgerService
+
             ledger_service = LedgerService(self.db)
             await ledger_service.process_payment(payment)
 
@@ -165,6 +149,7 @@ class PaymentService:
 
             if deal:
                 from app.services.deal.service import DealService
+
                 deal_service = DealService(self.db)
                 try:
                     await deal_service.transition_to_in_progress(deal)
@@ -185,40 +170,26 @@ class PaymentService:
 
     async def get_deal_payment_schedules(self, deal_id: UUID) -> list[PaymentSchedule]:
         """Get all payment schedules for deal"""
-        stmt = (
-            select(PaymentSchedule)
-            .where(PaymentSchedule.deal_id == deal_id)
-            .order_by(PaymentSchedule.step_no)
-        )
+        stmt = select(PaymentSchedule).where(PaymentSchedule.deal_id == deal_id).order_by(PaymentSchedule.step_no)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
-    async def create_intent(
-        self,
-        deal_id: str,
-        amount: int,
-        description: Optional[str] = None
-    ) -> PaymentIntent:
+    async def create_intent(self, deal_id: str, amount: int, description: Optional[str] = None) -> PaymentIntent:
         """Create payment intent for deal (simplified API)"""
         # Convert deal_id to UUID
         from uuid import UUID
+
         deal_uuid = UUID(deal_id)
 
         # Find or create payment schedule
-        stmt = select(PaymentSchedule).where(
-            PaymentSchedule.deal_id == deal_uuid
-        ).order_by(PaymentSchedule.step_no)
+        stmt = select(PaymentSchedule).where(PaymentSchedule.deal_id == deal_uuid).order_by(PaymentSchedule.step_no)
         result = await self.db.execute(stmt)
         schedule = result.scalars().first()
 
         if not schedule:
             # Create default schedule
             schedule = PaymentSchedule(
-                deal_id=deal_uuid,
-                step_no=1,
-                amount=amount,
-                currency="RUB",
-                status=PaymentScheduleStatus.AVAILABLE
+                deal_id=deal_uuid, step_no=1, amount=amount, currency="RUB", status=PaymentScheduleStatus.AVAILABLE
             )
             self.db.add(schedule)
             await self.db.flush()
@@ -229,6 +200,7 @@ class PaymentService:
     async def get_payment(self, payment_id: str) -> Optional[Payment]:
         """Get payment by ID"""
         from uuid import UUID
+
         payment_uuid = UUID(payment_id)
 
         stmt = select(Payment).where(Payment.id == payment_uuid)
@@ -238,14 +210,13 @@ class PaymentService:
     async def get_payment_with_details(self, payment_id: str) -> Optional[Payment]:
         """Get payment by ID with related intent and schedule loaded"""
         from uuid import UUID
+
         payment_uuid = UUID(payment_id)
 
         stmt = (
             select(Payment)
             .where(Payment.id == payment_uuid)
-            .options(
-                selectinload(Payment.intent).selectinload(PaymentIntent.schedule)
-            )
+            .options(selectinload(Payment.intent).selectinload(PaymentIntent.schedule))
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
@@ -256,14 +227,10 @@ class PaymentService:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def update_payment_status(
-        self,
-        payment_id: str,
-        status: str,
-        provider_payment_id: Optional[str] = None
-    ):
+    async def update_payment_status(self, payment_id: str, status: str, provider_payment_id: Optional[str] = None):
         """Update payment status from webhook"""
         from uuid import UUID
+
         payment_uuid = UUID(payment_id)
 
         stmt = select(Payment).where(Payment.id == payment_uuid)
@@ -287,23 +254,13 @@ class PaymentService:
 
         await self.db.flush()
 
-    def _validate_schedule_transition(
-        self,
-        schedule: PaymentSchedule,
-        new_status: PaymentScheduleStatus
-    ) -> None:
+    def _validate_schedule_transition(self, schedule: PaymentSchedule, new_status: PaymentScheduleStatus) -> None:
         """Validate payment schedule status transition"""
         allowed = SCHEDULE_TRANSITIONS.get(schedule.status, set())
         if new_status not in allowed:
-            raise ValueError(
-                f"Invalid schedule transition: {schedule.status.value} -> {new_status.value}"
-            )
+            raise ValueError(f"Invalid schedule transition: {schedule.status.value} -> {new_status.value}")
 
-    async def _set_schedule_status(
-        self,
-        schedule: PaymentSchedule,
-        new_status: PaymentScheduleStatus
-    ) -> None:
+    async def _set_schedule_status(self, schedule: PaymentSchedule, new_status: PaymentScheduleStatus) -> None:
         """Set schedule status with validation"""
         self._validate_schedule_transition(schedule, new_status)
         schedule.status = new_status
@@ -312,13 +269,10 @@ class PaymentService:
     async def activate_next_step(self, deal_id: UUID, current_step_no: int) -> Optional[PaymentSchedule]:
         """Activate next payment step after current step is paid"""
         # Find next step
-        stmt = (
-            select(PaymentSchedule)
-            .where(
-                PaymentSchedule.deal_id == deal_id,
-                PaymentSchedule.step_no == current_step_no + 1,
-                PaymentSchedule.status == PaymentScheduleStatus.LOCKED
-            )
+        stmt = select(PaymentSchedule).where(
+            PaymentSchedule.deal_id == deal_id,
+            PaymentSchedule.step_no == current_step_no + 1,
+            PaymentSchedule.status == PaymentScheduleStatus.LOCKED,
         )
         result = await self.db.execute(stmt)
         next_step = result.scalar_one_or_none()

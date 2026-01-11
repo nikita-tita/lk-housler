@@ -11,6 +11,7 @@ from app.services.sms.provider import SMSProvider
 
 class OTPData:
     """OTP data stored in Redis"""
+
     def __init__(
         self,
         phone: str,
@@ -21,7 +22,7 @@ class OTPData:
         verified: bool = False,
         blocked_until: Optional[datetime] = None,
         ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None
+        user_agent: Optional[str] = None,
     ):
         self.phone = phone
         self.code = code
@@ -77,11 +78,8 @@ class OTPService:
         """Get Redis connection"""
         if self._redis is None:
             import redis.asyncio as redis
-            self._redis = redis.from_url(
-                settings.REDIS_URL,
-                encoding="utf-8",
-                decode_responses=True
-            )
+
+            self._redis = redis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
         return self._redis
 
     def _make_key(self, phone: str, purpose: str) -> str:
@@ -89,11 +87,7 @@ class OTPService:
         return f"otp:{phone}:{purpose}"
 
     async def send_otp(
-        self,
-        phone: str,
-        purpose: str,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None
+        self, phone: str, purpose: str, ip_address: Optional[str] = None, user_agent: Optional[str] = None
     ) -> OTPData:
         """Send OTP code"""
         redis = await self._get_redis()
@@ -111,22 +105,16 @@ class OTPService:
 
             # Check if too many attempts
             if existing.attempts >= settings.OTP_MAX_ATTEMPTS:
-                existing.blocked_until = datetime.utcnow() + timedelta(
-                    minutes=settings.OTP_BLOCK_MINUTES
-                )
-                await redis.setex(
-                    key,
-                    settings.OTP_BLOCK_MINUTES * 60,
-                    json.dumps(existing.to_dict())
-                )
+                existing.blocked_until = datetime.utcnow() + timedelta(minutes=settings.OTP_BLOCK_MINUTES)
+                await redis.setex(key, settings.OTP_BLOCK_MINUTES * 60, json.dumps(existing.to_dict()))
                 raise ValueError("Too many attempts. Blocked for 10 minutes.")
 
             # Preserve attempt count for resend (prevents rate limit bypass)
             existing_attempts = existing.attempts
 
         # Generate new OTP
-        normalized_phone = phone.lstrip('+')
-        if settings.SMS_TEST_MODE and normalized_phone.startswith('79999'):
+        normalized_phone = phone.lstrip("+")
+        if settings.SMS_TEST_MODE and normalized_phone.startswith("79999"):
             code = "123456"
         else:
             code = generate_otp(settings.OTP_LENGTH)
@@ -145,11 +133,7 @@ class OTPService:
         )
 
         # Store in Redis with TTL
-        await redis.setex(
-            key,
-            settings.OTP_EXPIRE_MINUTES * 60,
-            json.dumps(otp_data.to_dict())
-        )
+        await redis.setex(key, settings.OTP_EXPIRE_MINUTES * 60, json.dumps(otp_data.to_dict()))
 
         # Send SMS
         message = f"Ваш код подтверждения: {code}. Действителен {settings.OTP_EXPIRE_MINUTES} минут."
@@ -157,12 +141,7 @@ class OTPService:
 
         return otp_data
 
-    async def verify_otp(
-        self,
-        phone: str,
-        code: str,
-        purpose: str
-    ) -> bool:
+    async def verify_otp(self, phone: str, code: str, purpose: str) -> bool:
         """Verify OTP code"""
         redis = await self._get_redis()
         key = self._make_key(phone, purpose)
@@ -192,9 +171,7 @@ class OTPService:
         # Verify code
         if otp_data.code != code:
             if otp_data.attempts >= settings.OTP_MAX_ATTEMPTS:
-                otp_data.blocked_until = datetime.utcnow() + timedelta(
-                    minutes=settings.OTP_BLOCK_MINUTES
-                )
+                otp_data.blocked_until = datetime.utcnow() + timedelta(minutes=settings.OTP_BLOCK_MINUTES)
 
             # Update Redis
             remaining_ttl = await redis.ttl(key)

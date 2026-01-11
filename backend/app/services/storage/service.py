@@ -18,10 +18,7 @@ class StorageService:
         secure = settings.S3_ENDPOINT.startswith("https://")
 
         self.client = Minio(
-            endpoint,
-            access_key=settings.S3_ACCESS_KEY,
-            secret_key=settings.S3_SECRET_KEY,
-            secure=secure
+            endpoint, access_key=settings.S3_ACCESS_KEY, secret_key=settings.S3_SECRET_KEY, secure=secure
         )
 
         # Ensure buckets exist
@@ -42,34 +39,20 @@ class StorageService:
                 print(f"Error ensuring bucket {bucket}: {e}")
 
     async def upload(
-        self,
-        key: str,
-        data: bytes,
-        content_type: str = "application/octet-stream",
-        bucket: Optional[str] = None
+        self, key: str, data: bytes, content_type: str = "application/octet-stream", bucket: Optional[str] = None
     ) -> str:
         """Upload file to storage"""
         bucket = bucket or settings.S3_BUCKET_DOCUMENTS
 
         try:
-            self.client.put_object(
-                bucket,
-                key,
-                BytesIO(data),
-                length=len(data),
-                content_type=content_type
-            )
+            self.client.put_object(bucket, key, BytesIO(data), length=len(data), content_type=content_type)
 
             # Return URL
             return f"{settings.S3_ENDPOINT}/{bucket}/{key}"
         except S3Error as e:
             raise Exception(f"Failed to upload file: {e}")
 
-    async def download(
-        self,
-        key: str,
-        bucket: Optional[str] = None
-    ) -> bytes:
+    async def download(self, key: str, bucket: Optional[str] = None) -> bytes:
         """Download file from storage"""
         bucket = bucket or settings.S3_BUCKET_DOCUMENTS
 
@@ -79,11 +62,7 @@ class StorageService:
         except S3Error as e:
             raise Exception(f"Failed to download file: {e}")
 
-    async def delete(
-        self,
-        key: str,
-        bucket: Optional[str] = None
-    ) -> bool:
+    async def delete(self, key: str, bucket: Optional[str] = None) -> bool:
         """Delete file from storage"""
         bucket = bucket or settings.S3_BUCKET_DOCUMENTS
 
@@ -94,12 +73,7 @@ class StorageService:
             print(f"Failed to delete file: {e}")
             return False
 
-    async def get_url(
-        self,
-        key: str,
-        bucket: Optional[str] = None,
-        expires: int = 3600
-    ) -> str:
+    async def get_url(self, key: str, bucket: Optional[str] = None, expires: int = 3600) -> str:
         """Get presigned URL for file access"""
         bucket = bucket or settings.S3_BUCKET_DOCUMENTS
 

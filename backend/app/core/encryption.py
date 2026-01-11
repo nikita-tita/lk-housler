@@ -32,6 +32,7 @@ def _get_crypto() -> HouslerCrypto:
 # Email encryption
 # =============================================================================
 
+
 def encrypt_email(email: str) -> Tuple[str, str]:
     """Encrypt email and create blind index for search
 
@@ -43,10 +44,7 @@ def encrypt_email(email: str) -> Tuple[str, str]:
 
     crypto = _get_crypto()
     normalized = email.lower().strip()
-    return (
-        crypto.encrypt(normalized, field="email"),
-        crypto.blind_index(normalized, field="email")
-    )
+    return (crypto.encrypt(normalized, field="email"), crypto.blind_index(normalized, field="email"))
 
 
 def decrypt_email(encrypted: str) -> str:
@@ -60,6 +58,7 @@ def decrypt_email(encrypted: str) -> str:
 # Phone encryption
 # =============================================================================
 
+
 def encrypt_phone(phone: str) -> Tuple[str, str]:
     """Encrypt phone and create blind index for search
 
@@ -71,10 +70,7 @@ def encrypt_phone(phone: str) -> Tuple[str, str]:
 
     crypto = _get_crypto()
     normalized = normalize_phone(phone)
-    return (
-        crypto.encrypt(normalized, field="phone"),
-        crypto.blind_index(normalized, field="phone")
-    )
+    return (crypto.encrypt(normalized, field="phone"), crypto.blind_index(normalized, field="phone"))
 
 
 def decrypt_phone(encrypted: str) -> str:
@@ -87,6 +83,7 @@ def decrypt_phone(encrypted: str) -> str:
 # =============================================================================
 # Name encryption
 # =============================================================================
+
 
 def encrypt_name(name: str) -> str:
     """Encrypt name (no hash needed - not searchable)"""
@@ -106,6 +103,7 @@ def decrypt_name(encrypted: str) -> str:
 # INN encryption
 # =============================================================================
 
+
 def encrypt_inn(inn: str) -> Tuple[str, str]:
     """Encrypt INN and create blind index for search
 
@@ -117,11 +115,8 @@ def encrypt_inn(inn: str) -> Tuple[str, str]:
 
     crypto = _get_crypto()
     # Normalize: only digits
-    normalized = ''.join(filter(str.isdigit, inn))
-    return (
-        crypto.encrypt(normalized, field="inn"),
-        crypto.blind_index(normalized, field="inn")
-    )
+    normalized = "".join(filter(str.isdigit, inn))
+    return (crypto.encrypt(normalized, field="inn"), crypto.blind_index(normalized, field="inn"))
 
 
 def decrypt_inn(encrypted: str) -> str:
@@ -135,6 +130,7 @@ def decrypt_inn(encrypted: str) -> str:
 # Passport encryption (152-ФЗ - высокочувствительные данные)
 # =============================================================================
 
+
 def encrypt_passport(series: str, number: str) -> Tuple[str, str, str]:
     """Encrypt passport series and number, create combined hash for search
 
@@ -144,8 +140,8 @@ def encrypt_passport(series: str, number: str) -> Tuple[str, str, str]:
     crypto = _get_crypto()
 
     # Normalize: only digits
-    series_norm = ''.join(filter(str.isdigit, series)) if series else ""
-    number_norm = ''.join(filter(str.isdigit, number)) if number else ""
+    series_norm = "".join(filter(str.isdigit, series)) if series else ""
+    number_norm = "".join(filter(str.isdigit, number)) if number else ""
 
     series_enc = crypto.encrypt(series_norm, field="passport_series") if series_norm else ""
     number_enc = crypto.encrypt(number_norm, field="passport_number") if number_norm else ""
@@ -199,6 +195,7 @@ mask_card = mask.card
 # =============================================================================
 # Legacy compatibility (deprecated)
 # =============================================================================
+
 
 class PIIEncryption:
     """Legacy class for backwards compatibility.

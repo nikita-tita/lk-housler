@@ -8,6 +8,7 @@ from enum import Enum
 
 class AuditEvent(str, Enum):
     """Security audit event types"""
+
     # Authentication
     LOGIN_SUCCESS = "login_success"
     LOGIN_FAILED = "login_failed"
@@ -49,7 +50,7 @@ def log_audit_event(
     user_agent: Optional[str] = None,
     resource: Optional[str] = None,
     details: Optional[Dict[str, Any]] = None,
-    success: bool = True
+    success: bool = True,
 ) -> None:
     """
     Log a security audit event.
@@ -71,7 +72,7 @@ def log_audit_event(
         "ip_address": ip_address,
         "user_agent": user_agent[:200] if user_agent else None,
         "resource": resource,
-        "details": details or {}
+        "details": details or {},
     }
 
     # Log at appropriate level

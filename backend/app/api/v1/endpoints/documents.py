@@ -17,19 +17,14 @@ router = APIRouter()
 
 @router.post("/deals/{deal_id}/generate")
 async def generate_contract(
-    deal_id: str,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    deal_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     """Generate contract for deal"""
     deal_service = DealService(db)
     deal = await deal_service.get_by_id(deal_id)
 
     if not deal:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Deal not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
 
     require_deal_access(deal, current_user)
 
@@ -43,31 +38,26 @@ async def generate_contract(
             "version": document.version_no,
             "status": document.status,
             "file_url": document.file_url,
-            "hash": document.document_hash
+            "hash": document.document_hash,
         }
     except Exception as e:
         logger.error(f"Failed to generate document for deal {deal_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to generate document. Please try again later."
+            detail="Failed to generate document. Please try again later.",
         )
 
 
 @router.get("/{document_id}")
 async def get_document(
-    document_id: str,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    document_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     """Get document metadata"""
     doc_service = DocumentService(db)
     document = await doc_service.get_by_id(document_id)
 
     if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
     deal_service = DealService(db)
     deal = await deal_service.get_by_id(document.deal_id)
@@ -81,25 +71,20 @@ async def get_document(
         "status": document.status,
         "file_url": document.file_url,
         "hash": document.document_hash,
-        "created_at": document.created_at.isoformat()
+        "created_at": document.created_at.isoformat(),
     }
 
 
 @router.get("/{document_id}/download")
 async def download_document(
-    document_id: str,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    document_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     """Redirect to document download URL"""
     doc_service = DocumentService(db)
     document = await doc_service.get_by_id(document_id)
 
     if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
     deal_service = DealService(db)
     deal = await deal_service.get_by_id(document.deal_id)

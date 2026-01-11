@@ -10,6 +10,7 @@ from app.db.base import BaseModel
 
 class CheckType(str, PyEnum):
     """Antifraud check type"""
+
     VELOCITY = "velocity"
     AMOUNT_LIMIT = "amount_limit"
     NEW_AGENT = "new_agent"
@@ -23,6 +24,7 @@ class CheckType(str, PyEnum):
 
 class CheckResult(str, PyEnum):
     """Check result"""
+
     PASS = "pass"
     FLAG = "flag"
     BLOCK = "block"
@@ -30,6 +32,7 @@ class CheckResult(str, PyEnum):
 
 class BlacklistType(str, PyEnum):
     """Blacklist type"""
+
     PHONE = "phone"
     PASSPORT = "passport"
     INN = "inn"

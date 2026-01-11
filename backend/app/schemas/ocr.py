@@ -7,12 +7,14 @@ from pydantic import BaseModel, Field
 
 class PassportFieldConfidence(BaseModel):
     """Confidence level for extracted field"""
+
     value: str
     confidence: float = Field(ge=0.0, le=1.0)
 
 
 class PassportData(BaseModel):
     """Extracted passport data"""
+
     # Main fields
     surname: Optional[str] = Field(None, description="Surname (Фамилия)")
     name: Optional[str] = Field(None, description="First name (Имя)")
@@ -38,6 +40,7 @@ class PassportData(BaseModel):
 
 class PassportOCRResponse(BaseModel):
     """Response from passport OCR endpoint"""
+
     success: bool
     confidence: float = Field(ge=0.0, le=1.0, description="Overall confidence")
     data: PassportData
@@ -47,6 +50,7 @@ class PassportOCRResponse(BaseModel):
 
 class PassportOCRError(BaseModel):
     """Error response"""
+
     success: bool = False
     error: str
     details: Optional[str] = None

@@ -22,21 +22,14 @@ def setup_logging() -> None:
 
     # Configure root logger
     logging.basicConfig(
-        level=level,
-        format=log_format,
-        datefmt=date_format,
-        handlers=[
-            logging.StreamHandler(sys.stdout)
-        ]
+        level=level, format=log_format, datefmt=date_format, handlers=[logging.StreamHandler(sys.stdout)]
     )
 
     # Set specific levels for noisy libraries
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("sqlalchemy.engine").setLevel(
-        logging.INFO if settings.DEBUG else logging.WARNING
-    )
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO if settings.DEBUG else logging.WARNING)
 
     # Security audit logger - always INFO level for audit trail
     audit_logger = logging.getLogger("security.audit")

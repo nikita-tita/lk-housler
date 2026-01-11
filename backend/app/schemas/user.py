@@ -8,6 +8,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 class UserBase(BaseModel):
     """Base user schema"""
+
     email: EmailStr = Field(..., description="Email address")
     phone: Optional[str] = Field(None, description="Phone number")
     name: Optional[str] = Field(None, description="Display name")
@@ -15,6 +16,7 @@ class UserBase(BaseModel):
 
 class UserResponse(BaseModel):
     """User response schema - matches agent.housler.ru users table"""
+
     id: int
     email: str
     phone: Optional[str] = None
@@ -33,6 +35,7 @@ class UserResponse(BaseModel):
 
 class UserPublic(BaseModel):
     """Public user info (safe to expose)"""
+
     id: int
     name: Optional[str] = None
     role: str

@@ -35,35 +35,21 @@ class AntiFraudService:
                 passport_hash = hash_value(user.profile.passport_number)
                 if await self._is_blacklisted(BlacklistType.PASSPORT, passport_hash):
                     await self._log_check(
-                        "user",
-                        user.id,
-                        CheckType.BLACKLIST,
-                        CheckResult.BLOCK,
-                        "Passport in blacklist"
+                        "user", user.id, CheckType.BLACKLIST, CheckResult.BLOCK, "Passport in blacklist"
                     )
                     return False
 
             if user.profile.inn:
                 inn_hash = hash_value(user.profile.inn)
                 if await self._is_blacklisted(BlacklistType.INN, inn_hash):
-                    await self._log_check(
-                        "user",
-                        user.id,
-                        CheckType.BLACKLIST,
-                        CheckResult.BLOCK,
-                        "INN in blacklist"
-                    )
+                    await self._log_check("user", user.id, CheckType.BLACKLIST, CheckResult.BLOCK, "INN in blacklist")
                     return False
 
         # Set initial limits for new users
         await self._set_new_user_limits(user)
 
         await self._log_check(
-            "user",
-            user.id,
-            CheckType.NEW_AGENT,
-            CheckResult.PASS,
-            "New user initialized with limits"
+            "user", user.id, CheckType.NEW_AGENT, CheckResult.PASS, "New user initialized with limits"
         )
 
         return True
@@ -81,7 +67,7 @@ class AntiFraudService:
                     deal.id,
                     CheckType.AMOUNT_LIMIT,
                     CheckResult.BLOCK,
-                    f"Deal amount {deal.terms.commission_total} exceeds limit {limits.max_deal_amount}"
+                    f"Deal amount {deal.terms.commission_total} exceeds limit {limits.max_deal_amount}",
                 )
                 return False, f"Deal amount exceeds your limit of {limits.max_deal_amount}"
 
@@ -89,11 +75,7 @@ class AntiFraudService:
         deals_today = await self._count_user_deals_today(user.id)
         if deals_today >= 5:  # Max 5 deals per day for new users
             await self._log_check(
-                "deal",
-                deal.id,
-                CheckType.VELOCITY,
-                CheckResult.FLAG,
-                f"User created {deals_today} deals today"
+                "deal", deal.id, CheckType.VELOCITY, CheckResult.FLAG, f"User created {deals_today} deals today"
             )
             return False, "Too many deals created today. Please contact support."
 
@@ -105,13 +87,7 @@ class AntiFraudService:
             if deal.terms.commission_total > settings.ANTIFRAUD_NEW_AGENT_MAX_DEAL_AMOUNT:
                 return False, f"Maximum deal amount for new users: {settings.ANTIFRAUD_NEW_AGENT_MAX_DEAL_AMOUNT}"
 
-        await self._log_check(
-            "deal",
-            deal.id,
-            CheckType.NEW_AGENT,
-            CheckResult.PASS,
-            "Deal passed antifraud checks"
-        )
+        await self._log_check("deal", deal.id, CheckType.NEW_AGENT, CheckResult.PASS, "Deal passed antifraud checks")
 
         return True, None
 
@@ -136,35 +112,17 @@ class AntiFraudService:
     async def _count_user_deals_today(self, user_id: UUID) -> int:
         """Count deals created by user today"""
         today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-        stmt = (
-            select(func.count(Deal.id))
-            .where(
-                Deal.created_by_user_id == user_id,
-                Deal.created_at >= today
-            )
-        )
+        stmt = select(func.count(Deal.id)).where(Deal.created_by_user_id == user_id, Deal.created_at >= today)
         result = await self.db.execute(stmt)
         return result.scalar() or 0
 
-    async def _is_blacklisted(
-        self,
-        bl_type: BlacklistType,
-        value_hash: str
-    ) -> bool:
+    async def _is_blacklisted(self, bl_type: BlacklistType, value_hash: str) -> bool:
         """Check if value is in blacklist"""
-        stmt = select(Blacklist).where(
-            Blacklist.type == bl_type,
-            Blacklist.value_hash == value_hash
-        )
+        stmt = select(Blacklist).where(Blacklist.type == bl_type, Blacklist.value_hash == value_hash)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none() is not None
 
-    async def add_to_blacklist(
-        self,
-        bl_type: BlacklistType,
-        value: str,
-        reason: str
-    ) -> Blacklist:
+    async def add_to_blacklist(self, bl_type: BlacklistType, value: str, reason: str) -> Blacklist:
         """Add to blacklist"""
         value_hash = hash_value(value)
 
@@ -185,7 +143,7 @@ class AntiFraudService:
         entity_id: UUID,
         check_type: CheckType,
         result: CheckResult,
-        reason: Optional[str] = None
+        reason: Optional[str] = None,
     ):
         """Log antifraud check"""
         check = AntiFraudCheck(

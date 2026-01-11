@@ -22,18 +22,11 @@ class SignatureService:
         self.otp_service = OTPService(db, get_sms_provider())
 
     async def request_otp_for_signing(
-        self,
-        document_id: UUID,
-        phone: str,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None
+        self, document_id: UUID, phone: str, ip_address: Optional[str] = None, user_agent: Optional[str] = None
     ) -> None:
         """Send OTP for document signing"""
         await self.otp_service.send_otp(
-            phone=phone,
-            purpose=f"sign_{document_id}",
-            ip_address=ip_address,
-            user_agent=user_agent
+            phone=phone, purpose=f"sign_{document_id}", ip_address=ip_address, user_agent=user_agent
         )
 
     async def verify_and_sign(
@@ -47,7 +40,7 @@ class SignatureService:
         signing_token: Optional[str] = None,
         consent_personal_data: bool = False,
         consent_pep: bool = False,
-        geolocation: Optional[dict] = None
+        geolocation: Optional[dict] = None,
     ) -> Signature:
         """Verify OTP and create signature"""
         # Check if already signed
@@ -56,11 +49,7 @@ class SignatureService:
             raise ValueError("Party has already signed this document")
 
         # Verify OTP
-        verified = await self.otp_service.verify_otp(
-            phone=phone,
-            code=otp_code,
-            purpose=f"sign_{document.id}"
-        )
+        verified = await self.otp_service.verify_otp(phone=phone, code=otp_code, purpose=f"sign_{document.id}")
 
         if not verified:
             raise ValueError("Invalid OTP code")
@@ -92,7 +81,7 @@ class SignatureService:
                 method=SignatureMethod.PEP_SMS,
                 phone=phone,
                 signed_at=now,
-                evidence=evidence
+                evidence=evidence,
             )
             self.db.add(signature)
 
@@ -104,27 +93,16 @@ class SignatureService:
         await self.db.refresh(signature)
         return signature
 
-    async def _get_party_signature(
-        self,
-        document_id: UUID,
-        party_id: UUID
-    ) -> Optional[Signature]:
+    async def _get_party_signature(self, document_id: UUID, party_id: UUID) -> Optional[Signature]:
         """Get signature by document and party"""
-        stmt = select(Signature).where(
-            Signature.document_id == document_id,
-            Signature.signer_party_id == party_id
-        )
+        stmt = select(Signature).where(Signature.document_id == document_id, Signature.signer_party_id == party_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
     async def check_document_fully_signed(self, document: Document) -> bool:
         """Check if all required signatures are collected and update document/deal status"""
         # Get deal with parties
-        stmt_deal = (
-            select(Deal)
-            .where(Deal.id == document.deal_id)
-            .options(selectinload(Deal.parties))
-        )
+        stmt_deal = select(Deal).where(Deal.id == document.deal_id).options(selectinload(Deal.parties))
         result_deal = await self.db.execute(stmt_deal)
         deal = result_deal.scalar_one_or_none()
 
@@ -136,10 +114,7 @@ class SignatureService:
         required_party_ids = {p.id for p in required_parties}
 
         # Get all signatures for this document
-        stmt_sigs = select(Signature).where(
-            Signature.document_id == document.id,
-            Signature.signed_at.isnot(None)
-        )
+        stmt_sigs = select(Signature).where(Signature.document_id == document.id, Signature.signed_at.isnot(None))
         result_sigs = await self.db.execute(stmt_sigs)
         signatures = list(result_sigs.scalars().all())
 
@@ -151,6 +126,7 @@ class SignatureService:
 
             # Transition deal to SIGNED status
             from app.services.deal.service import DealService
+
             deal_service = DealService(self.db)
             try:
                 await deal_service.transition_to_signed(deal)

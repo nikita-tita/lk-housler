@@ -47,28 +47,24 @@ class LedgerService:
         entries.append(entry_in)
 
         # 2. Acquirer fee (2%)
-        acq_fee = payment.gross_amount * Decimal(
-            settings.PAYMENT_ACQUIRER_FEE_PERCENT / 100
-        )
+        acq_fee = payment.gross_amount * Decimal(settings.PAYMENT_ACQUIRER_FEE_PERCENT / 100)
         entry_acq = LedgerEntry(
             payment_id=payment.id,
             entry_type=EntryType.ACQ_FEE,
             amount=-acq_fee,
             account=Account.BANK,
-            meta={"fee_percent": settings.PAYMENT_ACQUIRER_FEE_PERCENT}
+            meta={"fee_percent": settings.PAYMENT_ACQUIRER_FEE_PERCENT},
         )
         entries.append(entry_acq)
 
         # 3. Bank rebate (1.3%)
-        bank_rebate = payment.gross_amount * Decimal(
-            settings.PAYMENT_PLATFORM_REBATE_PERCENT / 100
-        )
+        bank_rebate = payment.gross_amount * Decimal(settings.PAYMENT_PLATFORM_REBATE_PERCENT / 100)
         entry_rebate = LedgerEntry(
             payment_id=payment.id,
             entry_type=EntryType.BANK_REBATE,
             amount=bank_rebate,
             account=Account.PLATFORM,
-            meta={"rebate_percent": settings.PAYMENT_PLATFORM_REBATE_PERCENT}
+            meta={"rebate_percent": settings.PAYMENT_PLATFORM_REBATE_PERCENT},
         )
         entries.append(entry_rebate)
 
@@ -160,11 +156,7 @@ class LedgerService:
 
     async def get_payment_ledger(self, payment_id: UUID) -> List[LedgerEntry]:
         """Get ledger entries for payment"""
-        stmt = (
-            select(LedgerEntry)
-            .where(LedgerEntry.payment_id == payment_id)
-            .order_by(LedgerEntry.created_at)
-        )
+        stmt = select(LedgerEntry).where(LedgerEntry.payment_id == payment_id).order_by(LedgerEntry.created_at)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
