@@ -74,7 +74,7 @@ class MockEmailProvider(EmailProvider):
         if reply_to:
             print(f"[Email Mock] Reply-To: {reply_to}")
         print(f"[Email Mock] HTML: {html}")
-        print(f"[Email Mock] Body: (hidden for security)")
+        print("[Email Mock] Body: (hidden for security)")
         print(f"{'='*60}\n")
         return True
 
@@ -523,7 +523,7 @@ async def send_document_ready_email(
     """Send notification when document is ready"""
     provider = get_email_provider()
 
-    subject = f"Документ готов к подписанию"
+    subject = "Документ готов к подписанию"
 
     html_content = f"""
 <h2>Документ готов</h2>
@@ -578,4 +578,3 @@ async def send_password_reset_email(email: str, code: str) -> bool:
     html = _get_html_wrapper(html_content)
 
     return await provider.send(email, subject, html, html=True)
-

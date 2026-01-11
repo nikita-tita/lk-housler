@@ -1,2 +1,1 @@
 """Antifraud service"""
-

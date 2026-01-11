@@ -32,7 +32,7 @@ class ExecutorType(str, PyEnum):
     """Executor type"""
     USER = "user"           # Агент сам на себя
     ORG = "org"            # Агентство
-    DEVELOPER = "developer" # Застройщик (Phase 2)
+    DEVELOPER = "developer"  # Застройщик (Phase 2)
 
 
 class PartyRole(str, PyEnum):
@@ -98,24 +98,24 @@ class Deal(BaseModel, SoftDeleteMixin):
 
 class DealParty(BaseModel):
     """Deal participant"""
-    
+
     __tablename__ = "deal_parties"
-    
+
     deal_id = Column(UUID(as_uuid=True), ForeignKey("deals.id"), nullable=False)
-    
+
     party_role = Column(Enum(PartyRole), nullable=False)
     party_type = Column(Enum(PartyType), nullable=False)
     party_id = Column(Integer, nullable=True)  # user_id или org_id
-    
+
     # Snapshot данных участника на момент создания сделки
     display_name_snapshot = Column(String(255), nullable=False)
     phone_snapshot = Column(String(20), nullable=True)
     passport_snapshot_hash = Column(String(64), nullable=True)  # SHA-256
-    
+
     # Подпись
     signing_required = Column(Boolean, default=True, nullable=False)
     signing_order = Column(Integer, default=0, nullable=False)
-    
+
     # Relationships
     deal = relationship("Deal", back_populates="parties")
     signatures = relationship("Signature", back_populates="party")
@@ -123,29 +123,28 @@ class DealParty(BaseModel):
 
 class DealTerms(BaseModel):
     """Deal terms and conditions"""
-    
+
     __tablename__ = "deal_terms"
-    
+
     deal_id = Column(UUID(as_uuid=True), ForeignKey("deals.id"), nullable=False, unique=True)
-    
+
     # Комиссия
     commission_total = Column(Numeric(15, 2), nullable=False)
-    
+
     # План платежей (JSON)
     payment_plan = Column(JSONB, nullable=False)
     # Например: [{"step": 1, "amount": 50000, "trigger": "immediate"}, ...]
-    
+
     # Правило распределения комиссии
     split_rule = Column(JSONB, nullable=False)
     # Например: {"agent": 60, "agency": 40} или {"agent": 100}
-    
+
     # Условия этапов (milestones)
     milestone_rules = Column(JSONB, nullable=True)
     # Например: [{"step": 2, "trigger": "registration_confirmed", "proof_required": true}]
-    
+
     # Политика отмены
     cancellation_policy = Column(JSONB, nullable=True)
-    
+
     # Relationships
     deal = relationship("Deal", back_populates="terms")
-

@@ -1,2 +1,1 @@
 """Deal service"""
-

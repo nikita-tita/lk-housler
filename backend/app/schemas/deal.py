@@ -177,4 +177,3 @@ class DealList(BaseModel):
     total: int
     page: int
     page_size: int
-

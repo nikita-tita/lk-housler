@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.tasks.celery_app import celery_app
 from app.db.session import SessionLocal
-from app.models.ledger import Split, Payout, SplitStatus, PayoutStatus
+from app.models.ledger import Payout, SplitStatus, PayoutStatus
 
 logger = logging.getLogger(__name__)
 

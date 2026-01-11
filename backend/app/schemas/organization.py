@@ -1,7 +1,7 @@
 """Organization schemas"""
 
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -45,7 +45,7 @@ class Organization(OrganizationBase):
     default_split_percent_agent: Optional[int] = None
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -68,7 +68,7 @@ class OrganizationMember(OrganizationMemberBase):
     default_split_percent_agent: Optional[int] = None
     is_active: bool
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -92,7 +92,6 @@ class PayoutAccount(PayoutAccountBase):
     is_default: bool
     verified_at: Optional[datetime] = None
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
-

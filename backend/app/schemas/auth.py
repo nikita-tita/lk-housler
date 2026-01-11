@@ -1,6 +1,5 @@
 """Auth schemas"""
 
-from typing import Dict
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -99,4 +98,3 @@ class OTPVerify(BaseModel):
     phone: str = Field(..., description="Phone number")
     code: str = Field(..., description="OTP code", min_length=6, max_length=6)
     purpose: str = Field(..., description="OTP purpose")
-

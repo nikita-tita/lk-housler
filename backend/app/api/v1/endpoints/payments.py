@@ -41,21 +41,21 @@ async def create_payment_intent(
     """Create payment intent for deal"""
     try:
         payment_service = PaymentService(db)
-        
+
         # Create payment intent
         intent = await payment_service.create_intent(
             deal_id=request.deal_id,
             amount=request.amount,
             description=request.description
         )
-        
+
         return PaymentIntentResponse(
             payment_intent_id=str(intent.id),
             payment_url=intent.sbp_link or "",
             amount=int(intent.amount),
             status=intent.status.value
         )
-        
+
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -195,4 +195,3 @@ async def payment_webhook(
         # Log error but return 200 to avoid webhook retry storms
         logger.error(f"Payment webhook error: {e}", exc_info=True)
         return {"status": "error", "message": "Webhook processing failed"}
-

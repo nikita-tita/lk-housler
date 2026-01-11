@@ -13,9 +13,7 @@ from app.models.user import User
 from app.models.deal import DealStatus
 from app.schemas.deal import (
     Deal as DealSchema,
-    DealCreate,
     DealUpdate,
-    DealList,
     DealCreateSimple,
     DealSimpleResponse,
     DealListSimple,
@@ -108,7 +106,7 @@ async def get_deal(
     """Get deal by ID"""
     deal_service = DealService(db)
     deal = await deal_service.get_by_id(deal_id)
-    
+
     if not deal:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -130,7 +128,7 @@ async def update_deal(
     """Update deal"""
     deal_service = DealService(db)
     deal = await deal_service.get_by_id(deal_id)
-    
+
     if not deal:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -158,7 +156,7 @@ async def submit_deal(
     """Submit deal for signatures"""
     deal_service = DealService(db)
     deal = await deal_service.get_by_id(deal_id)
-    
+
     if not deal:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -212,7 +210,6 @@ async def send_deal_for_signing(
     db: AsyncSession = Depends(get_db)
 ):
     """Generate document and send signing link to client via SMS"""
-    from uuid import UUID
     from app.services.document.service import DocumentService
     from app.services.notification.service import NotificationService
     from app.api.v1.endpoints.sign import create_signing_token
@@ -313,4 +310,3 @@ async def send_deal_for_signing(
         "sms_sent": sms_sent,
         "message": "Signing link sent to client" if sms_sent else "Signing link created (SMS failed)"
     }
-

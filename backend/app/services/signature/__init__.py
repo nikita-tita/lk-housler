@@ -1,2 +1,1 @@
 """Signature service (ПЭП)"""
-

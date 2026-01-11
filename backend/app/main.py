@@ -30,6 +30,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Pragma"] = "no-cache"
         return response
 
+
 # Disable API docs in production
 _docs_url = "/docs" if settings.APP_ENV != "production" else None
 _redoc_url = "/redoc" if settings.APP_ENV != "production" else None
@@ -150,4 +151,3 @@ if __name__ == "__main__":
         port=8000,
         reload=settings.DEBUG,
     )
-

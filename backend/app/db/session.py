@@ -66,4 +66,3 @@ def get_sync_db():
         raise
     finally:
         db.close()
-

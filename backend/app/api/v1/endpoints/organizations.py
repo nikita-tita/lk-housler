@@ -41,7 +41,7 @@ async def create_organization(
 ):
     """Create new organization"""
     org_service = OrganizationService(db)
-    
+
     try:
         organization = await org_service.create(org_in, current_user)
         return organization
@@ -146,4 +146,3 @@ async def create_payout_account(
 
     account = await org_service.create_payout_account("org", org_id, account_in)
     return account
-

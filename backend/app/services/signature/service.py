@@ -1,7 +1,7 @@
 """Signature service implementation"""
 
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select
@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.document import Signature, Document, DocumentStatus, SignatureMethod
-from app.models.deal import Deal, DealParty
+from app.models.deal import Deal
 from app.services.auth.otp import OTPService
 from app.services.sms.provider import get_sms_provider
 
@@ -103,7 +103,7 @@ class SignatureService:
 
         await self.db.refresh(signature)
         return signature
-    
+
     async def _get_party_signature(
         self,
         document_id: UUID,
@@ -116,7 +116,7 @@ class SignatureService:
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
-    
+
     async def check_document_fully_signed(self, document: Document) -> bool:
         """Check if all required signatures are collected and update document/deal status"""
         # Get deal with parties
@@ -162,10 +162,9 @@ class SignatureService:
             return True
 
         return False
-    
+
     async def get_document_signatures(self, document_id: UUID) -> list[Signature]:
         """Get all signatures for document"""
         stmt = select(Signature).where(Signature.document_id == document_id)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
-

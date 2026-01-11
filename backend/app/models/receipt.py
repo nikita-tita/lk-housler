@@ -33,40 +33,39 @@ class NPDTaskStatus(str, PyEnum):
 
 class Receipt(BaseModel):
     """Receipt"""
-    
+
     __tablename__ = "receipts"
-    
+
     payment_id = Column(UUID(as_uuid=True), ForeignKey("payments.id"), nullable=False)
-    
+
     type = Column(Enum(ReceiptType), nullable=False)
-    
+
     url = Column(String(500), nullable=True)
-    
+
     status = Column(
         Enum(ReceiptStatus),
         default=ReceiptStatus.PENDING,
         nullable=False
     )
-    
+
     meta = Column(JSONB, nullable=True)
-    
+
     # Relationships
     payment = relationship("Payment", back_populates="receipts")
 
 
 class NPDTask(BaseModel):
     """NPD task (самозанятый должен приложить чек)"""
-    
+
     __tablename__ = "npd_tasks"
-    
+
     deal_id = Column(UUID(as_uuid=True), ForeignKey("deals.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    
+
     due_at = Column(DateTime, nullable=False)
-    
+
     status = Column(
         Enum(NPDTaskStatus),
         default=NPDTaskStatus.OPEN,
         nullable=False
     )
-

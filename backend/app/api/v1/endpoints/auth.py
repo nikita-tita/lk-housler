@@ -130,7 +130,7 @@ async def send_client_email(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to send email"
@@ -150,7 +150,7 @@ async def verify_client_email(
             request.email,
             request.code
         )
-        
+
         return Token(
             access_token=access_token,
             refresh_token=refresh_token
@@ -221,11 +221,11 @@ async def register_agent(
     """Register new agent with full profile"""
     try:
         auth_service = AuthServiceExtended(db)
-        
+
         # Get client IP and User-Agent
         ip_address = http_request.client.host if http_request.client else None
         user_agent = http_request.headers.get("user-agent")
-        
+
         user = await auth_service.register_agent(
             phone=request.phone,
             name=request.name,
@@ -237,7 +237,7 @@ async def register_agent(
             ip_address=ip_address,
             user_agent=user_agent
         )
-        
+
         return {
             "id": str(user.id),
             "message": "Agent registered successfully. Please verify phone to activate."
@@ -258,11 +258,11 @@ async def register_agency(
     """Register new agency with admin account"""
     try:
         auth_service = AuthServiceExtended(db)
-        
+
         # Get client IP and User-Agent
         ip_address = http_request.client.host if http_request.client else None
         user_agent = http_request.headers.get("user-agent")
-        
+
         user = await auth_service.register_agency(
             inn=request.inn,
             name=request.name,
@@ -275,7 +275,7 @@ async def register_agency(
             ip_address=ip_address,
             user_agent=user_agent
         )
-        
+
         return {
             "id": str(user.id),
             "message": "Agency registered successfully. Awaiting verification."
@@ -307,7 +307,7 @@ async def send_otp(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to send OTP"
@@ -327,7 +327,7 @@ async def verify_otp(
             request.phone,
             request.code
         )
-        
+
         return Token(
             access_token=access_token,
             refresh_token=refresh_token
@@ -337,9 +337,8 @@ async def verify_otp(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to verify OTP"
         )
-

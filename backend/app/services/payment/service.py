@@ -3,7 +3,6 @@
 from datetime import datetime, timedelta
 from typing import Optional
 from uuid import UUID, uuid4
-from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -34,11 +33,11 @@ SCHEDULE_TRANSITIONS: dict[PaymentScheduleStatus, set[PaymentScheduleStatus]] = 
 
 class PaymentService:
     """Payment service"""
-    
+
     def __init__(self, db: AsyncSession):
         self.db = db
         self.provider = get_payment_provider()
-    
+
     async def create_payment_intent(
         self,
         schedule: PaymentSchedule
@@ -108,7 +107,7 @@ class PaymentService:
         await self.db.refresh(intent)
 
         return intent
-    
+
     async def process_payment_webhook(
         self,
         provider_intent_id: str,
@@ -123,10 +122,10 @@ class PaymentService:
         )
         result = await self.db.execute(stmt)
         intent = result.scalar_one_or_none()
-        
+
         if not intent:
             raise ValueError("Payment intent not found")
-        
+
         if status == "paid":
             # Create payment record
             payment = Payment(
@@ -175,15 +174,15 @@ class PaymentService:
 
             await self.db.refresh(payment)
             return payment
-        
+
         elif status == "failed":
             intent.status = PaymentIntentStatus.FAILED
             await self.db.flush()
             raise ValueError("Payment failed")
-        
+
         else:
             raise ValueError(f"Unknown payment status: {status}")
-    
+
     async def get_deal_payment_schedules(self, deal_id: UUID) -> list[PaymentSchedule]:
         """Get all payment schedules for deal"""
         stmt = (
@@ -193,7 +192,7 @@ class PaymentService:
         )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
-    
+
     async def create_intent(
         self,
         deal_id: str,
@@ -204,14 +203,14 @@ class PaymentService:
         # Convert deal_id to UUID
         from uuid import UUID
         deal_uuid = UUID(deal_id)
-        
+
         # Find or create payment schedule
         stmt = select(PaymentSchedule).where(
             PaymentSchedule.deal_id == deal_uuid
         ).order_by(PaymentSchedule.step_no)
         result = await self.db.execute(stmt)
         schedule = result.scalars().first()
-        
+
         if not schedule:
             # Create default schedule
             schedule = PaymentSchedule(
@@ -223,10 +222,10 @@ class PaymentService:
             )
             self.db.add(schedule)
             await self.db.flush()
-        
+
         # Create intent
         return await self.create_payment_intent(schedule)
-    
+
     async def get_payment(self, payment_id: str) -> Optional[Payment]:
         """Get payment by ID"""
         from uuid import UUID
@@ -266,14 +265,14 @@ class PaymentService:
         """Update payment status from webhook"""
         from uuid import UUID
         payment_uuid = UUID(payment_id)
-        
+
         stmt = select(Payment).where(Payment.id == payment_uuid)
         result = await self.db.execute(stmt)
         payment = result.scalar_one_or_none()
-        
+
         if not payment:
             raise ValueError("Payment not found")
-        
+
         # Update status
         if status == "succeeded":
             payment.status = PaymentStatus.SUCCEEDED
@@ -282,7 +281,7 @@ class PaymentService:
             payment.status = PaymentStatus.FAILED
         elif status == "canceled":
             payment.status = PaymentStatus.CANCELED
-        
+
         if provider_payment_id:
             payment.provider_tx_id = provider_payment_id
 
@@ -334,4 +333,3 @@ class PaymentService:
 
         # For MILESTONE/DATE triggers, leave as LOCKED until triggered externally
         return None
-

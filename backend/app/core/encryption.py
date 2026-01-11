@@ -1,150 +1,134 @@
-"""PII Encryption for 152-ФЗ compliance"""
+"""PII Encryption for 152-ФЗ compliance
 
-import base64
-import hashlib
+Uses housler-crypto library for unified encryption across Housler ecosystem.
+See: /Users/fatbookpro/Desktop/housler-crypto/README.md
+"""
+
 import logging
-from typing import Optional, Tuple
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.backends import default_backend
+from typing import Tuple
+
+from housler_crypto import HouslerCrypto, mask, normalize_phone
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
-class PIIEncryption:
-    """PII (Personal Identifiable Information) encryption service"""
-
-    def __init__(self):
-        # Validate ENCRYPTION_KEY
-        if not settings.ENCRYPTION_KEY:
-            raise ValueError("ENCRYPTION_KEY not set in environment")
-
-        # Validate ENCRYPTION_SALT
-        if not settings.ENCRYPTION_SALT:
-            raise ValueError("ENCRYPTION_SALT not set in environment")
-
-        # SECURITY: Block insecure default salt in production
-        if settings.APP_ENV == "production" and "housler_salt" in settings.ENCRYPTION_SALT.lower():
-            raise ValueError(
-                "ENCRYPTION_SALT contains insecure default value. "
-                "Generate a unique salt: openssl rand -base64 32"
-            )
-
-        key_bytes = bytes.fromhex(settings.ENCRYPTION_KEY)
-        salt = settings.ENCRYPTION_SALT.encode('utf-8')
-
-        # Use PBKDF2HMAC to derive a Fernet-compatible key
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=salt,
-            iterations=100000,
-            backend=default_backend()
-        )
-        fernet_key = Fernet(base64.urlsafe_b64encode(kdf.derive(key_bytes)))
-        self.cipher = fernet_key
-
-    def encrypt(self, plaintext: str) -> str:
-        """Encrypt PII data (email, phone, name, etc.)"""
-        if not plaintext:
-            return ""
-
-        try:
-            encrypted = self.cipher.encrypt(plaintext.encode())
-            return encrypted.decode('utf-8')
-        except Exception:
-            logger.exception("Encryption failed")
-            return ""
-
-    def decrypt(self, ciphertext: str) -> str:
-        """Decrypt PII data"""
-        if not ciphertext:
-            return ""
-
-        try:
-            decrypted = self.cipher.decrypt(ciphertext.encode())
-            return decrypted.decode('utf-8')
-        except Exception:
-            logger.exception("Decryption failed")
-            return ""
-
-    @staticmethod
-    def hash(value: str) -> str:
-        """Create SHA-256 hash for searching (не расшифровывается)"""
-        if not value:
-            return ""
-        return hashlib.sha256(value.encode()).hexdigest()
+# Initialize crypto instance
+_crypto: HouslerCrypto = None
 
 
-# Global instance
-pii_encryption = PIIEncryption()
+def _get_crypto() -> HouslerCrypto:
+    """Lazy initialization of crypto instance"""
+    global _crypto
+    if _crypto is None:
+        if not settings.HOUSLER_CRYPTO_KEY:
+            raise ValueError("HOUSLER_CRYPTO_KEY not set in environment")
+        _crypto = HouslerCrypto(master_key=settings.HOUSLER_CRYPTO_KEY)
+    return _crypto
 
 
-def encrypt_email(email: str) -> tuple[str, str]:
-    """Encrypt email and create search hash
-    
+# =============================================================================
+# Email encryption
+# =============================================================================
+
+def encrypt_email(email: str) -> Tuple[str, str]:
+    """Encrypt email and create blind index for search
+
     Returns:
         (encrypted, hash) - both as strings
     """
+    if not email:
+        return "", ""
+
+    crypto = _get_crypto()
+    normalized = email.lower().strip()
     return (
-        pii_encryption.encrypt(email.lower()),
-        pii_encryption.hash(email.lower())
+        crypto.encrypt(normalized, field="email"),
+        crypto.blind_index(normalized, field="email")
     )
 
 
 def decrypt_email(encrypted: str) -> str:
     """Decrypt email"""
-    return pii_encryption.decrypt(encrypted)
+    if not encrypted:
+        return ""
+    return _get_crypto().decrypt(encrypted, field="email")
 
 
-def encrypt_phone(phone: str) -> tuple[str, str]:
-    """Encrypt phone and create search hash
-    
+# =============================================================================
+# Phone encryption
+# =============================================================================
+
+def encrypt_phone(phone: str) -> Tuple[str, str]:
+    """Encrypt phone and create blind index for search
+
     Returns:
         (encrypted, hash) - both as strings
     """
-    # Normalize phone: remove spaces, dashes, etc.
-    normalized = ''.join(filter(str.isdigit, phone))
+    if not phone:
+        return "", ""
+
+    crypto = _get_crypto()
+    normalized = normalize_phone(phone)
     return (
-        pii_encryption.encrypt(normalized),
-        pii_encryption.hash(normalized)
+        crypto.encrypt(normalized, field="phone"),
+        crypto.blind_index(normalized, field="phone")
     )
 
 
 def decrypt_phone(encrypted: str) -> str:
     """Decrypt phone"""
-    return pii_encryption.decrypt(encrypted)
+    if not encrypted:
+        return ""
+    return _get_crypto().decrypt(encrypted, field="phone")
 
+
+# =============================================================================
+# Name encryption
+# =============================================================================
 
 def encrypt_name(name: str) -> str:
-    """Encrypt name (no hash needed)"""
-    return pii_encryption.encrypt(name)
+    """Encrypt name (no hash needed - not searchable)"""
+    if not name:
+        return ""
+    return _get_crypto().encrypt(name.strip(), field="name")
 
 
 def decrypt_name(encrypted: str) -> str:
     """Decrypt name"""
-    return pii_encryption.decrypt(encrypted)
+    if not encrypted:
+        return ""
+    return _get_crypto().decrypt(encrypted, field="name")
 
 
-def encrypt_inn(inn: str) -> tuple[str, str]:
-    """Encrypt INN and create search hash
-    
+# =============================================================================
+# INN encryption
+# =============================================================================
+
+def encrypt_inn(inn: str) -> Tuple[str, str]:
+    """Encrypt INN and create blind index for search
+
     Returns:
         (encrypted, hash) - both as strings
     """
+    if not inn:
+        return "", ""
+
+    crypto = _get_crypto()
+    # Normalize: only digits
     normalized = ''.join(filter(str.isdigit, inn))
     return (
-        pii_encryption.encrypt(normalized),
-        pii_encryption.hash(normalized)
+        crypto.encrypt(normalized, field="inn"),
+        crypto.blind_index(normalized, field="inn")
     )
 
 
 def decrypt_inn(encrypted: str) -> str:
     """Decrypt INN"""
-    return pii_encryption.decrypt(encrypted)
+    if not encrypted:
+        return ""
+    return _get_crypto().decrypt(encrypted, field="inn")
 
 
 # =============================================================================
@@ -157,36 +141,101 @@ def encrypt_passport(series: str, number: str) -> Tuple[str, str, str]:
     Returns:
         (series_encrypted, number_encrypted, combined_hash)
     """
+    crypto = _get_crypto()
+
     # Normalize: only digits
     series_norm = ''.join(filter(str.isdigit, series)) if series else ""
     number_norm = ''.join(filter(str.isdigit, number)) if number else ""
 
-    series_enc = pii_encryption.encrypt(series_norm) if series_norm else ""
-    number_enc = pii_encryption.encrypt(number_norm) if number_norm else ""
+    series_enc = crypto.encrypt(series_norm, field="passport_series") if series_norm else ""
+    number_enc = crypto.encrypt(number_norm, field="passport_number") if number_norm else ""
 
     # Combined hash for duplicate detection (серия+номер)
     combined = f"{series_norm}{number_norm}"
-    combined_hash = pii_encryption.hash(combined) if combined else ""
+    combined_hash = crypto.blind_index(combined, field="passport") if combined else ""
 
     return series_enc, number_enc, combined_hash
 
 
 def decrypt_passport_series(encrypted: str) -> str:
     """Decrypt passport series"""
-    return pii_encryption.decrypt(encrypted)
+    if not encrypted:
+        return ""
+    return _get_crypto().decrypt(encrypted, field="passport_series")
 
 
 def decrypt_passport_number(encrypted: str) -> str:
     """Decrypt passport number"""
-    return pii_encryption.decrypt(encrypted)
+    if not encrypted:
+        return ""
+    return _get_crypto().decrypt(encrypted, field="passport_number")
 
 
 def encrypt_passport_issued_by(issued_by: str) -> str:
     """Encrypt passport issued by field"""
-    return pii_encryption.encrypt(issued_by) if issued_by else ""
+    if not issued_by:
+        return ""
+    return _get_crypto().encrypt(issued_by, field="passport_issued_by")
 
 
 def decrypt_passport_issued_by(encrypted: str) -> str:
     """Decrypt passport issued by field"""
-    return pii_encryption.decrypt(encrypted)
+    if not encrypted:
+        return ""
+    return _get_crypto().decrypt(encrypted, field="passport_issued_by")
 
+
+# =============================================================================
+# Masking for logs (re-export from housler_crypto)
+# =============================================================================
+
+mask_email = mask.email
+mask_phone = mask.phone
+mask_name = mask.name
+mask_inn = mask.inn
+mask_card = mask.card
+
+
+# =============================================================================
+# Legacy compatibility (deprecated)
+# =============================================================================
+
+class PIIEncryption:
+    """Legacy class for backwards compatibility.
+
+    DEPRECATED: Use encrypt_* / decrypt_* functions directly.
+    """
+
+    def __init__(self):
+        self._crypto = _get_crypto()
+
+    def encrypt(self, plaintext: str) -> str:
+        """Generic encrypt - use field-specific functions instead"""
+        if not plaintext:
+            return ""
+        return self._crypto.encrypt(plaintext, field="generic")
+
+    def decrypt(self, ciphertext: str) -> str:
+        """Generic decrypt"""
+        if not ciphertext:
+            return ""
+        return self._crypto.decrypt(ciphertext, field="generic")
+
+    @staticmethod
+    def hash(value: str) -> str:
+        """Create blind index"""
+        if not value:
+            return ""
+        return _get_crypto().blind_index(value, field="generic")
+
+
+# Legacy global instance (deprecated)
+pii_encryption = None  # Will be initialized on first use
+
+
+def _get_pii_encryption() -> PIIEncryption:
+    """Lazy initialization for legacy compatibility"""
+    global pii_encryption
+    if pii_encryption is None:
+        pii_encryption = PIIEncryption()
+    return pii_encryption

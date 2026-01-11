@@ -85,27 +85,27 @@ class ContractTemplate(BaseModel):
 
 class Document(BaseModel):
     """Generated document"""
-    
+
     __tablename__ = "documents"
-    
+
     deal_id = Column(UUID(as_uuid=True), ForeignKey("deals.id"), nullable=False)
     template_id = Column(UUID(as_uuid=True), ForeignKey("contract_templates.id"), nullable=True)
-    
+
     version_no = Column(Integer, default=1, nullable=False)
-    
+
     status = Column(
         Enum(DocumentStatus),
         default=DocumentStatus.GENERATED,
         nullable=False,
         index=True
     )
-    
+
     # URL файла в S3
     file_url = Column(String(500), nullable=True)
-    
+
     # SHA-256 хеш документа (для ПЭП)
     document_hash = Column(String(64), nullable=False, index=True)
-    
+
     # Relationships
     deal = relationship("Deal", back_populates="documents")
     signatures = relationship("Signature", back_populates="document", cascade="all, delete-orphan")
@@ -113,20 +113,20 @@ class Document(BaseModel):
 
 class Signature(BaseModel):
     """Document signature"""
-    
+
     __tablename__ = "signatures"
-    
+
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False)
     signer_party_id = Column(UUID(as_uuid=True), ForeignKey("deal_parties.id"), nullable=False)
-    
+
     method = Column(Enum(SignatureMethod), nullable=False)
-    
+
     # Для ПЭП
     phone = Column(String(20), nullable=True)
     otp_request_id = Column(UUID(as_uuid=True), nullable=True)  # Ссылка на OTPSession
-    
+
     signed_at = Column(DateTime, nullable=True)
-    
+
     # Evidence (доказательная база для 63-ФЗ)
     evidence = Column(JSONB, nullable=True)
     # {
@@ -137,7 +137,7 @@ class Signature(BaseModel):
     #   "consent_clicked_at": "...",
     #   "geolocation": {"lat": ..., "lon": ...}
     # }
-    
+
     # Relationships
     document = relationship("Document", back_populates="signatures")
     party = relationship("DealParty", back_populates="signatures")
@@ -187,4 +187,3 @@ class AuditLog(BaseModel):
     # IP и user agent для аудита
     ip_address = Column(String(45), nullable=True)
     user_agent = Column(Text, nullable=True)
-

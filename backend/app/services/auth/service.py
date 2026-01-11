@@ -9,7 +9,6 @@ from typing import Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import create_access_token, create_refresh_token
 from app.models.user import User
 from app.services.user.service import UserService
 

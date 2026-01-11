@@ -15,4 +15,3 @@ api_router.include_router(documents.router, prefix="/documents", tags=["document
 api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
 api_router.include_router(sign.router, prefix="/sign", tags=["signing"])
 api_router.include_router(templates.router, prefix="/templates", tags=["templates"])
-

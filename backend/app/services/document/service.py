@@ -3,14 +3,11 @@
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
-import json
-import random
-import string
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.document import Document, ContractTemplate, DocumentStatus
+from app.models.document import Document, DocumentStatus
 from app.models.deal import Deal
 from app.services.document.generator import DocumentGenerator, ContractTemplates
 from app.services.storage.service import StorageService
@@ -197,7 +194,7 @@ class DocumentService:
                 success=False
             )
             raise
-    
+
     def _generate_contract_number(self, deal: Deal) -> str:
         """Generate unique contract number"""
         year = datetime.now().year
@@ -334,13 +331,13 @@ class DocumentService:
         }
 
         return context
-    
+
     async def get_by_id(self, document_id: UUID) -> Optional[Document]:
         """Get document by ID"""
         stmt = select(Document).where(Document.id == document_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
-    
+
     async def get_deal_documents(self, deal_id: UUID) -> list[Document]:
         """Get all documents for deal"""
         stmt = (
@@ -350,4 +347,3 @@ class DocumentService:
         )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
-

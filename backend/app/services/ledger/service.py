@@ -1,7 +1,7 @@
 """Ledger service implementation"""
 
 from decimal import Decimal
-from typing import List, Dict, Any
+from typing import List
 from uuid import UUID
 
 from sqlalchemy import select
@@ -29,14 +29,14 @@ DEFAULT_HOLD_DAYS = 3
 
 class LedgerService:
     """Ledger service (append-only accounting)"""
-    
+
     def __init__(self, db: AsyncSession):
         self.db = db
-    
+
     async def process_payment(self, payment: Payment) -> List[LedgerEntry]:
         """Process payment and create ledger entries"""
         entries = []
-        
+
         # 1. Payment incoming
         entry_in = LedgerEntry(
             payment_id=payment.id,
@@ -45,7 +45,7 @@ class LedgerService:
             account=Account.PLATFORM,
         )
         entries.append(entry_in)
-        
+
         # 2. Acquirer fee (2%)
         acq_fee = payment.gross_amount * Decimal(
             settings.PAYMENT_ACQUIRER_FEE_PERCENT / 100
@@ -58,7 +58,7 @@ class LedgerService:
             meta={"fee_percent": settings.PAYMENT_ACQUIRER_FEE_PERCENT}
         )
         entries.append(entry_acq)
-        
+
         # 3. Bank rebate (1.3%)
         bank_rebate = payment.gross_amount * Decimal(
             settings.PAYMENT_PLATFORM_REBATE_PERCENT / 100
@@ -71,18 +71,18 @@ class LedgerService:
             meta={"rebate_percent": settings.PAYMENT_PLATFORM_REBATE_PERCENT}
         )
         entries.append(entry_rebate)
-        
+
         # Add all entries
         for entry in entries:
             self.db.add(entry)
-        
+
         await self.db.flush()
-        
+
         # Create splits
         await self._create_splits(payment)
-        
+
         return entries
-    
+
     async def _create_splits(self, payment: Payment) -> List[Split]:
         """Create payment splits based on deal terms"""
         # Get deal with terms
@@ -157,7 +157,7 @@ class LedgerService:
 
         await self.db.flush()
         return payouts
-    
+
     async def get_payment_ledger(self, payment_id: UUID) -> List[LedgerEntry]:
         """Get ledger entries for payment"""
         stmt = (
@@ -167,13 +167,12 @@ class LedgerService:
         )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
-    
+
     async def get_balance(self, account: Account) -> Decimal:
         """Get balance for account"""
         stmt = select(LedgerEntry).where(LedgerEntry.account == account)
         result = await self.db.execute(stmt)
         entries = result.scalars().all()
-        
+
         balance = sum(entry.amount for entry in entries)
         return Decimal(balance)
-

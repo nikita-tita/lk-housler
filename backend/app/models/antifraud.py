@@ -2,9 +2,8 @@
 
 from enum import Enum as PyEnum
 
-from sqlalchemy import Column, String, Enum, Integer, ForeignKey, DateTime, Text
+from sqlalchemy import Column, String, Enum, Integer, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
 
 from app.db.base import BaseModel
 
@@ -40,23 +39,23 @@ class BlacklistType(str, PyEnum):
 
 class AntiFraudCheck(BaseModel):
     """Antifraud check log"""
-    
+
     __tablename__ = "antifraud_checks"
-    
+
     entity_type = Column(String(50), nullable=False, index=True)  # user, deal, payment
     entity_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    
+
     check_type = Column(Enum(CheckType), nullable=False)
     result = Column(Enum(CheckResult), nullable=False)
-    
+
     reason = Column(Text, nullable=True)
 
 
 class UserLimit(BaseModel):
     """User limits"""
-    
+
     __tablename__ = "user_limits"
-    
+
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
 
     max_deal_amount = Column(Integer, nullable=True)
@@ -68,11 +67,10 @@ class UserLimit(BaseModel):
 
 class Blacklist(BaseModel):
     """Blacklist"""
-    
+
     __tablename__ = "blacklist"
-    
+
     type = Column(Enum(BlacklistType), nullable=False)
     value_hash = Column(String(64), nullable=False, unique=True, index=True)
-    
-    reason = Column(Text, nullable=False)
 
+    reason = Column(Text, nullable=False)

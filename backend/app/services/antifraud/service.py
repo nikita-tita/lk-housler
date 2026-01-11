@@ -1,9 +1,8 @@
 """Antifraud service implementation"""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 from uuid import UUID
-from decimal import Decimal
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,10 +23,10 @@ from app.core.security import hash_value
 
 class AntiFraudService:
     """Antifraud service"""
-    
+
     def __init__(self, db: AsyncSession):
         self.db = db
-    
+
     async def check_new_user(self, user: User) -> bool:
         """Check new user and set initial limits"""
         # Check blacklist
@@ -43,7 +42,7 @@ class AntiFraudService:
                         "Passport in blacklist"
                     )
                     return False
-            
+
             if user.profile.inn:
                 inn_hash = hash_value(user.profile.inn)
                 if await self._is_blacklisted(BlacklistType.INN, inn_hash):
@@ -55,10 +54,10 @@ class AntiFraudService:
                         "INN in blacklist"
                     )
                     return False
-        
+
         # Set initial limits for new users
         await self._set_new_user_limits(user)
-        
+
         await self._log_check(
             "user",
             user.id,
@@ -66,14 +65,14 @@ class AntiFraudService:
             CheckResult.PASS,
             "New user initialized with limits"
         )
-        
+
         return True
-    
+
     async def check_deal(self, deal: Deal, user: User) -> tuple[bool, Optional[str]]:
         """Check deal before creation/approval"""
         # Get user limits
         limits = await self._get_user_limits(user.id)
-        
+
         # Check amount limit
         if limits and limits.max_deal_amount:
             if deal.terms.commission_total > limits.max_deal_amount:
@@ -85,7 +84,7 @@ class AntiFraudService:
                     f"Deal amount {deal.terms.commission_total} exceeds limit {limits.max_deal_amount}"
                 )
                 return False, f"Deal amount exceeds your limit of {limits.max_deal_amount}"
-        
+
         # Check velocity (deals per day)
         deals_today = await self._count_user_deals_today(user.id)
         if deals_today >= 5:  # Max 5 deals per day for new users
@@ -97,15 +96,15 @@ class AntiFraudService:
                 f"User created {deals_today} deals today"
             )
             return False, "Too many deals created today. Please contact support."
-        
+
         # Check user age (days since registration)
         user_age_days = (datetime.utcnow() - user.created_at).days
-        
+
         # For new users (0-7 days): stricter limits
         if user_age_days < 7:
             if deal.terms.commission_total > settings.ANTIFRAUD_NEW_AGENT_MAX_DEAL_AMOUNT:
                 return False, f"Maximum deal amount for new users: {settings.ANTIFRAUD_NEW_AGENT_MAX_DEAL_AMOUNT}"
-        
+
         await self._log_check(
             "deal",
             deal.id,
@@ -113,9 +112,9 @@ class AntiFraudService:
             CheckResult.PASS,
             "Deal passed antifraud checks"
         )
-        
+
         return True, None
-    
+
     async def _set_new_user_limits(self, user: User) -> UserLimit:
         """Set initial limits for new user"""
         limits = UserLimit(
@@ -127,13 +126,13 @@ class AntiFraudService:
         self.db.add(limits)
         await self.db.flush()
         return limits
-    
+
     async def _get_user_limits(self, user_id: UUID) -> Optional[UserLimit]:
         """Get user limits"""
         stmt = select(UserLimit).where(UserLimit.user_id == user_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
-    
+
     async def _count_user_deals_today(self, user_id: UUID) -> int:
         """Count deals created by user today"""
         today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -146,7 +145,7 @@ class AntiFraudService:
         )
         result = await self.db.execute(stmt)
         return result.scalar() or 0
-    
+
     async def _is_blacklisted(
         self,
         bl_type: BlacklistType,
@@ -159,7 +158,7 @@ class AntiFraudService:
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none() is not None
-    
+
     async def add_to_blacklist(
         self,
         bl_type: BlacklistType,
@@ -168,7 +167,7 @@ class AntiFraudService:
     ) -> Blacklist:
         """Add to blacklist"""
         value_hash = hash_value(value)
-        
+
         entry = Blacklist(
             type=bl_type,
             value_hash=value_hash,
@@ -177,9 +176,9 @@ class AntiFraudService:
         self.db.add(entry)
         await self.db.flush()
         await self.db.refresh(entry)
-        
+
         return entry
-    
+
     async def _log_check(
         self,
         entity_type: str,
@@ -198,4 +197,3 @@ class AntiFraudService:
         )
         self.db.add(check)
         await self.db.flush()
-

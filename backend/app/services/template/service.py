@@ -40,7 +40,7 @@ class TemplateService:
         if status:
             conditions.append(ContractTemplate.status == status)
         if active_only:
-            conditions.append(ContractTemplate.active == True)
+            conditions.append(ContractTemplate.active.is_(True))
 
         # Count total
         count_stmt = select(func.count(ContractTemplate.id))
@@ -75,7 +75,7 @@ class TemplateService:
         stmt = select(ContractTemplate).where(
             and_(
                 ContractTemplate.code == code,
-                ContractTemplate.active == True,
+                ContractTemplate.active.is_(True),
                 ContractTemplate.status == TemplateStatus.PUBLISHED
             )
         )
@@ -213,7 +213,7 @@ class TemplateService:
                 and_(
                     ContractTemplate.code == template.code,
                     ContractTemplate.id != template.id,
-                    ContractTemplate.active == True
+                    ContractTemplate.active.is_(True)
                 )
             )
         )

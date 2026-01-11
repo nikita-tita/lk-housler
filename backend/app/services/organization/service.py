@@ -25,10 +25,10 @@ from app.schemas.organization import (
 
 class OrganizationService:
     """Organization service"""
-    
+
     def __init__(self, db: AsyncSession):
         self.db = db
-    
+
     async def get_by_id(self, org_id: UUID) -> Optional[Organization]:
         """Get organization by ID"""
         stmt = (
@@ -38,13 +38,13 @@ class OrganizationService:
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
-    
+
     async def get_by_inn(self, inn: str) -> Optional[Organization]:
         """Get organization by INN"""
         stmt = select(Organization).where(Organization.inn == inn)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
-    
+
     async def create(
         self,
         org_in: OrganizationCreate,
@@ -55,7 +55,7 @@ class OrganizationService:
         existing = await self.get_by_inn(org_in.inn)
         if existing:
             raise ValueError("Organization with this INN already exists")
-        
+
         org = Organization(
             **org_in.model_dump(),
             status=OrganizationStatus.PENDING,
@@ -63,7 +63,7 @@ class OrganizationService:
         )
         self.db.add(org)
         await self.db.flush()
-        
+
         # Add creator as admin
         member = OrganizationMember(
             org_id=org.id,
@@ -73,10 +73,10 @@ class OrganizationService:
         )
         self.db.add(member)
         await self.db.flush()
-        
+
         await self.db.refresh(org)
         return org
-    
+
     async def update(
         self,
         org: Organization,
@@ -86,11 +86,11 @@ class OrganizationService:
         update_data = org_in.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(org, field, value)
-        
+
         await self.db.flush()
         await self.db.refresh(org)
         return org
-    
+
     async def list_user_organizations(
         self,
         user: User
@@ -106,7 +106,7 @@ class OrganizationService:
         )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
-    
+
     async def add_member(
         self,
         org: Organization,
@@ -120,7 +120,7 @@ class OrganizationService:
         )
         result = await self.db.execute(stmt)
         existing = result.scalar_one_or_none()
-        
+
         if existing:
             if existing.is_active:
                 raise ValueError("User is already a member")
@@ -129,7 +129,7 @@ class OrganizationService:
             existing.role = member_in.role
             await self.db.flush()
             return existing
-        
+
         member = OrganizationMember(
             org_id=org.id,
             **member_in.model_dump()
@@ -138,7 +138,7 @@ class OrganizationService:
         await self.db.flush()
         await self.db.refresh(member)
         return member
-    
+
     async def create_payout_account(
         self,
         owner_type: str,
@@ -159,7 +159,7 @@ class OrganizationService:
             result = await self.db.execute(stmt)
             for acc in result.scalars():
                 acc.is_default = False
-        
+
         account = PayoutAccount(
             owner_type=owner_type,
             owner_id=owner_id,
@@ -169,4 +169,3 @@ class OrganizationService:
         await self.db.flush()
         await self.db.refresh(account)
         return account
-

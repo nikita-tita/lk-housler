@@ -24,7 +24,7 @@ async def generate_contract(
     """Generate contract for deal"""
     deal_service = DealService(db)
     deal = await deal_service.get_by_id(deal_id)
-    
+
     if not deal:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -34,7 +34,7 @@ async def generate_contract(
     require_deal_access(deal, current_user)
 
     doc_service = DocumentService(db)
-    
+
     try:
         document = await doc_service.generate_contract(deal)
         return {
@@ -113,4 +113,3 @@ async def download_document(
 async def sign_document(document_id: str):
     """Sign document (TODO: будет реализовано в Signature Service)"""
     return {"message": f"Sign document {document_id} - TODO in Signature Service"}
-

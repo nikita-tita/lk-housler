@@ -23,9 +23,9 @@ class Settings(BaseSettings):
         if self.APP_ENV not in valid_envs:
             raise ValueError(f"APP_ENV must be one of {valid_envs}, got '{self.APP_ENV}'")
 
-        # Validate ENCRYPTION_KEY length (should be 64 hex chars = 32 bytes)
-        if len(self.ENCRYPTION_KEY) != 64:
-            raise ValueError("ENCRYPTION_KEY must be 64 hex characters (32 bytes)")
+        # Validate HOUSLER_CRYPTO_KEY length (should be 64 hex chars = 32 bytes)
+        if len(self.HOUSLER_CRYPTO_KEY) != 64:
+            raise ValueError("HOUSLER_CRYPTO_KEY must be 64 hex characters (32 bytes)")
 
         # Production-specific validations
         if self.APP_ENV == "production":
@@ -39,7 +39,7 @@ class Settings(BaseSettings):
                 raise ValueError("FRONTEND_URL cannot contain 'localhost' in production")
 
         return self
-    
+
     # Application
     APP_NAME: str = "Housler LK"
     APP_VERSION: str = "0.1.0"
@@ -50,13 +50,14 @@ class Settings(BaseSettings):
     # Frontend URL (for links in emails, SMS, etc.)
     FRONTEND_URL: str = "http://localhost:3000"
 
-    # PII Encryption (152-ФЗ)
-    # IMPORTANT: Both keys are REQUIRED. Generate with:
-    #   ENCRYPTION_KEY: openssl rand -hex 32
-    #   ENCRYPTION_SALT: openssl rand -base64 32
-    ENCRYPTION_KEY: str  # 32 bytes hex key for AES-256
-    ENCRYPTION_SALT: str  # Unique salt for PBKDF2 key derivation (NO DEFAULT!)
-    
+    # PII Encryption (152-ФЗ) - housler-crypto library
+    # Generate key: python -c "from housler_crypto import HouslerCrypto; print(HouslerCrypto.generate_key())"
+    HOUSLER_CRYPTO_KEY: str  # 64 hex chars (32 bytes) for AES-256-GCM
+
+    # Legacy keys (deprecated - kept for migration if needed)
+    ENCRYPTION_KEY: str = ""  # Old Fernet key
+    ENCRYPTION_SALT: str = ""  # Old Fernet salt
+
     # Company Info (ООО "Сектор ИТ")
     COMPANY_NAME: str = 'ООО "Сектор ИТ"'
     COMPANY_INN: str = "5190237491"
@@ -75,39 +76,39 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str
     DATABASE_URL_SYNC: str
-    
+
     # Redis
     REDIS_URL: str
-    
+
     # Celery
     CELERY_BROKER_URL: str
     CELERY_RESULT_BACKEND: str
-    
+
     # S3/MinIO
     S3_ENDPOINT: str
     S3_ACCESS_KEY: str
     S3_SECRET_KEY: str
     S3_BUCKET_DOCUMENTS: str = "lk-documents"
     S3_BUCKET_RECEIPTS: str = "lk-receipts"
-    
+
     # JWT
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    
+
     # OTP
     OTP_LENGTH: int = 6
     OTP_EXPIRE_MINUTES: int = 5
     OTP_MAX_ATTEMPTS: int = 3
     OTP_BLOCK_MINUTES: int = 10
-    
+
     # SMS (SMS.RU for Housler)
     SMS_PROVIDER: str = "sms_ru"
     SMS_RU_API_ID: str = ""  # SMS.RU API ID
     SMS_TEST_MODE: bool = False  # Test mode: accept 79999xxxxxx phones
     SMS_SENDER_NAME: str = "Housler"
-    
+
     # Email (Yandex 360 SMTP or SendGrid)
     EMAIL_PROVIDER: str = "mock"  # mock, smtp, or sendgrid
     EMAIL_TEST_MODE: bool = False  # Test mode: use fixed code 123456
@@ -122,12 +123,12 @@ class Settings(BaseSettings):
 
     # SendGrid (альтернатива если SMTP порты заблокированы)
     SENDGRID_API_KEY: str = ""  # API key from sendgrid.com
-    
+
     # KYC
     FNS_API_KEY: str = ""
     MVD_API_KEY: str = ""
     ROSFINMONITORING_API_KEY: str = ""
-    
+
     # Payment
     PAYMENT_PROVIDER: str = "mock"
     PAYMENT_API_KEY: str = ""
@@ -135,28 +136,27 @@ class Settings(BaseSettings):
     PAYMENT_ACQUIRER_FEE_PERCENT: float = 2.0
     PAYMENT_BANK_FEE_PERCENT: float = 0.7
     PAYMENT_PLATFORM_REBATE_PERCENT: float = 1.3
-    
+
     # Antifraud
     ANTIFRAUD_NEW_AGENT_MAX_DEAL_AMOUNT: int = 50000
     ANTIFRAUD_NEW_AGENT_MAX_MONTHLY_GMV: int = 100000
     ANTIFRAUD_NEW_AGENT_PAYOUT_HOLD_DAYS: int = 3
-    
+
     # Limits
     MIN_PAYMENT_AMOUNT: int = 10000
     MAX_PAYMENT_AMOUNT: int = 10000000
-    
+
     # CORS
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
-    
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Parse CORS origins into list"""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
-    
+
     # Monitoring
     SENTRY_DSN: str = ""
 
 
 # Global settings instance
 settings = Settings()
-
