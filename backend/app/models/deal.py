@@ -103,7 +103,7 @@ class DealParty(BaseModel):
 
     __tablename__ = "deal_parties"
 
-    deal_id = Column(UUID(as_uuid=True), ForeignKey("deals.id"), nullable=False)
+    deal_id = Column(UUID(as_uuid=True), ForeignKey("lk_deals.id"), nullable=False)
 
     party_role = Column(Enum(PartyRole), nullable=False)
     party_type = Column(Enum(PartyType), nullable=False)
@@ -128,7 +128,7 @@ class DealTerms(BaseModel):
 
     __tablename__ = "deal_terms"
 
-    deal_id = Column(UUID(as_uuid=True), ForeignKey("deals.id"), nullable=False, unique=True)
+    deal_id = Column(UUID(as_uuid=True), ForeignKey("lk_deals.id"), nullable=False, unique=True)
 
     # Комиссия
     commission_total = Column(Numeric(15, 2), nullable=False)
