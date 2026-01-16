@@ -86,6 +86,7 @@ class User(Base):
     # Relationships to lk.housler.ru tables (using Integer FK)
     deals_created = relationship("Deal", foreign_keys="Deal.created_by_user_id", back_populates="creator")
     deals_as_agent = relationship("Deal", foreign_keys="Deal.agent_user_id", back_populates="agent")
+    organizations = relationship("OrganizationMember", back_populates="user")
 
     @property
     def is_admin(self) -> bool:
