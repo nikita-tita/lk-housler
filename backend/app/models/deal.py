@@ -59,9 +59,11 @@ class PartyType(str, PyEnum):
 class Deal(BaseModel, SoftDeleteMixin):
     """Deal with soft delete support"""
 
-    __tablename__ = "deals"
+    # Using separate table name to avoid conflict with agent.housler.ru deals table
+    __tablename__ = "lk_deals"
 
-    type = Column(Enum(DealType), nullable=False)
+    # Using String instead of Enum to match migration schema
+    type = Column(String(50), nullable=False)
 
     # Создатель сделки (INTEGER - совместимость с agent.housler.ru users table)
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -70,7 +72,7 @@ class Deal(BaseModel, SoftDeleteMixin):
     agent_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     # Исполнитель (кто получает деньги: агент или агентство)
-    executor_type = Column(Enum(ExecutorType), default=ExecutorType.USER, nullable=False)
+    executor_type = Column(String(20), default="user", nullable=False)
     executor_id = Column(Integer, nullable=True)  # user.id или organization.id
 
     # Клиент (для MVP - просто текстовые поля)
@@ -78,7 +80,7 @@ class Deal(BaseModel, SoftDeleteMixin):
     client_name = Column(String(255), nullable=True)
     client_phone = Column(String(20), nullable=True)
 
-    status = Column(Enum(DealStatus), default=DealStatus.DRAFT, nullable=False, index=True)
+    status = Column(String(50), default="draft", nullable=False, index=True)
 
     # Адрес объекта недвижимости
     property_address = Column(Text, nullable=True)
