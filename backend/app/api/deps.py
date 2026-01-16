@@ -32,7 +32,8 @@ async def get_current_user(
             detail="Invalid authentication credentials",
         )
 
-    user_id = payload.get("sub")
+    # Support both lk-backend tokens (sub) and agent.housler.ru tokens (userId)
+    user_id = payload.get("sub") or payload.get("userId")
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
