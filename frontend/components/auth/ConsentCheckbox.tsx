@@ -83,8 +83,10 @@ export function ConsentCheckbox({
       <input
         type="checkbox"
         id={id}
+        name={id}
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
+        autoComplete="off"
         className={`mt-1 w-4 h-4 rounded border-[var(--color-border)] text-[var(--color-accent)] focus:ring-[var(--color-accent)] ${
           error ? 'border-[var(--gray-900)]' : ''
         }`}

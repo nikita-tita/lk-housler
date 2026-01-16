@@ -373,7 +373,7 @@ export default function RealtorLoginPage() {
       )}
 
       {step === 'registration' && (
-        <form onSubmit={handleRegistration} className="space-y-5">
+        <form onSubmit={handleRegistration} className="space-y-5" autoComplete="off">
           <div>
             <label htmlFor="name" className="block text-sm font-medium mb-2">
               ФИО *
@@ -422,8 +422,10 @@ export default function RealtorLoginPage() {
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
+                name="isSelfEmployed"
                 checked={formData.isSelfEmployed}
                 onChange={(e) => setFormData(prev => ({ ...prev, isSelfEmployed: e.target.checked }))}
+                autoComplete="off"
                 className="w-5 h-5 rounded border-[var(--color-border)]"
               />
               <span className="text-sm">Я самозанятый (плательщик НПД)</span>
