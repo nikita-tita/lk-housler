@@ -84,7 +84,7 @@ async def create_deal(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.get("/{deal_id}", response_model=DealSchema)
+@router.get("/{deal_id}", response_model=DealSimpleResponse)
 async def get_deal(deal_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Get deal by ID"""
     deal_service = DealService(db)
@@ -95,7 +95,18 @@ async def get_deal(deal_id: str, current_user: User = Depends(get_current_user),
 
     require_deal_access(deal, current_user)
 
-    return deal
+    return DealSimpleResponse(
+        id=deal.id,
+        type=deal.type,
+        status=deal.status,
+        address=deal.property_address or "",
+        price=int(deal.price or 0),
+        commission_agent=int(deal.commission_agent or 0),
+        client_name=deal.client_name,
+        agent_user_id=deal.agent_user_id,
+        created_at=deal.created_at,
+        updated_at=deal.updated_at,
+    )
 
 
 @router.put("/{deal_id}", response_model=DealSchema)
