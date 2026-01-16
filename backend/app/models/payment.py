@@ -53,7 +53,7 @@ class PaymentSchedule(BaseModel):
 
     __tablename__ = "payment_schedules"
 
-    deal_id = Column(UUID(as_uuid=True), ForeignKey("deals.id"), nullable=False)
+    deal_id = Column(UUID(as_uuid=True), ForeignKey("lk_deals.id"), nullable=False)
 
     step_no = Column(Integer, nullable=False)
     amount = Column(Numeric(15, 2), nullable=False)

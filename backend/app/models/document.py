@@ -87,7 +87,7 @@ class Document(BaseModel):
 
     __tablename__ = "documents"
 
-    deal_id = Column(UUID(as_uuid=True), ForeignKey("deals.id"), nullable=False)
+    deal_id = Column(UUID(as_uuid=True), ForeignKey("lk_deals.id"), nullable=False)
     template_id = Column(UUID(as_uuid=True), ForeignKey("contract_templates.id"), nullable=True)
 
     version_no = Column(Integer, default=1, nullable=False)
