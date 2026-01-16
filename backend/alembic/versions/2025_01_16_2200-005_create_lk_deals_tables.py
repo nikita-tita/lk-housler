@@ -98,6 +98,35 @@ def upgrade() -> None:
             sa.Column('cancellation_policy', JSONB, nullable=True),
         )
 
+    # Check if contract_templates exists
+    result = conn.execute(sa.text(
+        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'contract_templates')"
+    ))
+    contract_templates_exists = result.scalar()
+
+    if not contract_templates_exists:
+        op.create_table(
+            'contract_templates',
+            sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
+            sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
+            sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
+            sa.Column('code', sa.String(50), nullable=False, index=True),
+            sa.Column('type', sa.String(50), nullable=False),
+            sa.Column('version', sa.String(20), nullable=False),
+            sa.Column('name', sa.String(255), nullable=False),
+            sa.Column('description', sa.Text, nullable=True),
+            sa.Column('template_body', sa.Text, nullable=False),
+            sa.Column('placeholders_schema', JSONB, nullable=False),
+            sa.Column('legal_basis', sa.Text, nullable=True),
+            sa.Column('effective_from', sa.Date, nullable=True),
+            sa.Column('status', sa.String(50), server_default='draft', nullable=False, index=True),
+            sa.Column('active', sa.Boolean, server_default='false', nullable=False),
+            sa.Column('published_at', sa.DateTime(timezone=True), nullable=True),
+            sa.Column('created_by_user_id', sa.Integer, sa.ForeignKey('users.id'), nullable=True),
+            sa.Column('approved_by_user_id', sa.Integer, sa.ForeignKey('users.id'), nullable=True),
+            sa.Column('approved_at', sa.DateTime(timezone=True), nullable=True),
+        )
+
     # Check if documents exists and has correct FK
     result = conn.execute(sa.text(
         "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'documents')"
