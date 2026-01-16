@@ -40,6 +40,15 @@ async def get_current_user(
             detail="Invalid token payload",
         )
 
+    # Ensure user_id is integer (JWT may return string)
+    try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user ID in token",
+        )
+
     user_service = UserService(db)
     user = await user_service.get_by_id(user_id)
 

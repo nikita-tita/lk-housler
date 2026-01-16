@@ -93,10 +93,6 @@ async def get_deal(deal_id: str, current_user: User = Depends(get_current_user),
     if not deal:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
 
-    logger.info(f"Deal access check: user.id={current_user.id} (type={type(current_user.id).__name__}), "
-                f"deal.created_by={deal.created_by_user_id} (type={type(deal.created_by_user_id).__name__}), "
-                f"deal.agent={deal.agent_user_id} (type={type(deal.agent_user_id).__name__})")
-
     require_deal_access(deal, current_user)
 
     return DealSimpleResponse(
