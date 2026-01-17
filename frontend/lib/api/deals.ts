@@ -2,7 +2,7 @@ import { apiClient } from './client';
 
 // Deal types matching backend
 export type DealType = 'secondary_buy' | 'secondary_sell' | 'newbuild_booking';
-export type DealStatus = 'draft' | 'awaiting_signatures' | 'signed' | 'payment_pending' | 'in_progress' | 'closed' | 'dispute' | 'cancelled';
+export type DealStatus = 'draft' | 'awaiting_signatures' | 'signed' | 'payment_pending' | 'in_progress' | 'hold_period' | 'payout_ready' | 'closed' | 'dispute' | 'cancelled';
 
 // Address for structured input
 export interface AddressInput {
