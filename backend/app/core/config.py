@@ -154,6 +154,17 @@ class Settings(BaseSettings):
     MIN_PAYMENT_AMOUNT: int = 10000
     MAX_PAYMENT_AMOUNT: int = 10000000
 
+    # Feature Flags (флаги для постепенного раскатывания функционала)
+    INSTANT_SPLIT_ENABLED: bool = False  # Глобальное включение/выключение bank-split
+    INSTANT_SPLIT_ORG_IDS: str = ""  # Список UUID организаций через запятую
+
+    @property
+    def instant_split_org_ids_list(self) -> List[str]:
+        """Parse comma-separated org IDs into list"""
+        if not self.INSTANT_SPLIT_ORG_IDS:
+            return []
+        return [org_id.strip() for org_id in self.INSTANT_SPLIT_ORG_IDS.split(",") if org_id.strip()]
+
     # CORS
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
 

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
+from app.core.feature_flags import is_instant_split_enabled
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.bank_split import (
@@ -52,6 +53,13 @@ async def create_bank_split_deal(
 
     This creates a deal using the T-Bank instant split payment model.
     """
+    # Проверка feature flag для организации
+    if not is_instant_split_enabled(deal_in.organization_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bank split is not enabled for this organization"
+        )
+
     service = BankSplitDealService(db)
 
     input_data = CreateBankSplitDealInput(

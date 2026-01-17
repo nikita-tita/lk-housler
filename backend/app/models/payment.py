@@ -89,9 +89,15 @@ class PaymentIntent(BaseModel):
     provider_intent_id = Column(String(255), nullable=True, index=True)
     idempotency_key = Column(String(255), nullable=False, unique=True, index=True)
 
+    # Bank Split fields (NEW for T-Bank integration)
+    external_payment_id = Column(String(255), nullable=True, index=True)  # T-Bank payment ID
+    bank_status = Column(String(50), nullable=True)  # T-Bank status
+    bank_status_updated_at = Column(DateTime, nullable=True)
+
     # Relationships
     schedule = relationship("PaymentSchedule", back_populates="intents")
     payments = relationship("Payment", back_populates="intent")
+    bank_events = relationship("BankEvent", back_populates="payment_intent")
 
 
 class Payment(BaseModel):

@@ -84,6 +84,10 @@ class Organization(BaseModel):
     members = relationship("OrganizationMember", back_populates="organization")
     # Note: payout_accounts uses polymorphic owner pattern, query manually
 
+    # Bank Split relationships
+    split_rule_templates = relationship("SplitRuleTemplate", back_populates="organization", cascade="all, delete-orphan")
+    self_employed_workers = relationship("SelfEmployedRegistry", back_populates="organization", cascade="all, delete-orphan")
+
 
 class OrganizationMember(BaseModel):
     """Organization membership"""

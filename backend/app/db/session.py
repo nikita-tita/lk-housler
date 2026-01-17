@@ -2,9 +2,16 @@
 
 from typing import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
+
+# async_sessionmaker was added in SQLAlchemy 2.0
+# For compatibility, try to import it or use sessionmaker
+try:
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+except ImportError:
+    from sqlalchemy.orm import sessionmaker as async_sessionmaker
 
 from app.core.config import settings
 
@@ -66,3 +73,7 @@ def get_sync_db():
         raise
     finally:
         db.close()
+
+
+# Alias for Celery tasks
+async_session_maker = AsyncSessionLocal
