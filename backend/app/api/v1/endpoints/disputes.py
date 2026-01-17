@@ -23,6 +23,8 @@ from app.schemas.dispute import (
     DisputeResolve,
 )
 from app.services.bank_split import BankSplitDealService
+from app.models.deal import DealStatus
+from app.integrations.tbank import get_tbank_deals_client, TBankError
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -92,6 +94,11 @@ async def create_dispute(
     )
 
     db.add(dispute)
+
+    # Update deal status to DISPUTE
+    deal.status = DealStatus.DISPUTE.value
+    logger.info(f"Deal {deal_id} status changed to DISPUTE due to dispute creation")
+
     await db.commit()
     await db.refresh(dispute)
 
@@ -310,6 +317,10 @@ async def resolve_dispute(
     dispute.resolved_by_user_id = current_user.id
     dispute.resolved_at = datetime.utcnow()
 
+    # Get the deal to update status
+    service = BankSplitDealService(db)
+    deal = await service.get_deal(dispute.deal_id)
+
     # Handle refund
     if resolve_in.resolution in ["full_refund", "partial_refund"]:
         if resolve_in.resolution == "partial_refund" and not resolve_in.refund_amount:
@@ -322,8 +333,40 @@ async def resolve_dispute(
         if resolve_in.refund_amount:
             dispute.refund_amount = resolve_in.refund_amount
 
-        # TODO: Trigger actual refund via T-Bank
-        # This would call the refund_deal function in tbank/deals.py
+        # Process refund via T-Bank if deal has external_deal_id
+        if deal and deal.external_deal_id and deal.payment_model == "bank_hold_split":
+            try:
+                dispute.refund_status = RefundStatus.PROCESSING.value
+                tbank = get_tbank_deals_client()
+                result = await tbank.cancel_deal(
+                    deal.external_deal_id,
+                    reason=f"Dispute resolved: {resolve_in.resolution}"
+                )
+                dispute.refund_status = RefundStatus.COMPLETED.value
+                dispute.refund_external_id = deal.external_deal_id
+                dispute.refund_processed_at = datetime.utcnow()
+                deal.status = DealStatus.REFUNDED.value
+                logger.info(f"Deal {deal.id} refunded via T-Bank")
+            except TBankError as e:
+                dispute.refund_status = RefundStatus.FAILED.value
+                logger.error(f"T-Bank refund failed for deal {deal.id}: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Refund processing failed: {str(e)}"
+                )
+        else:
+            # For legacy MoR deals, just mark as approved (manual refund)
+            deal.status = DealStatus.REFUNDED.value
+    else:
+        # No refund - return to previous state or close
+        if resolve_in.resolution == "no_refund":
+            # Dispute resolved in favor of service provider - return to hold or close
+            if deal:
+                deal.status = DealStatus.HOLD_PERIOD.value
+        elif resolve_in.resolution == "split_adjustment":
+            # Split was adjusted - can proceed
+            if deal:
+                deal.status = DealStatus.HOLD_PERIOD.value
 
     await db.commit()
     await db.refresh(dispute)

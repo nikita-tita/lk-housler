@@ -2,7 +2,21 @@ import { apiClient } from './client';
 
 // Deal types matching backend
 export type DealType = 'secondary_buy' | 'secondary_sell' | 'newbuild_booking';
-export type DealStatus = 'draft' | 'awaiting_signatures' | 'signed' | 'payment_pending' | 'in_progress' | 'hold_period' | 'payout_ready' | 'closed' | 'dispute' | 'cancelled';
+export type DealStatus =
+  | 'draft'
+  | 'awaiting_signatures'
+  | 'signed'
+  | 'payment_pending'
+  | 'in_progress'
+  | 'invoiced'              // Bank-split: invoice created
+  | 'hold_period'           // Bank-split: payment in hold
+  | 'payment_failed'        // Bank-split: payment attempt failed
+  | 'payout_ready'          // Bank-split: ready for payout
+  | 'payout_in_progress'    // Bank-split: payouts being processed
+  | 'refunded'              // Funds returned to client
+  | 'closed'
+  | 'dispute'
+  | 'cancelled';
 
 // Address for structured input
 export interface AddressInput {

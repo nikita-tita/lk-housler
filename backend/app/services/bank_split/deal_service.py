@@ -31,16 +31,21 @@ from app.integrations.tbank import get_tbank_deals_client, TBankError
 logger = logging.getLogger(__name__)
 
 
-# State machine for bank-split deals
+# State machine for bank-split deals (using DealStatus enum values)
 BANK_SPLIT_TRANSITIONS = {
-    "draft": {"awaiting_signatures", "cancelled"},
-    "awaiting_signatures": {"signed", "cancelled"},
-    "signed": {"invoiced", "cancelled"},
-    "invoiced": {"payment_pending", "cancelled"},
-    "payment_pending": {"hold_period", "cancelled"},
-    "hold_period": {"closed", "cancelled"},
-    "closed": set(),  # Terminal
-    "cancelled": set(),  # Terminal
+    DealStatus.DRAFT.value: {DealStatus.AWAITING_SIGNATURES.value, DealStatus.CANCELLED.value},
+    DealStatus.AWAITING_SIGNATURES.value: {DealStatus.SIGNED.value, DealStatus.CANCELLED.value},
+    DealStatus.SIGNED.value: {DealStatus.INVOICED.value, DealStatus.CANCELLED.value},
+    DealStatus.INVOICED.value: {DealStatus.PAYMENT_PENDING.value, DealStatus.PAYMENT_FAILED.value, DealStatus.CANCELLED.value},
+    DealStatus.PAYMENT_PENDING.value: {DealStatus.HOLD_PERIOD.value, DealStatus.PAYMENT_FAILED.value, DealStatus.CANCELLED.value},
+    DealStatus.PAYMENT_FAILED.value: {DealStatus.INVOICED.value, DealStatus.CANCELLED.value},  # Can retry
+    DealStatus.HOLD_PERIOD.value: {DealStatus.PAYOUT_READY.value, DealStatus.DISPUTE.value, DealStatus.CANCELLED.value},
+    DealStatus.PAYOUT_READY.value: {DealStatus.PAYOUT_IN_PROGRESS.value, DealStatus.DISPUTE.value},
+    DealStatus.PAYOUT_IN_PROGRESS.value: {DealStatus.CLOSED.value},
+    DealStatus.DISPUTE.value: {DealStatus.HOLD_PERIOD.value, DealStatus.REFUNDED.value, DealStatus.CANCELLED.value},  # After resolution
+    DealStatus.REFUNDED.value: set(),  # Terminal
+    DealStatus.CLOSED.value: set(),  # Terminal
+    DealStatus.CANCELLED.value: {DealStatus.DRAFT.value},  # Can recover early cancellations
 }
 
 

@@ -13,12 +13,35 @@
 
 ---
 
+## Активные фичи
+
+| Фича | Статус | Документация |
+|------|--------|--------------|
+| **bank-split** | PLANNING | `docs/features/bank-split/` |
+
+### bank-split: Переход MoR -> Bank Hold + Split
+Интеграция с Т-Банком для безопасных сделок.
+
+**Roadmap:**
+```
+[SPEC] -> [BUSINESS DECISIONS] -> [ARCHITECTURE] -> [DECOMPOSITION] -> [DEV] -> [QA] -> [RELEASE]
+  DONE        BLOCKED                 TODO              TODO           TODO    TODO     TODO
+```
+
+**Блокеры:** 5 бизнес-решений (модель монетизации, договор с банком, SLA, политики)
+
+---
+
 ## Команда
 
-| Роль | Специализация | Промпт |
-|------|---------------|--------|
-| BE-LK | FastAPI, SQLAlchemy | `prompts/BE_LK.md` |
-| FE-LK | Next.js, React | `prompts/FE_LK.md` |
+| Роль | Специализация | Промпт | Статус |
+|------|---------------|--------|--------|
+| TPM-LK | Координация | `TPM_PROMPT.md` | ACTIVE |
+| ARCH-LK | Архитектура | `prompts/ARCH_LK.md` | NEW |
+| BE-LK | FastAPI, SQLAlchemy | `prompts/BE_LK.md` | ACTIVE |
+| INTEG-LK | Т-Банк API | `prompts/INTEG_LK.md` | NEW |
+| FE-LK | Next.js, React | `prompts/FE_LK.md` | ACTIVE |
+| QA-LK | Тестирование | - | ACTIVE |
 
 ---
 

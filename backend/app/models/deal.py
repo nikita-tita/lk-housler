@@ -18,16 +18,27 @@ class DealType(str, PyEnum):
 
 
 class DealStatus(str, PyEnum):
-    """Deal status"""
+    """Deal status - unified for all payment models"""
 
+    # Common statuses
     DRAFT = "draft"
     AWAITING_SIGNATURES = "awaiting_signatures"
     SIGNED = "signed"
+    CANCELLED = "cancelled"
+    DISPUTE = "dispute"
+
+    # Legacy MoR statuses
     PAYMENT_PENDING = "payment_pending"
     IN_PROGRESS = "in_progress"
     CLOSED = "closed"
-    DISPUTE = "dispute"
-    CANCELLED = "cancelled"
+
+    # Bank-split specific statuses
+    INVOICED = "invoiced"                    # Invoice created in T-Bank
+    HOLD_PERIOD = "hold_period"              # Payment in hold, awaiting release
+    PAYMENT_FAILED = "payment_failed"        # Payment attempt failed
+    REFUNDED = "refunded"                    # Funds returned to client
+    PAYOUT_READY = "payout_ready"            # Ready for payout to recipients
+    PAYOUT_IN_PROGRESS = "payout_in_progress"  # Payouts being processed
 
 
 class ExecutorType(str, PyEnum):
@@ -73,7 +84,7 @@ class Deal(BaseModel, SoftDeleteMixin):
 
     # Исполнитель (кто получает деньги: агент или агентство)
     executor_type = Column(String(20), default="user", nullable=False)
-    executor_id = Column(Integer, nullable=True)  # user.id или organization.id
+    executor_id = Column(String(36), nullable=True)  # user.id (as string) или organization.id (UUID)
 
     # Клиент (для MVP - просто текстовые поля)
     client_id = Column(Integer, nullable=True)  # Может быть external party

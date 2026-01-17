@@ -181,6 +181,89 @@ class NotificationService:
         except Exception:
             return False
 
+    # ============================================
+    # Dispute notifications
+    # ============================================
+
+    async def send_dispute_opened(
+        self,
+        phone: str,
+        address: Optional[str] = None,
+        initiator_name: Optional[str] = None,
+    ) -> bool:
+        """Notify about dispute opened"""
+        short_address = address[:25] + "..." if address and len(address) > 25 else address
+        initiator = initiator_name or "Участник"
+
+        message = f"Housler: {initiator} открыл спор по сделке {short_address}. Выплата приостановлена до разрешения."
+
+        try:
+            await self.sms.send(phone, message)
+            return True
+        except Exception:
+            return False
+
+    async def send_dispute_resolved(
+        self,
+        phone: str,
+        address: Optional[str] = None,
+        resolution: Optional[str] = None,
+    ) -> bool:
+        """Notify about dispute resolution"""
+        short_address = address[:25] + "..." if address and len(address) > 25 else address
+
+        resolution_text = {
+            "full_refund": "полный возврат средств",
+            "partial_refund": "частичный возврат",
+            "no_refund": "без возврата, сделка продолжается",
+            "split_adjustment": "изменение распределения комиссии",
+        }.get(resolution, "разрешён")
+
+        message = f"Housler: спор по сделке {short_address} разрешён: {resolution_text}."
+
+        try:
+            await self.sms.send(phone, message)
+            return True
+        except Exception:
+            return False
+
+    async def send_refund_completed(
+        self,
+        phone: str,
+        address: Optional[str] = None,
+        amount: Optional[float] = None,
+    ) -> bool:
+        """Notify about refund completed"""
+        short_address = address[:25] + "..." if address and len(address) > 25 else address
+        amount_str = f"{amount:,.0f}".replace(",", " ") if amount else ""
+
+        message = f"Housler: возврат {amount_str} руб. по сделке {short_address} выполнен. Средства вернутся в течение 3-5 дней."
+
+        try:
+            await self.sms.send(phone, message)
+            return True
+        except Exception:
+            return False
+
+    async def send_payment_failed(
+        self,
+        phone: str,
+        address: Optional[str] = None,
+        payment_url: Optional[str] = None,
+    ) -> bool:
+        """Notify about payment failure"""
+        short_address = address[:25] + "..." if address and len(address) > 25 else address
+
+        message = f"Housler: оплата по сделке {short_address} не прошла."
+        if payment_url:
+            message += f" Попробуйте ещё раз: {payment_url}"
+
+        try:
+            await self.sms.send(phone, message)
+            return True
+        except Exception:
+            return False
+
 
 # Singleton instance
 notification_service = NotificationService()
@@ -218,4 +301,25 @@ async def notify_deal_status_change(
         reason = kwargs.get("reason")
         return await service.send_bank_split_deal_cancelled(phone, address, reason)
 
+    elif new_status == "dispute":
+        initiator_name = kwargs.get("initiator_name")
+        return await service.send_dispute_opened(phone, address, initiator_name)
+
+    elif new_status == "refunded":
+        amount = kwargs.get("amount")
+        return await service.send_refund_completed(phone, address, amount)
+
+    elif new_status == "payment_failed":
+        payment_url = kwargs.get("payment_url", f"{settings.FRONTEND_URL}/pay/{deal_id}")
+        return await service.send_payment_failed(phone, address, payment_url)
+
     return False
+
+
+async def notify_dispute_resolved(
+    phone: str,
+    address: str,
+    resolution: str,
+) -> bool:
+    """Convenience function for dispute resolution notifications"""
+    return await notification_service.send_dispute_resolved(phone, address, resolution)
