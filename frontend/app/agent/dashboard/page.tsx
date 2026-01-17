@@ -103,7 +103,7 @@ export default function AgentDashboard() {
         </div>
         <div className="flex gap-3">
           <Link href="/agent/deals/bank-split/new">
-            <Button variant="outline">Bank-Split сделка</Button>
+            <Button variant="secondary">Bank-Split сделка</Button>
           </Link>
           <Link href="/agent/deals/new">
             <Button>Создать сделку</Button>
@@ -208,7 +208,7 @@ export default function AgentDashboard() {
             <CardDescription>Ваши недавние сделки</CardDescription>
           </div>
           <Link href="/agent/deals">
-            <Button variant="outline" size="sm">Все сделки</Button>
+            <Button variant="secondary" size="sm">Все сделки</Button>
           </Link>
         </CardHeader>
         <CardContent>
