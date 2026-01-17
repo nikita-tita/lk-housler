@@ -33,6 +33,7 @@ export interface RecentDeal {
   status: string;
   commission: number;
   created_at: string;
+  deal_type?: 'legacy' | 'bank_split';
 }
 
 export interface DashboardSummary {

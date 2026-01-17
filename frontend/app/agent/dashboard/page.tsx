@@ -47,7 +47,7 @@ export default function AgentDashboard() {
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
   const [timeSeries, setTimeSeries] = useState<TimeSeriesPoint[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'all' | 'bank-split'>('all');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -55,6 +55,9 @@ export default function AgentDashboard() {
 
   async function loadData() {
     try {
+      setError(null);
+      setLoading(true);
+
       const [dealsRes, dashboardRes, timeSeriesRes] = await Promise.all([
         getDeals(1, 10),
         getDashboardSummary().catch(() => null),
@@ -64,8 +67,9 @@ export default function AgentDashboard() {
       setDeals(dealsRes.items);
       setDashboard(dashboardRes);
       setTimeSeries(timeSeriesRes);
-    } catch (error) {
-      console.error('Failed to load data:', error);
+    } catch (err) {
+      console.error('Failed to load data:', err);
+      setError('Не удалось загрузить данные. Попробуйте обновить страницу.');
     } finally {
       setLoading(false);
     }
@@ -78,6 +82,29 @@ export default function AgentDashboard() {
       </div>
     );
   }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Card className="max-w-md w-full">
+            <CardContent className="pt-6 text-center">
+              <p className="text-gray-900 mb-4">{error}</p>
+              <Button onClick={loadData}>Повторить</Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  const getDealLink = (deal: { id: string; deal_type?: 'legacy' | 'bank_split' }) => {
+    // Default to bank_split if no type specified (dashboard returns bank-split deals)
+    if (deal.deal_type === 'legacy') {
+      return `/agent/deals/${deal.id}`;
+    }
+    return `/agent/deals/bank-split/${deal.id}`;
+  };
 
   const stats = dashboard?.month_stats || {
     total_deals: deals.filter(d => d.status === 'closed').length,
@@ -232,7 +259,7 @@ export default function AgentDashboard() {
               {recentDeals.map((deal) => (
                 <Link
                   key={deal.id}
-                  href={`/agent/deals/bank-split/${deal.id}`}
+                  href={getDealLink(deal)}
                   className="block p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-center justify-between">

@@ -3,8 +3,33 @@
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 
+const ROLE_LABELS: Record<string, string> = {
+  agent: 'Агент',
+  agency: 'Агентство',
+  client: 'Клиент',
+  admin: 'Администратор',
+};
+
+function formatPhone(phone: string | undefined): string {
+  if (!phone) return '';
+  // Format: +7 (999) 123-45-67
+  const cleaned = phone.replace(/\D/g, '');
+  if (cleaned.length === 11 && cleaned.startsWith('7')) {
+    return `+7 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7, 9)}-${cleaned.slice(9, 11)}`;
+  }
+  return phone;
+}
+
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin h-8 w-8 border-2 border-black border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -36,12 +61,12 @@ export default function ProfilePage() {
               {user?.phone && (
                 <div>
                   <dt className="text-sm text-gray-600">Телефон</dt>
-                  <dd className="text-base text-gray-900 mt-1">{user.phone}</dd>
+                  <dd className="text-base text-gray-900 mt-1">{formatPhone(user.phone)}</dd>
                 </div>
               )}
               <div>
                 <dt className="text-sm text-gray-600">Роль</dt>
-                <dd className="text-base text-gray-900 mt-1 capitalize">{user?.role}</dd>
+                <dd className="text-base text-gray-900 mt-1">{ROLE_LABELS[user?.role || ''] || user?.role}</dd>
               </div>
               <div>
                 <dt className="text-sm text-gray-600">Статус</dt>

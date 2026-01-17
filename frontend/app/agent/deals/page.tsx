@@ -36,8 +36,11 @@ const FILTER_OPTIONS = [
   { value: 'awaiting_signatures', label: 'На подписании' },
   { value: 'signed', label: 'Подписаны' },
   { value: 'payment_pending', label: 'Ожидают оплаты' },
+  { value: 'payment_failed', label: 'Ошибка оплаты' },
   { value: 'hold_period', label: 'Удержание' },
+  { value: 'dispute', label: 'Споры' },
   { value: 'closed', label: 'Закрыты' },
+  { value: 'cancelled', label: 'Отменены' },
 ];
 
 type DealType = 'legacy' | 'bank_split';
@@ -57,6 +60,7 @@ interface UnifiedDeal {
 export default function DealsPage() {
   const [deals, setDeals] = useState<UnifiedDeal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('all');
   const [showCreateMenu, setShowCreateMenu] = useState(false);
 
@@ -66,6 +70,9 @@ export default function DealsPage() {
 
   async function loadDeals() {
     try {
+      setError(null);
+      setLoading(true);
+
       // Load both legacy and bank-split deals
       const [legacyResponse, bankSplitResponse] = await Promise.all([
         getDeals().catch(() => ({ items: [] })),
@@ -106,8 +113,9 @@ export default function DealsPage() {
       );
 
       setDeals(allDeals);
-    } catch (error) {
-      console.error('Failed to load deals:', error);
+    } catch (err) {
+      console.error('Failed to load deals:', err);
+      setError('Не удалось загрузить сделки. Попробуйте обновить страницу.');
     } finally {
       setLoading(false);
     }
@@ -129,6 +137,21 @@ export default function DealsPage() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin h-8 w-8 border-2 border-black border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Card className="max-w-md w-full">
+            <CardContent className="pt-6 text-center">
+              <p className="text-gray-900 mb-4">{error}</p>
+              <Button onClick={loadDeals}>Повторить</Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -263,6 +286,14 @@ export default function DealsPage() {
                             ? 'bg-gray-100 text-gray-500'
                             : deal.status === 'hold_period'
                             ? 'bg-gray-400 text-white'
+                            : deal.status === 'dispute'
+                            ? 'bg-gray-900 text-white'
+                            : deal.status === 'payment_failed'
+                            ? 'bg-gray-300 text-gray-700'
+                            : deal.status === 'payout_ready' || deal.status === 'payout_in_progress'
+                            ? 'bg-gray-500 text-white'
+                            : deal.status === 'refunded'
+                            ? 'bg-gray-200 text-gray-600'
                             : 'bg-gray-100 text-gray-900'
                         }`}
                       >
