@@ -273,10 +273,15 @@ export async function createDispute(
 
 export async function getDispute(dealId: string): Promise<DisputeResponse | null> {
   try {
-    const { data } = await apiClient.get<DisputeResponse>(
-      `/disputes/deal/${dealId}`
+    // Backend returns array of disputes, get the first open/under_review one
+    const { data } = await apiClient.get<DisputeResponse[]>(
+      `/bank-split/${dealId}/disputes`
     );
-    return data;
+    // Return the most recent open or under_review dispute
+    const activeDispute = data.find(
+      (d) => d.status === 'open' || d.status === 'under_review'
+    );
+    return activeDispute || data[0] || null;
   } catch {
     return null;
   }
