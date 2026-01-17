@@ -23,8 +23,9 @@ python-dotenv==1.0.0
 cryptography==42.0.0  # For PII encryption (152-ФЗ)
 
 # Housler Crypto (unified PII encryption)
-# TODO: uncomment after HC-PUB-001 (PyPI publish)
-# housler-crypto>=1.0.0
+# NOTE: If not published to PyPI, install from git:
+# pip install git+https://github.com/housler/housler-crypto.git
+housler-crypto>=1.0.0
 
 # HTTP Client
 httpx==0.26.0

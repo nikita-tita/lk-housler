@@ -58,19 +58,109 @@ class RateLimiter:
 rate_limiter = RateLimiter()
 
 
-async def rate_limit_otp_send(request: Request):
-    """Rate limit for OTP send endpoints: 3 requests per 60 seconds per IP"""
+async def rate_limit_otp_send(request: Request, phone: str = None, email: str = None):
+    """
+    Rate limit for OTP send endpoints.
+
+    Two-layer protection:
+    1. IP-based: 3 requests per 60 seconds per IP
+    2. Phone/Email-based: 5 requests per hour per phone/email
+
+    This prevents bypass via VPN/proxy (everyone behind same IP).
+    """
     client_ip = request.client.host if request.client else "unknown"
-    await rate_limiter.check_rate_limit(identifier=client_ip, endpoint="otp_send", max_requests=3, window_seconds=60)
+
+    # Layer 1: Rate limit by IP (short window, strict limit)
+    await rate_limiter.check_rate_limit(
+        identifier=f"ip:{client_ip}",
+        endpoint="otp_send",
+        max_requests=3,
+        window_seconds=60
+    )
+
+    # Layer 2: Rate limit by phone (longer window, prevents phone enumeration)
+    if phone:
+        await rate_limiter.check_rate_limit(
+            identifier=f"phone:{phone}",
+            endpoint="otp_send",
+            max_requests=5,
+            window_seconds=3600  # 1 hour
+        )
+
+    # Layer 2 (alt): Rate limit by email
+    if email:
+        await rate_limiter.check_rate_limit(
+            identifier=f"email:{email}",
+            endpoint="otp_send",
+            max_requests=5,
+            window_seconds=3600  # 1 hour
+        )
 
 
-async def rate_limit_otp_verify(request: Request):
-    """Rate limit for OTP verify endpoints: 5 requests per 60 seconds per IP"""
+async def rate_limit_otp_verify(request: Request, phone: str = None, email: str = None):
+    """
+    Rate limit for OTP verify endpoints.
+
+    Two-layer protection:
+    1. IP-based: 5 requests per 60 seconds per IP
+    2. Phone/Email-based: 10 requests per hour per phone/email
+
+    Prevents brute-force OTP guessing attacks.
+    """
     client_ip = request.client.host if request.client else "unknown"
-    await rate_limiter.check_rate_limit(identifier=client_ip, endpoint="otp_verify", max_requests=5, window_seconds=60)
+
+    # Layer 1: Rate limit by IP
+    await rate_limiter.check_rate_limit(
+        identifier=f"ip:{client_ip}",
+        endpoint="otp_verify",
+        max_requests=5,
+        window_seconds=60
+    )
+
+    # Layer 2: Rate limit by phone (prevents brute-force on specific phone)
+    if phone:
+        await rate_limiter.check_rate_limit(
+            identifier=f"phone:{phone}",
+            endpoint="otp_verify",
+            max_requests=10,
+            window_seconds=3600  # 1 hour
+        )
+
+    # Layer 2 (alt): Rate limit by email
+    if email:
+        await rate_limiter.check_rate_limit(
+            identifier=f"email:{email}",
+            endpoint="otp_verify",
+            max_requests=10,
+            window_seconds=3600  # 1 hour
+        )
 
 
-async def rate_limit_login(request: Request):
-    """Rate limit for password login: 5 requests per 60 seconds per IP"""
+async def rate_limit_login(request: Request, email: str = None):
+    """
+    Rate limit for password login.
+
+    Two-layer protection:
+    1. IP-based: 5 requests per 60 seconds per IP
+    2. Email-based: 10 requests per hour per email
+
+    Prevents brute-force password attacks.
+    """
     client_ip = request.client.host if request.client else "unknown"
-    await rate_limiter.check_rate_limit(identifier=client_ip, endpoint="login", max_requests=5, window_seconds=60)
+
+    # Layer 1: Rate limit by IP
+    await rate_limiter.check_rate_limit(
+        identifier=f"ip:{client_ip}",
+        endpoint="login",
+        max_requests=5,
+        window_seconds=60
+    )
+
+    # Layer 2: Rate limit by email (prevents brute-force on specific account)
+    if email:
+        await rate_limiter.check_rate_limit(
+            identifier=f"email:{email}",
+            endpoint="login",
+            max_requests=10,
+            window_seconds=3600  # 1 hour
+        )

@@ -113,7 +113,7 @@ git push -u origin main
 
 1. Settings → Secrets and variables → Actions
 2. Добавьте секреты:
-   - `SERVER_HOST`: 91.229.8.221
+   - `SERVER_HOST`: 95.163.227.26
    - `SERVER_USER`: root
    - `SSH_PRIVATE_KEY`: содержимое ~/.ssh/id_housler
    - `ENV_FILE`: содержимое .env.production
@@ -125,7 +125,7 @@ git push -u origin main
 ### 1. Подключение к серверу
 
 ```bash
-ssh -i ~/.ssh/id_housler root@91.229.8.221
+ssh -i ~/.ssh/id_housler root@95.163.227.26
 ```
 
 ### 2. Установка необходимых пакетов (если еще не установлены)
@@ -155,8 +155,8 @@ apt install certbot python3-certbot-nginx -y
 
 ```bash
 # Создание директории
-mkdir -p /var/www/lk.housler.ru
-cd /var/www/lk.housler.ru
+mkdir -p /root/lk-housler
+cd /root/lk-housler
 
 # Клонирование репозитория
 git clone https://github.com/YOUR_USERNAME/lk-housler.git .
@@ -227,7 +227,7 @@ curl http://localhost:3090/api/health
 
 ```bash
 # Копирование конфига
-cp /var/www/lk.housler.ru/nginx/lk.housler.ru.conf /etc/nginx/sites-available/lk.housler.ru
+cp /root/lk-housler/nginx/lk.housler.ru.conf /etc/nginx/sites-available/lk.housler.ru
 
 # Создание симлинка
 ln -s /etc/nginx/sites-available/lk.housler.ru /etc/nginx/sites-enabled/
@@ -356,10 +356,10 @@ docker logs lk-backend | grep -i minio
 
 ```bash
 # Подключение к серверу
-ssh -i ~/.ssh/id_housler root@91.229.8.221
+ssh -i ~/.ssh/id_housler root@95.163.227.26
 
 # Переход в директорию проекта
-cd /var/www/lk.housler.ru
+cd /root/lk-housler
 
 # Получение последних изменений
 git pull origin main
@@ -695,8 +695,8 @@ docker exec lk-backend env
 
 ## Контакты и поддержка
 
-- **Сервер:** 91.229.8.221
-- **SSH:** `ssh -i ~/.ssh/id_housler root@91.229.8.221`
+- **Сервер:** 95.163.227.26
+- **SSH:** `ssh -i ~/.ssh/id_housler root@95.163.227.26`
 - **Домен:** https://lk.housler.ru
 - **GitHub:** https://github.com/YOUR_USERNAME/lk-housler
 

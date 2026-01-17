@@ -1,9 +1,14 @@
 """FastAPI application entry point"""
 
+import logging
+from uuid import uuid4
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy import text
 import redis.asyncio as aioredis
 from minio import Minio
@@ -15,6 +20,34 @@ from app.api.v1.router import api_router
 
 # Configure logging before app initialization
 setup_logging()
+
+logger = logging.getLogger(__name__)
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Add X-Request-ID header to all requests for tracing.
+
+    This middleware:
+    - Accepts existing X-Request-ID from incoming requests (for distributed tracing)
+    - Generates a new UUID if not provided
+    - Stores request_id in request.state for access in handlers
+    - Adds X-Request-ID to response headers
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        # Get existing request ID or generate new one
+        request_id = request.headers.get("X-Request-ID") or str(uuid4())
+
+        # Store in request state for access in handlers
+        request.state.request_id = request_id
+
+        # Process request
+        response = await call_next(request)
+
+        # Add to response headers
+        response.headers["X-Request-ID"] = request_id
+
+        return response
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -61,16 +94,105 @@ app = FastAPI(
 )
 
 # CORS - restricted to actual methods and headers used
+# Note: Also expose X-Request-ID header for clients
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With", "X-Request-ID"],
+    expose_headers=["X-Request-ID"],
 )
 
 # Security headers
 app.add_middleware(SecurityHeadersMiddleware)
+
+# Request ID tracing (added last = executed first in middleware chain)
+app.add_middleware(RequestIDMiddleware)
+
+
+# =============================================================================
+# Global Exception Handlers
+# =============================================================================
+
+
+def _get_request_id(request: Request) -> str | None:
+    """Safely get request_id from request state."""
+    return getattr(request.state, "request_id", None)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Handle HTTP exceptions with consistent format."""
+    request_id = _get_request_id(request)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": True,
+            "detail": exc.detail,
+            "status_code": exc.status_code,
+            "request_id": request_id,
+        },
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle validation errors."""
+    request_id = _get_request_id(request)
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": True,
+            "detail": "Validation error",
+            "errors": exc.errors(),
+            "request_id": request_id,
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch-all handler for unhandled exceptions.
+
+    In production (DEBUG=False), internal details are hidden.
+    """
+    request_id = _get_request_id(request)
+
+    # Log the full traceback for debugging with request_id
+    logger.error(
+        f"[{request_id}] Unhandled exception on {request.method} {request.url.path}: {exc}",
+        exc_info=True,
+    )
+
+    # In debug mode, include exception details for development
+    if settings.DEBUG:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": True,
+                "detail": str(exc),
+                "status_code": 500,
+                "type": type(exc).__name__,
+                "request_id": request_id,
+            },
+        )
+
+    # In production, return safe error message (no internal details)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": True,
+            "detail": "Internal server error",
+            "status_code": 500,
+            "request_id": request_id,
+        },
+    )
+
+
+# =============================================================================
+# Routes
+# =============================================================================
 
 
 @app.get("/")

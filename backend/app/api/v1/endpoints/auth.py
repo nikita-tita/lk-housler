@@ -20,7 +20,6 @@ from app.schemas.auth import (
     AgencyRegisterRequest,
     Token,
 )
-from app.services.auth.service import AuthService
 from app.services.auth.service_extended import AuthServiceExtended
 
 router = APIRouter()
@@ -36,9 +35,11 @@ async def send_agent_sms(
     request: SMSOTPRequest,
     http_request: Request,
     db: AsyncSession = Depends(get_db),
-    _: None = Depends(rate_limit_otp_send),
 ):
     """Send SMS OTP for agent login"""
+    # Rate limit by IP + phone number
+    await rate_limit_otp_send(http_request, phone=request.phone)
+
     ip_address = http_request.client.host if http_request.client else None
     try:
         auth_service = AuthServiceExtended(db)
@@ -68,9 +69,11 @@ async def verify_agent_sms(
     request: SMSOTPVerify,
     http_request: Request,
     db: AsyncSession = Depends(get_db),
-    _: None = Depends(rate_limit_otp_verify),
 ):
     """Verify SMS OTP and login/register agent"""
+    # Rate limit by IP + phone number
+    await rate_limit_otp_verify(http_request, phone=request.phone)
+
     ip_address = http_request.client.host if http_request.client else None
     user_agent = http_request.headers.get("user-agent")
     try:
@@ -103,9 +106,14 @@ async def verify_agent_sms(
 
 @router.post("/client/email/send", status_code=status.HTTP_200_OK)
 async def send_client_email(
-    request: EmailOTPRequest, db: AsyncSession = Depends(get_db), _: None = Depends(rate_limit_otp_send)
+    request: EmailOTPRequest,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
 ):
     """Send Email OTP for client login"""
+    # Rate limit by IP + email
+    await rate_limit_otp_send(http_request, email=request.email)
+
     try:
         auth_service = AuthServiceExtended(db)
         await auth_service.send_email_otp(request.email)
@@ -118,9 +126,14 @@ async def send_client_email(
 
 @router.post("/client/email/verify", response_model=Token)
 async def verify_client_email(
-    request: EmailOTPVerify, db: AsyncSession = Depends(get_db), _: None = Depends(rate_limit_otp_verify)
+    request: EmailOTPVerify,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
 ):
     """Verify Email OTP and login/register client"""
+    # Rate limit by IP + email
+    await rate_limit_otp_verify(http_request, email=request.email)
+
     try:
         auth_service = AuthServiceExtended(db)
         user, access_token, refresh_token = await auth_service.verify_email_otp(request.email, request.code)
@@ -140,9 +153,11 @@ async def login_agency(
     request: AgencyLoginRequest,
     http_request: Request,
     db: AsyncSession = Depends(get_db),
-    _: None = Depends(rate_limit_login),
 ):
     """Agency admin login with email + password"""
+    # Rate limit by IP + email
+    await rate_limit_login(http_request, email=request.email)
+
     ip_address = http_request.client.host if http_request.client else None
     user_agent = http_request.headers.get("user-agent")
     try:
@@ -234,27 +249,32 @@ async def register_agency(request: AgencyRegisterRequest, http_request: Request,
 
 
 @router.post("/otp/send", status_code=status.HTTP_200_OK)
-async def send_otp(request: OTPRequest, db: AsyncSession = Depends(get_db), _: None = Depends(rate_limit_otp_send)):
-    """Send OTP code (legacy)"""
-    try:
-        auth_service = AuthService(db)
-        await auth_service.send_otp(request.phone, request.purpose)
-        return {"message": "OTP sent successfully"}
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to send OTP")
+async def send_otp(
+    request: OTPRequest,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Send OTP code (legacy - deprecated)"""
+    # Rate limit by IP + phone (even for deprecated endpoints)
+    await rate_limit_otp_send(http_request, phone=request.phone)
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="This endpoint is deprecated. Use agent.housler.ru/api/auth/* for authentication"
+    )
 
 
 @router.post("/otp/verify", response_model=Token)
-async def verify_otp(request: OTPVerify, db: AsyncSession = Depends(get_db), _: None = Depends(rate_limit_otp_verify)):
-    """Verify OTP and login/register (legacy)"""
-    try:
-        auth_service = AuthService(db)
-        user, access_token, refresh_token = await auth_service.login_with_otp(request.phone, request.code)
+async def verify_otp(
+    request: OTPVerify,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Verify OTP and login/register (legacy - deprecated)"""
+    # Rate limit by IP + phone (even for deprecated endpoints)
+    await rate_limit_otp_verify(http_request, phone=request.phone)
 
-        return Token(access_token=access_token, refresh_token=refresh_token)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to verify OTP")
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="This endpoint is deprecated. Use agent.housler.ru/api/auth/* for authentication"
+    )

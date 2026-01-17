@@ -1,13 +1,13 @@
-# 🏠 Agent Deal Platform (lk.housler.ru)
+# Agent Deal Platform (lk.housler.ru)
 
-> **Платформа для автоматизации агентских сделок на рынке недвижимости**
+> Платформа для автоматизации агентских сделок на рынке недвижимости
 
-[![Backend Status](https://img.shields.io/badge/Backend-Ready%20100%25-success)](./BACKEND_READY.md)
-[![Documentation](https://img.shields.io/badge/Docs-Complete-blue)](./NEXT_STEPS.md)
-[![Housler Ecosystem](https://img.shields.io/badge/Housler-Integrated-orange)](./HOUSLER_ECOSYSTEM.md)
+[![Backend Status](https://img.shields.io/badge/Backend-Ready-success)]()
+[![Bank Split](https://img.shields.io/badge/Bank_Split-95%25-blue)](./docs/features/bank-split/README.md)
+[![Housler Ecosystem](https://img.shields.io/badge/Housler-Integrated-orange)](./CLAUDE.md)
 
-**Часть экосистемы Housler**  
-🏢 ООО "Сектор ИТ" (ИНН 5190237491)
+**Часть экосистемы Housler**
+ООО "Сектор ИТ" (ИНН 5190237491)
 
 ## 🎯 Что это?
 
@@ -19,26 +19,26 @@
 - ✅ Шифрование PII (152-ФЗ)
 - ✅ Генерация чеков для самозанятых
 
-## 🔐 Авторизация (3 типа)
+## Авторизация (3 типа)
 
 1. **SMS Auth** - Риелторы (физ. лица)
 2. **Email Auth** - Клиенты (покупатели/продавцы)
 3. **Email + Password** - Агентства (юр. лица)
 
-📖 **[API_AUTH_GUIDE.md](./API_AUTH_GUIDE.md)** - Полный гайд
+**[docs/UNIFIED_AUTH.md](./docs/UNIFIED_AUTH.md)** - Полная документация авторизации
 
-## 💰 Платежи
+## Платежи (Bank Split)
 
-- Создание Payment Intent
+- **Instant Split** через Т-Банк (номинальный счёт)
 - Webhook от СБП
 - Автоматическое распределение комиссий
 - Генерация чеков (НПД)
 
-📖 **[API_PAYMENTS_GUIDE.md](./API_PAYMENTS_GUIDE.md)** - Полный гайд
+**[docs/features/bank-split/](./docs/features/bank-split/)** - Документация Bank Split
 
-## 🏗 Архитектура
+## Архитектура
 
-**📐 Полная документация**: [ARCHITECTURE.md](./ARCHITECTURE.md)
+**Полная документация**: [docs/features/bank-split/ARCHITECTURE.md](./docs/features/bank-split/ARCHITECTURE.md)
 
 ### Backend ✅
 - **Framework**: FastAPI (Python 3.11+)
@@ -101,13 +101,9 @@ lk/
 └── .env.example
 ```
 
-## 🚀 Быстрый старт
+## Быстрый старт
 
-### 📋 Чек-лист запуска
-
-**Для нетерпеливых** - [QUICK_START_CHECKLIST.md](./QUICK_START_CHECKLIST.md)
-
-### 🏃 Автоматический запуск (одна команда)
+### Автоматический запуск (одна команда)
 
 ```bash
 # Настроить backend/.env (см. ниже)
@@ -175,28 +171,23 @@ curl -X POST http://localhost:8000/api/v1/auth/client/email/verify \
   -d '{"email": "client@test.com", "code": "111111"}'
 ```
 
-## 📚 Документация
+## Документация
 
-### 🎯 Начните здесь
-- **[QUICK_START_CHECKLIST.md](./QUICK_START_CHECKLIST.md)** - Запуск за 5 минут ⚡
-- **[PROJECT_STATUS.md](./PROJECT_STATUS.md)** - Текущий статус проекта
-- **[NEXT_STEPS.md](./NEXT_STEPS.md)** - План дальнейших действий
+### Основная документация
+- **[CLAUDE.md](./CLAUDE.md)** - Инструкции для разработки (AI и люди)
+- **[BACKLOG.md](./BACKLOG.md)** - Единый бэклог задач
 
-### 🔍 Детальная документация
-- [FINAL_REVIEW.md](./FINAL_REVIEW.md) - Полный обзор проекта
-- [SETUP.md](./SETUP.md) - Подробная инструкция по установке
-- [PROGRESS.md](./PROGRESS.md) - История разработки
+### Авторизация
+- **[docs/UNIFIED_AUTH.md](./docs/UNIFIED_AUTH.md)** - Единая авторизация через agent.housler.ru
 
-### 🔌 API Guides
-- **[API_AUTH_GUIDE.md](./API_AUTH_GUIDE.md)** - Авторизация (3 типа)
-- **[API_PAYMENTS_GUIDE.md](./API_PAYMENTS_GUIDE.md)** - Платежи и СБП
-- [BACKEND_READY.md](./BACKEND_READY.md) - Backend документация
+### Bank Split (Платежи)
+- **[docs/features/bank-split/README.md](./docs/features/bank-split/README.md)** - Обзор фичи
+- **[docs/features/bank-split/SPEC.md](./docs/features/bank-split/SPEC.md)** - Спецификация
+- **[docs/features/bank-split/ARCHITECTURE.md](./docs/features/bank-split/ARCHITECTURE.md)** - Архитектура
 
-### 🏗 Housler Ecosystem
-- [HOUSLER_ECOSYSTEM.md](./HOUSLER_ECOSYSTEM.md) - Главный документ
-- [HOUSLER_INTEGRATION.md](./HOUSLER_INTEGRATION.md) - Детали интеграции
-- [QUICKSTART_HOUSLER.md](./QUICKSTART_HOUSLER.md) - Быстрый старт Housler
-- [CLAUDE.md](./CLAUDE.md) - Инструкции для AI
+### Команда
+- **[team/TEAM.md](./team/TEAM.md)** - Структура команды
+- **[team/TASKS_2026-01-17.md](./team/TASKS_2026-01-17.md)** - Текущие задачи
 
 ## 🗄️ База данных
 
@@ -250,23 +241,26 @@ alembic downgrade -1
 - `operator` - Операторы системы
 - `admin` - Системные администраторы
 
-## 🌍 Production Deployment
+## Production Deployment
 
 ### Сервер
 ```
-IP: 91.229.8.221
-SSH: ssh -i ~/.ssh/id_housler root@91.229.8.221
-Порт: 3090
+IP: 95.163.227.26
+SSH: ssh -i ~/.ssh/id_housler root@95.163.227.26
+Путь: /root/lk-housler
 Домен: lk.housler.ru
 ```
 
 ### Deploy
 ```bash
 # На сервере
-cd /opt/lk.housler.ru
-git pull
-docker-compose -f docker-compose.prod.yml up -d --build
+ssh -i ~/.ssh/id_housler root@95.163.227.26
+cd /root/lk-housler
+git pull origin main
+docker compose -f docker-compose.prod.yml up -d --build
 ```
+
+См. **[DEPLOY.md](./DEPLOY.md)** для подробных инструкций.
 
 ## 📊 Unit-экономика
 
@@ -285,24 +279,24 @@ docker-compose -f docker-compose.prod.yml up -d --build
 ### Email Test Mode
 - Все Email логируются в консоль (если `EMAIL_PROVIDER=mock`)
 
-## ✅ Статус проекта
+## Статус проекта
 
-### Backend (95% готов)
-- ✅ 3 типа авторизации (SMS, Email, Password)
-- ✅ Регистрация с согласиями
-- ✅ PII шифрование (152-ФЗ)
-- ✅ SMS.RU интеграция
-- ✅ Email провайдер (Mock + SMTP)
-- ✅ 9 сервисов (Auth, User, Organization, Deal, Document, Signature, Payment, Ledger, Antifraud)
-- ✅ Payment endpoints (Create Intent, Webhook, Get Status)
-- ✅ Docker + Docker Compose (dev + prod)
-- ⏳ Unit тесты
-- ⏳ Integration тесты
+### Backend (READY)
+- [x] 3 типа авторизации (SMS, Email, Password)
+- [x] Регистрация с согласиями
+- [x] PII шифрование (152-ФЗ)
+- [x] SMS.RU интеграция
+- [x] Email провайдер (Mock + SMTP)
+- [x] 9 сервисов (Auth, User, Organization, Deal, Document, Signature, Payment, Ledger, Antifraud)
+- [x] Bank Split (Instant Split через Т-Банк) - 95%
+- [x] Docker + Docker Compose (dev + prod)
+- [x] Unit тесты (111 passed)
 
-### Frontend (0% готов)
-- ⏳ Agent Console
-- ⏳ Client Portal
-- ⏳ Agency Admin
+### Frontend (IN PROGRESS)
+- [x] Payment page (Bank Split)
+- [ ] Agent Console
+- [ ] Client Portal
+- [ ] Agency Admin
 
 ## 🔗 Связанные проекты Housler
 

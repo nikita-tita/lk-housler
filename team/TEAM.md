@@ -27,8 +27,9 @@
 │  │agent-postgres│         │  lk-redis   │  │lk-minio │     │
 │  │ (SHARED DB) │         │   (OTP)     │  │  (S3)   │     │
 │  └─────────────┘         └─────────────┘  └─────────┘     │
-│                                                             │
+│                                 │                           │
 │  Auth: делегируется → agent.housler.ru                     │
+│  Payments: Т-Банк API (Instant Split) [95% READY]          │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -36,6 +37,48 @@
 ---
 
 ## Команда проекта
+
+| Роль | Специализация | Промпт | Статус |
+|------|---------------|--------|--------|
+| **TPM-LK** | Координация, roadmap | `TPM_PROMPT.md` | ACTIVE |
+| **ARCH-LK** | Архитектура, ADR | `prompts/ARCH_LK.md` | NEW |
+| **BE-LK** | FastAPI, SQLAlchemy | `prompts/BE_LK.md` | ACTIVE |
+| **INTEG-LK** | Т-Банк API, webhooks | `prompts/INTEG_LK.md` | NEW |
+| **FE-LK** | Next.js, React | `prompts/FE_LK.md` | ACTIVE |
+| **QA-LK** | Тестирование | - | ACTIVE |
+
+---
+
+### TPM-LK: Technical Project Manager
+**Роль:** Project Coordinator
+
+**Ответственность:**
+- Roadmap и приоритизация
+- Декомпозиция задач
+- Координация команды
+- Трекинг зависимостей
+
+**Промпт:** `TPM_PROMPT.md`
+
+---
+
+### ARCH-LK: Solution Architect
+**Роль:** Technical Lead / Architect
+
+**Специализация:**
+- Проектирование архитектуры
+- ADR (Architecture Decision Records)
+- Code review критичных компонентов
+- Интеграционные паттерны
+
+**Зона ответственности:**
+- `docs/features/*/ARCHITECTURE.md`
+- `docs/adr/`
+- API контракты
+
+**Промпт:** `prompts/ARCH_LK.md`
+
+---
 
 ### BE-LK: Backend Developer
 **Роль:** Primary backend разработчик
@@ -64,6 +107,38 @@ backend/
 
 **Текущий фокус:** Документооборот, электронная подпись, интеграция с agent
 
+**Промпт:** `prompts/BE_LK.md`
+
+---
+
+### INTEG-LK: Integration Engineer
+**Роль:** External API Integration Specialist
+
+**Специализация:**
+- Т-Банк API (Номинальные счета, Самозанятые)
+- Webhook handlers
+- Circuit breaker / Retry логика
+- Event sourcing для платежей
+
+**Ключевые директории:**
+```
+backend/
+├── app/
+│   ├── integrations/
+│   │   └── tbank/           # Т-Банк клиенты
+│   │       ├── client.py
+│   │       ├── deals.py
+│   │       ├── payments.py
+│   │       ├── self_employed.py
+│   │       └── webhooks.py
+│   └── services/
+│       └── bank/            # Бизнес-логика банка
+```
+
+**Текущий фокус:** Интеграция с Т-Банком для bank-split
+
+**Промпт:** `prompts/INTEG_LK.md`
+
 ---
 
 ### FE-LK: Frontend Developer
@@ -91,6 +166,8 @@ frontend/
 ```
 
 **Текущий фокус:** Dashboard, просмотр документов, UI подписания
+
+**Промпт:** `prompts/FE_LK.md`
 
 ---
 
