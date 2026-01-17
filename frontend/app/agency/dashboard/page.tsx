@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { getDeals, Deal } from '@/lib/api/deals';
 import { formatPrice } from '@/lib/utils/format';
 
@@ -14,6 +15,7 @@ export default function AgencyDashboard() {
     totalRevenue: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -21,6 +23,9 @@ export default function AgencyDashboard() {
 
   async function loadData() {
     try {
+      setError(null);
+      setLoading(true);
+
       const response = await getDeals();
       setDeals(response.items);
 
@@ -35,13 +40,14 @@ export default function AgencyDashboard() {
         .reduce((sum, d) => sum + d.commission_agent, 0);
 
       setStats({
-        totalAgents: 0, 
+        totalAgents: 0,
         activeDeals,
         completedDeals,
         totalRevenue,
       });
-    } catch (error) {
-      console.error('Failed to load data:', error);
+    } catch (err) {
+      console.error('Failed to load data:', err);
+      setError('Не удалось загрузить данные. Попробуйте обновить страницу.');
     } finally {
       setLoading(false);
     }
@@ -51,6 +57,21 @@ export default function AgencyDashboard() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin h-8 w-8 border-2 border-black border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Card className="max-w-md w-full">
+            <CardContent className="pt-6 text-center">
+              <p className="text-gray-900 mb-4">{error}</p>
+              <Button onClick={loadData}>Повторить</Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }

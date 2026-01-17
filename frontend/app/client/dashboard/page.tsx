@@ -3,12 +3,31 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
-import { getDeals, Deal } from '@/lib/api/deals';
+import { Button } from '@/components/ui/Button';
+import { getDeals, Deal, DealStatus } from '@/lib/api/deals';
 import { formatPrice, formatDate } from '@/lib/utils/format';
+
+const STATUS_LABELS: Record<DealStatus, string> = {
+  draft: 'Черновик',
+  awaiting_signatures: 'Ожидает подписания',
+  signed: 'Подписано',
+  payment_pending: 'Ожидает оплаты',
+  in_progress: 'В работе',
+  invoiced: 'Счёт создан',
+  hold_period: 'Удержание',
+  payment_failed: 'Ошибка оплаты',
+  payout_ready: 'К выплате',
+  payout_in_progress: 'Выплата',
+  refunded: 'Возврат',
+  closed: 'Закрыта',
+  dispute: 'Спор',
+  cancelled: 'Отменена',
+};
 
 export default function ClientDashboard() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadDeals();
@@ -16,10 +35,14 @@ export default function ClientDashboard() {
 
   async function loadDeals() {
     try {
+      setError(null);
+      setLoading(true);
+
       const response = await getDeals();
       setDeals(response.items);
-    } catch (error) {
-      console.error('Failed to load deals:', error);
+    } catch (err) {
+      console.error('Failed to load deals:', err);
+      setError('Не удалось загрузить сделки. Попробуйте обновить страницу.');
     } finally {
       setLoading(false);
     }
@@ -29,6 +52,19 @@ export default function ClientDashboard() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin h-8 w-8 border-2 border-black border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="max-w-md w-full">
+          <CardContent className="pt-6 text-center">
+            <p className="text-gray-900 mb-4">{error}</p>
+            <Button onClick={loadDeals}>Повторить</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -65,10 +101,14 @@ export default function ClientDashboard() {
                           ? 'bg-gray-200 text-gray-900'
                           : deal.status === 'closed'
                           ? 'bg-black text-white'
+                          : deal.status === 'cancelled'
+                          ? 'bg-gray-100 text-gray-500'
+                          : deal.status === 'dispute'
+                          ? 'bg-gray-900 text-white'
                           : 'bg-gray-100 text-gray-900'
                       }`}
                     >
-                      {deal.status}
+                      {STATUS_LABELS[deal.status] || deal.status}
                     </span>
                   </div>
                 </CardHeader>
