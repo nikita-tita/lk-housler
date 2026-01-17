@@ -20,8 +20,12 @@ import {
   cancelBankSplitDeal,
   getDealTimeline,
   sendPaymentLink,
+  regeneratePaymentLink,
+  createDispute,
+  getDispute,
   BankSplitDeal,
   TimelineEvent,
+  DisputeResponse,
   BANK_SPLIT_STATUS_LABELS,
 } from '@/lib/api/bank-split';
 import { formatPrice, formatDate, formatDateTime } from '@/lib/utils/format';
@@ -51,6 +55,11 @@ export default function BankSplitDealDetailPage() {
     success: boolean;
     message: string;
   } | null>(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [dispute, setDispute] = useState<DisputeResponse | null>(null);
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [disputeReason, setDisputeReason] = useState('');
+  const [disputeDescription, setDisputeDescription] = useState('');
 
   const loadDeal = useCallback(async (id: string) => {
     try {
@@ -72,26 +81,42 @@ export default function BankSplitDealDetailPage() {
     }
   }, []);
 
+  const loadDispute = useCallback(async (id: string) => {
+    try {
+      const disputeData = await getDispute(id);
+      setDispute(disputeData);
+    } catch (error) {
+      console.error('Failed to load dispute:', error);
+    }
+  }, []);
+
   useEffect(() => {
     if (params.id) {
       loadDeal(params.id as string);
       loadTimeline(params.id as string);
+      loadDispute(params.id as string);
     }
-  }, [params.id, loadDeal, loadTimeline]);
+  }, [params.id, loadDeal, loadTimeline, loadDispute]);
 
   const handleAction = async (
     actionFn: () => Promise<unknown>,
-    successMessage?: string
+    message?: string
   ) => {
     if (!deal) return;
 
     setActionLoading(true);
     setActionError('');
+    setSuccessMessage('');
 
     try {
       await actionFn();
       await loadDeal(deal.id);
       await loadTimeline(deal.id);
+      await loadDispute(deal.id);
+      if (message) {
+        setSuccessMessage(message);
+        setTimeout(() => setSuccessMessage(''), 5000);
+      }
     } catch (error: unknown) {
       console.error('Action failed:', error);
       const axiosError = error as { response?: { data?: { detail?: string } } };
@@ -105,12 +130,12 @@ export default function BankSplitDealDetailPage() {
 
   const handleSubmitForSigning = () => {
     if (!deal) return;
-    handleAction(() => submitForSigning(deal.id));
+    handleAction(() => submitForSigning(deal.id), 'Договор отправлен на подпись');
   };
 
   const handleMarkSigned = () => {
     if (!deal) return;
-    handleAction(() => markSigned(deal.id));
+    handleAction(() => markSigned(deal.id), 'Договор отмечен как подписанный');
   };
 
   const handleCreateInvoice = async () => {
@@ -142,7 +167,66 @@ export default function BankSplitDealDetailPage() {
 
   const handleRelease = () => {
     if (!deal) return;
-    handleAction(() => releaseDeal(deal.id));
+    handleAction(() => releaseDeal(deal.id), 'Средства освобождены');
+  };
+
+  const handleRetryPayment = async () => {
+    if (!deal) return;
+
+    setActionLoading(true);
+    setActionError('');
+    setSuccessMessage('');
+
+    try {
+      const result = await regeneratePaymentLink(deal.id);
+      setPaymentData({
+        url: result.payment_url,
+        expiresAt: result.expires_at,
+      });
+      await loadDeal(deal.id);
+      await loadTimeline(deal.id);
+      setSuccessMessage('Платежная ссылка обновлена');
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (error: unknown) {
+      console.error('Failed to regenerate payment link:', error);
+      const axiosError = error as { response?: { data?: { detail?: string } } };
+      setActionError(
+        axiosError.response?.data?.detail || 'Ошибка создания новой ссылки'
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleOpenDispute = async () => {
+    if (!deal || !disputeReason.trim()) return;
+
+    setActionLoading(true);
+    setActionError('');
+
+    try {
+      await createDispute(deal.id, {
+        reason: disputeReason,
+        description: disputeDescription || undefined,
+        refund_requested: false,
+      });
+      setShowDisputeModal(false);
+      setDisputeReason('');
+      setDisputeDescription('');
+      await loadDeal(deal.id);
+      await loadTimeline(deal.id);
+      await loadDispute(deal.id);
+      setSuccessMessage('Спор открыт');
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (error: unknown) {
+      console.error('Failed to create dispute:', error);
+      const axiosError = error as { response?: { data?: { detail?: string } } };
+      setActionError(
+        axiosError.response?.data?.detail || 'Ошибка открытия спора'
+      );
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleCancel = async () => {
@@ -204,6 +288,12 @@ export default function BankSplitDealDetailPage() {
   const canMarkSigned = deal.status === 'awaiting_signatures';
   const canCreateInvoice = deal.status === 'signed';
   const canRelease = deal.status === 'hold_period';
+  const canRetryPayment = deal.status === 'payment_failed' || (deal.status === 'invoiced' && !deal.payment_link_url);
+  const canOpenDispute = deal.status === 'hold_period' && !dispute;
+  const isInDispute = deal.status === 'dispute';
+  const isRefunded = deal.status === 'refunded';
+  const isPayoutReady = deal.status === 'payout_ready';
+  const isPayoutInProgress = deal.status === 'payout_in_progress';
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -232,6 +322,12 @@ export default function BankSplitDealDetailPage() {
       <div className="mb-8">
         <DealStepIndicator status={deal.status} />
       </div>
+
+      {successMessage && (
+        <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+          <p className="text-sm text-gray-900">{successMessage}</p>
+        </div>
+      )}
 
       {actionError && (
         <div className="mb-6 p-4 bg-gray-100 border border-gray-300 rounded-lg">
@@ -440,6 +536,112 @@ export default function BankSplitDealDetailPage() {
             </Card>
           )}
 
+          {/* Payment Failed Info */}
+          {deal.status === 'payment_failed' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Ошибка оплаты</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center p-4 bg-gray-100 rounded-lg">
+                  <p className="text-sm text-gray-600 mb-4">
+                    Оплата не прошла. Вы можете создать новую ссылку для оплаты.
+                  </p>
+                  <Button
+                    onClick={handleRetryPayment}
+                    loading={actionLoading}
+                  >
+                    Создать новую ссылку
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Dispute Info */}
+          {(isInDispute || dispute) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Спор по сделке</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {dispute && (
+                    <>
+                      <div className="p-4 bg-gray-100 rounded-lg">
+                        <p className="text-sm text-gray-600">Причина</p>
+                        <p className="text-gray-900 mt-1">{dispute.reason}</p>
+                        {dispute.description && (
+                          <p className="text-sm text-gray-600 mt-2">{dispute.description}</p>
+                        )}
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Статус спора:</span>
+                        <span className="font-medium text-gray-900">
+                          {dispute.status === 'open' && 'Открыт'}
+                          {dispute.status === 'under_review' && 'На рассмотрении'}
+                          {dispute.status === 'resolved' && 'Разрешен'}
+                          {dispute.status === 'closed' && 'Закрыт'}
+                        </span>
+                      </div>
+                      {dispute.refund_status && dispute.refund_status !== 'none' && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Возврат:</span>
+                          <span className="font-medium text-gray-900">
+                            {dispute.refund_status === 'pending' && 'Ожидает'}
+                            {dispute.refund_status === 'processing' && 'Обрабатывается'}
+                            {dispute.refund_status === 'completed' && 'Выполнен'}
+                            {dispute.refund_status === 'failed' && 'Ошибка'}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {!dispute && isInDispute && (
+                    <div className="text-center p-4 bg-gray-50 rounded-lg">
+                      <p className="text-sm text-gray-600">
+                        По сделке открыт спор. Выплата приостановлена.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Refunded Info */}
+          {isRefunded && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Возврат средств</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-600">
+                    Средства возвращены клиенту
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Payout Ready/In Progress Info */}
+          {(isPayoutReady || isPayoutInProgress) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Выплата</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-600">
+                    {isPayoutReady && 'Средства готовы к выплате получателям'}
+                    {isPayoutInProgress && 'Выплата средств получателям в процессе'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Timeline */}
           <Card>
             <CardHeader>
@@ -523,6 +725,26 @@ export default function BankSplitDealDetailPage() {
                   </Button>
                 )}
 
+                {canRetryPayment && (
+                  <Button
+                    onClick={handleRetryPayment}
+                    loading={actionLoading}
+                    fullWidth
+                  >
+                    Новая ссылка оплаты
+                  </Button>
+                )}
+
+                {canOpenDispute && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => setShowDisputeModal(true)}
+                    fullWidth
+                  >
+                    Открыть спор
+                  </Button>
+                )}
+
                 {canCancel && (
                   <Button
                     variant="secondary"
@@ -543,6 +765,30 @@ export default function BankSplitDealDetailPage() {
                 {deal.status === 'cancelled' && (
                   <div className="text-center p-4 bg-gray-100 rounded-lg">
                     <p className="text-sm text-gray-600">Сделка отменена</p>
+                  </div>
+                )}
+
+                {isInDispute && (
+                  <div className="text-center p-4 bg-gray-100 rounded-lg">
+                    <p className="text-sm text-gray-600">Спор на рассмотрении</p>
+                  </div>
+                )}
+
+                {isRefunded && (
+                  <div className="text-center p-4 bg-gray-100 rounded-lg">
+                    <p className="text-sm text-gray-600">Средства возвращены</p>
+                  </div>
+                )}
+
+                {isPayoutReady && (
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600">Готово к выплате</p>
+                  </div>
+                )}
+
+                {isPayoutInProgress && (
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600">Выплата в процессе</p>
                   </div>
                 )}
               </div>
@@ -576,6 +822,69 @@ export default function BankSplitDealDetailPage() {
           </Card>
         </div>
       </div>
+
+      {/* Dispute Modal */}
+      {showDisputeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Открыть спор
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Причина спора
+                </label>
+                <select
+                  value={disputeReason}
+                  onChange={(e) => setDisputeReason(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  <option value="">Выберите причину</option>
+                  <option value="service_not_provided">Услуга не оказана</option>
+                  <option value="service_quality">Качество услуги</option>
+                  <option value="wrong_amount">Неверная сумма</option>
+                  <option value="unauthorized_transaction">Несанкционированная транзакция</option>
+                  <option value="other">Другое</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Описание (опционально)
+                </label>
+                <textarea
+                  value={disputeDescription}
+                  onChange={(e) => setDisputeDescription(e.target.value)}
+                  placeholder="Опишите ситуацию подробнее..."
+                  rows={3}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black resize-none"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowDisputeModal(false);
+                  setDisputeReason('');
+                  setDisputeDescription('');
+                }}
+                fullWidth
+              >
+                Отмена
+              </Button>
+              <Button
+                onClick={handleOpenDispute}
+                loading={actionLoading}
+                disabled={!disputeReason.trim()}
+                fullWidth
+              >
+                Открыть спор
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

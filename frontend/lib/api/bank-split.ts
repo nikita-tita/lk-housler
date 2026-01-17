@@ -9,6 +9,7 @@ export type BankSplitStatus =
   | 'signed'
   | 'invoiced'
   | 'payment_pending'
+  | 'payment_failed'
   | 'hold_period'
   | 'payout_ready'
   | 'payout_in_progress'
@@ -220,6 +221,67 @@ export async function sendPaymentLink(
   return data;
 }
 
+// Regenerate payment link response
+export interface RegeneratePaymentLinkResponse {
+  payment_url: string;
+  expires_at: string;
+}
+
+// Dispute create request
+export interface DisputeCreateRequest {
+  reason: string;
+  description?: string;
+  refund_requested?: boolean;
+  refund_amount?: number;
+}
+
+// Dispute response
+export interface DisputeResponse {
+  id: string;
+  deal_id: string;
+  initiator_user_id: number;
+  reason: string;
+  description?: string;
+  status: 'open' | 'under_review' | 'resolved' | 'closed';
+  resolution?: string;
+  refund_requested: boolean;
+  refund_amount?: number;
+  refund_status?: 'none' | 'pending' | 'processing' | 'completed' | 'failed';
+  created_at: string;
+  resolved_at?: string;
+}
+
+export async function regeneratePaymentLink(
+  id: string
+): Promise<RegeneratePaymentLinkResponse> {
+  const { data } = await apiClient.post<RegeneratePaymentLinkResponse>(
+    `/bank-split/${id}/regenerate-payment-link`
+  );
+  return data;
+}
+
+export async function createDispute(
+  dealId: string,
+  dispute: DisputeCreateRequest
+): Promise<DisputeResponse> {
+  const { data } = await apiClient.post<DisputeResponse>(
+    `/bank-split/${dealId}/dispute`,
+    dispute
+  );
+  return data;
+}
+
+export async function getDispute(dealId: string): Promise<DisputeResponse | null> {
+  try {
+    const { data } = await apiClient.get<DisputeResponse>(
+      `/disputes/deal/${dealId}`
+    );
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 // Status labels for UI
 export const BANK_SPLIT_STATUS_LABELS: Record<BankSplitStatus, string> = {
   draft: 'Черновик',
@@ -227,6 +289,7 @@ export const BANK_SPLIT_STATUS_LABELS: Record<BankSplitStatus, string> = {
   signed: 'Подписано',
   invoiced: 'Счет выставлен',
   payment_pending: 'Ожидает оплаты',
+  payment_failed: 'Ошибка оплаты',
   hold_period: 'Период удержания',
   payout_ready: 'Готов к выплате',
   payout_in_progress: 'Выплата в процессе',
@@ -243,6 +306,7 @@ export const BANK_SPLIT_STATUS_STYLES: Record<BankSplitStatus, string> = {
   signed: 'bg-gray-300 text-gray-900',
   invoiced: 'bg-gray-200 text-gray-900',
   payment_pending: 'bg-gray-300 text-gray-900',
+  payment_failed: 'bg-gray-300 text-gray-700',
   hold_period: 'bg-gray-400 text-white',
   payout_ready: 'bg-gray-500 text-white',
   payout_in_progress: 'bg-gray-600 text-white',

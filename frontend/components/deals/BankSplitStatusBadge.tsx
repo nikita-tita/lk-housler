@@ -64,8 +64,8 @@ const STEP_LABELS: Partial<Record<BankSplitStatus, string>> = {
 };
 
 export function DealStepIndicator({ status }: DealStepIndicatorProps) {
-  // Handle terminal states
-  if (status === 'cancelled' || status === 'dispute' || status === 'refunded') {
+  // Handle terminal/special states
+  if (status === 'cancelled' || status === 'dispute' || status === 'refunded' || status === 'payment_failed') {
     return (
       <div className="flex items-center gap-2">
         <div className="w-full bg-gray-200 h-1 rounded-full" />
