@@ -80,14 +80,19 @@ export default function CreateDealPage() {
   };
 
   const validateStep2 = (): boolean => {
-    if (!formData.price || formData.price <= 0) return false;
-    if (!formData.commission || formData.commission <= 0) return false;
+    if (!formData.price || formData.price < 100000) return false;
+    if (!formData.commission || formData.commission < 1000) return false;
+    if (formData.commission > formData.price * 0.3) return false;
     return true;
+  };
+
+  const isValidPhone = (phone: string): boolean => {
+    return phone.length === 11 && phone.startsWith('7');
   };
 
   const validateStep3 = (): boolean => {
     if (!formData.client_name || formData.client_name.length < 2) return false;
-    if (!formData.client_phone || formData.client_phone.length < 10) return false;
+    if (!isValidPhone(formData.client_phone)) return false;
     return true;
   };
 
@@ -287,10 +292,16 @@ export default function CreateDealPage() {
                 type="number"
                 placeholder="5 000 000"
                 value={formData.price || ''}
-                onChange={(e) =>
-                  setFormData({ ...formData, price: Number(e.target.value) })
-                }
+                onChange={(e) => {
+                  const value = Math.max(0, Number(e.target.value));
+                  setFormData({ ...formData, price: value });
+                }}
                 helperText="Цена объекта недвижимости в рублях"
+                error={
+                  formData.price > 0 && formData.price < 100000
+                    ? 'Минимальная стоимость объекта 100 000 руб.'
+                    : undefined
+                }
               />
 
               <Input
@@ -298,10 +309,18 @@ export default function CreateDealPage() {
                 type="number"
                 placeholder="150 000"
                 value={formData.commission || ''}
-                onChange={(e) =>
-                  setFormData({ ...formData, commission: Number(e.target.value) })
-                }
+                onChange={(e) => {
+                  const value = Math.max(0, Number(e.target.value));
+                  setFormData({ ...formData, commission: value });
+                }}
                 helperText="Ваше вознаграждение за сделку в рублях"
+                error={
+                  formData.commission > 0 && formData.commission < 1000
+                    ? 'Минимальная комиссия 1 000 руб.'
+                    : formData.price > 0 && formData.commission > formData.price * 0.3
+                    ? 'Комиссия не может превышать 30% от стоимости объекта'
+                    : undefined
+                }
               />
 
               {formData.price > 0 && formData.commission > 0 && (
@@ -328,6 +347,11 @@ export default function CreateDealPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, client_name: e.target.value })
                 }
+                error={
+                  formData.client_name.length > 0 && formData.client_name.length < 2
+                    ? 'Введите имя клиента'
+                    : undefined
+                }
               />
 
               <Input
@@ -337,6 +361,11 @@ export default function CreateDealPage() {
                 value={formatPhone(formData.client_phone)}
                 onChange={handlePhoneChange}
                 helperText="На этот номер будет отправлена ссылка для подписания"
+                error={
+                  formData.client_phone.length > 0 && !isValidPhone(formData.client_phone)
+                    ? 'Введите корректный номер телефона'
+                    : undefined
+                }
               />
             </div>
           )}
