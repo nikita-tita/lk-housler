@@ -83,7 +83,12 @@ export default function CreateBankSplitDealPage() {
   };
 
   const validateStep2 = (): boolean => {
-    return formData.price > 0 && formData.commission_total > 0 && feeConsent;
+    return (
+      formData.price >= 100000 &&
+      formData.commission_total >= 1000 &&
+      formData.commission_total <= formData.price * 0.3 &&
+      feeConsent
+    );
   };
 
   const validateStep3 = (): boolean => {
@@ -92,9 +97,21 @@ export default function CreateBankSplitDealPage() {
     return true;
   };
 
+  const isValidEmail = (email: string): boolean => {
+    if (!email) return true; // Optional field
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const isValidPhone = (phone: string): boolean => {
+    return phone.length === 11 && phone.startsWith('7');
+  };
+
   const validateStep4 = (): boolean => {
     return (
-      formData.client_name.length >= 2 && formData.client_phone.length >= 10
+      formData.client_name.length >= 2 &&
+      isValidPhone(formData.client_phone) &&
+      isValidEmail(formData.client_email)
     );
   };
 
@@ -301,6 +318,11 @@ export default function CreateBankSplitDealPage() {
                   setFormData({ ...formData, property_address: e.target.value })
                 }
                 helperText="Полный адрес объекта недвижимости"
+                error={
+                  formData.property_address.length > 0 && formData.property_address.length <= 5
+                    ? 'Введите полный адрес объекта'
+                    : undefined
+                }
               />
 
               <Input
@@ -322,10 +344,16 @@ export default function CreateBankSplitDealPage() {
                 type="number"
                 placeholder="15 000 000"
                 value={formData.price || ''}
-                onChange={(e) =>
-                  setFormData({ ...formData, price: Number(e.target.value) })
-                }
+                onChange={(e) => {
+                  const value = Math.max(0, Number(e.target.value));
+                  setFormData({ ...formData, price: value });
+                }}
                 helperText="Цена объекта недвижимости в рублях"
+                error={
+                  formData.price > 0 && formData.price < 100000
+                    ? 'Минимальная стоимость объекта 100 000 руб.'
+                    : undefined
+                }
               />
 
               <Input
@@ -333,13 +361,21 @@ export default function CreateBankSplitDealPage() {
                 type="number"
                 placeholder="450 000"
                 value={formData.commission_total || ''}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const value = Math.max(0, Number(e.target.value));
                   setFormData({
                     ...formData,
-                    commission_total: Number(e.target.value),
-                  })
-                }
+                    commission_total: value,
+                  });
+                }}
                 helperText="Общая сумма комиссии по сделке в рублях"
+                error={
+                  formData.commission_total > 0 && formData.commission_total < 1000
+                    ? 'Минимальная комиссия 1 000 руб.'
+                    : formData.price > 0 && formData.commission_total > formData.price * 0.3
+                    ? 'Комиссия не может превышать 30% от стоимости объекта'
+                    : undefined
+                }
               />
 
               {formData.price > 0 && formData.commission_total > 0 && (
@@ -557,6 +593,11 @@ export default function CreateBankSplitDealPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, client_name: e.target.value })
                 }
+                error={
+                  formData.client_name.length > 0 && formData.client_name.length < 2
+                    ? 'Введите имя клиента'
+                    : undefined
+                }
               />
 
               <Input
@@ -566,6 +607,11 @@ export default function CreateBankSplitDealPage() {
                 value={formatPhone(formData.client_phone)}
                 onChange={handlePhoneChange}
                 helperText="На этот номер будет отправлена ссылка для оплаты"
+                error={
+                  formData.client_phone.length > 0 && !isValidPhone(formData.client_phone)
+                    ? 'Введите корректный номер телефона'
+                    : undefined
+                }
               />
 
               <Input
@@ -575,6 +621,11 @@ export default function CreateBankSplitDealPage() {
                 value={formData.client_email}
                 onChange={(e) =>
                   setFormData({ ...formData, client_email: e.target.value })
+                }
+                error={
+                  formData.client_email.length > 0 && !isValidEmail(formData.client_email)
+                    ? 'Введите корректный email'
+                    : undefined
                 }
               />
 
