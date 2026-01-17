@@ -557,7 +557,7 @@ export default function SigningPage() {
           display: flex;
           justify-content: center;
           margin-bottom: 24px;
-          color: #16a34a;
+          color: #000;
         }
 
         .loading-spinner {

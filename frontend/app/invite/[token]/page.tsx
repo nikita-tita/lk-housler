@@ -94,7 +94,7 @@ export default function InvitationPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="max-w-md w-full mx-4 p-6 bg-white border border-gray-200 rounded-lg text-center">
-          <div className="text-red-600 mb-4">{error}</div>
+          <div className="text-gray-900 mb-4">{error}</div>
           <button
             onClick={() => router.push('/')}
             className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800"
@@ -117,7 +117,7 @@ export default function InvitationPage() {
           <h1 className="text-2xl font-semibold mb-6">Приглашение в сделку</h1>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div className="mb-4 p-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm">
               {error}
             </div>
           )}
@@ -164,7 +164,7 @@ export default function InvitationPage() {
           )}
 
           {invitation.status === 'accepted' && (
-            <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm mb-6">
+            <div className="p-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm mb-6">
               Вы приняли это приглашение
             </div>
           )}
