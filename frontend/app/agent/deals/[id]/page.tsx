@@ -14,6 +14,8 @@ const STATUS_LABELS: Record<DealStatus, string> = {
   signed: 'Подписано',
   payment_pending: 'Ожидает оплаты',
   in_progress: 'В работе',
+  hold_period: 'Удержание',
+  payout_ready: 'К выплате',
   closed: 'Закрыта',
   dispute: 'Спор',
   cancelled: 'Отменена',
