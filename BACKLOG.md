@@ -2,8 +2,47 @@
 
 Единый источник правды для задач проекта.
 
-**Последнее обновление:** 2026-01-09
+**Последнее обновление:** 2026-01-17
 **Источник:** Q1 2026 Ecosystem Review
+
+---
+
+## Активные фичи
+
+### FEAT-001: Bank Split (Instant Split через Т-Банк)
+
+**Статус:** `done` (Ready for staging deploy)
+**Приоритет:** HIGH
+**Документация:** [docs/features/bank-split/](./docs/features/bank-split/)
+
+Переход с модели Merchant of Record на Instant Split:
+- Договор → Подпись → Счет → Оплата → Авто-сплит (макс 1 час холда)
+
+| Компонент | Статус | Прогресс |
+|-----------|--------|----------|
+| E1: Инфраструктура | **DONE** | 100% |
+| E2: База данных | **DONE** | 100% |
+| E3: TBank Integration | **DONE** | 100% |
+| E4: Backend Services | **DONE** | 100% |
+| E5: API Endpoints | **DONE** | 100% |
+| E6: Frontend | **DONE** | 100% |
+| E7: Тестирование | **DONE** | 100% |
+| E8: Feature Flags + Deploy Prep | **DONE** | 100% |
+
+**Артефакты:**
+- Migration: `alembic/versions/006_add_bank_split_tables.py`
+- Models: `app/models/bank_split.py`
+- Services: `app/services/bank_split/`
+- API: `app/api/v1/endpoints/bank_split.py`
+- Frontend: `frontend/app/pay/[dealId]/page.tsx`
+- Tests: 111 passed, 71 skipped (need WeasyPrint lib)
+- Feature Flags: `app/core/feature_flags.py` (gradual rollout)
+- Docker: `docker-compose.prod.yml` (Celery, TBank env vars)
+
+**Следующие шаги:**
+- [ ] Deploy to staging (lk.housler.ru)
+- [ ] Получить TBank production credentials
+- [ ] Настроить INSTANT_SPLIT_ORG_IDS для пилотных организаций
 
 ---
 
