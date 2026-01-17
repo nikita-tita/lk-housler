@@ -58,6 +58,24 @@ def upgrade() -> None:
         op.create_index('ix_payment_intents_external_payment_id', 'payment_intents', ['external_payment_id'])
 
     # ========================================
+    # 2.5. Create payout_accounts table (needed for deal_split_recipients FK)
+    # ========================================
+    op.create_table(
+        'payout_accounts',
+        sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
+        sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
+        sa.Column('owner_type', sa.String(20), nullable=False),  # 'user' or 'org'
+        sa.Column('owner_id', UUID(as_uuid=True), nullable=False, index=True),
+        sa.Column('method', sa.String(20), nullable=False),  # sbp, bank_account, card
+        sa.Column('details', JSONB, nullable=False),
+        sa.Column('verified_at', sa.DateTime(timezone=True), nullable=True),
+        sa.Column('is_default', sa.Boolean, server_default='false', nullable=False),
+    )
+    op.create_index('ix_payout_accounts_owner', 'payout_accounts', ['owner_type', 'owner_id'])
+
+    # ========================================
     # 3. Create deal_split_recipients table
     # ========================================
     op.create_table(
@@ -231,13 +249,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Drop new tables
+    # Drop new tables (reverse order of creation)
     op.drop_table('deal_milestones')
     op.drop_table('evidence_files')
     op.drop_table('self_employed_registry')
     op.drop_table('bank_events')
     op.drop_table('split_rule_templates')
     op.drop_table('deal_split_recipients')
+    op.drop_table('payout_accounts')
 
     # Remove columns from payment_intents
     conn = op.get_bind()
