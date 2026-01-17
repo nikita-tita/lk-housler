@@ -2,7 +2,7 @@
  * Analytics API client
  */
 
-import { api } from './client';
+import { apiClient } from './client';
 
 export interface DealStatistics {
   total_deals: number;
@@ -45,7 +45,7 @@ export interface DashboardSummary {
  * Get agent dashboard summary
  */
 export async function getDashboardSummary(): Promise<DashboardSummary> {
-  const response = await api.get('/dashboard');
+  const response = await apiClient.get('/dashboard');
   return response.data;
 }
 
@@ -56,7 +56,7 @@ export async function getDealAnalytics(params?: {
   start_date?: string;
   end_date?: string;
 }): Promise<DealStatistics> {
-  const response = await api.get('/analytics/deals', { params });
+  const response = await apiClient.get('/analytics/deals', { params });
   return response.data;
 }
 
@@ -67,7 +67,7 @@ export async function getPayoutAnalytics(params?: {
   start_date?: string;
   end_date?: string;
 }): Promise<PayoutStatistics> {
-  const response = await api.get('/analytics/payouts', { params });
+  const response = await apiClient.get('/analytics/payouts', { params });
   return response.data;
 }
 
@@ -75,7 +75,7 @@ export async function getPayoutAnalytics(params?: {
  * Get time series data for charts
  */
 export async function getTimeSeries(days = 30): Promise<TimeSeriesPoint[]> {
-  const response = await api.get('/analytics/time-series', {
+  const response = await apiClient.get('/analytics/time-series', {
     params: { days },
   });
   return response.data;
@@ -98,7 +98,7 @@ export async function getGlobalAnalytics(params?: {
     open_disputes: number;
   };
 }> {
-  const response = await api.get('/admin/analytics/global', { params });
+  const response = await apiClient.get('/admin/analytics/global', { params });
   return response.data;
 }
 
@@ -115,7 +115,7 @@ export async function getLeaderboard(
     total_commission: number;
   }[]
 > {
-  const response = await api.get('/admin/analytics/leaderboard', {
+  const response = await apiClient.get('/admin/analytics/leaderboard', {
     params: { limit, ...params },
   });
   return response.data;
