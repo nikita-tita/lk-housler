@@ -137,6 +137,19 @@ class Settings(BaseSettings):
     ANTIFRAUD_NEW_AGENT_MAX_MONTHLY_GMV: int = 100000
     ANTIFRAUD_NEW_AGENT_PAYOUT_HOLD_DAYS: int = 3
 
+    # T-Bank Integration (Bank Split)
+    TBANK_MODE: str = "mock"  # mock | sandbox | production
+    TBANK_API_URL: str = "https://securepay.tinkoff.ru/v2"
+    TBANK_TERMINAL_KEY: str = ""
+    TBANK_SECRET_KEY: str = ""
+    TBANK_NOMINAL_API_URL: str = "https://business.tbank.ru/openapi/api/v1"
+    TBANK_NOMINAL_TOKEN: str = ""
+    TBANK_SE_API_URL: str = "https://business.tbank.ru/openapi/api/v1/partner"
+    TBANK_SE_PARTNER_ID: str = ""
+    TBANK_SE_TOKEN: str = ""
+    TBANK_WEBHOOK_SECRET: str = ""
+    TBANK_HOLD_PERIOD_SECONDS: int = 3600  # 1 hour max
+
     # Limits
     MIN_PAYMENT_AMOUNT: int = 10000
     MAX_PAYMENT_AMOUNT: int = 10000000

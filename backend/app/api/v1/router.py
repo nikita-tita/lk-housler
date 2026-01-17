@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, users, organizations, deals, documents, payments, sign, templates
+from app.api.v1.endpoints import auth, users, organizations, deals, documents, payments, sign, templates, bank_split
 
 api_router = APIRouter()
 
@@ -15,3 +15,6 @@ api_router.include_router(documents.router, prefix="/documents", tags=["document
 api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
 api_router.include_router(sign.router, prefix="/sign", tags=["signing"])
 api_router.include_router(templates.router, prefix="/templates", tags=["templates"])
+
+# Bank Split (T-Bank instant split)
+api_router.include_router(bank_split.router, prefix="/bank-split", tags=["bank-split"])

@@ -5,6 +5,12 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { getDeals, Deal, DealStatus } from '@/lib/api/deals';
+import {
+  getBankSplitDeals,
+  BankSplitDeal,
+  BankSplitStatus,
+  BANK_SPLIT_STATUS_LABELS,
+} from '@/lib/api/bank-split';
 import { formatPrice, formatDate } from '@/lib/utils/format';
 
 const STATUS_LABELS: Record<DealStatus, string> = {
@@ -23,14 +29,30 @@ const FILTER_OPTIONS = [
   { value: 'draft', label: 'Черновики' },
   { value: 'awaiting_signatures', label: 'На подписании' },
   { value: 'signed', label: 'Подписаны' },
-  { value: 'in_progress', label: 'В работе' },
+  { value: 'payment_pending', label: 'Ожидают оплаты' },
+  { value: 'hold_period', label: 'Удержание' },
   { value: 'closed', label: 'Закрыты' },
 ];
 
+type DealType = 'legacy' | 'bank_split';
+
+interface UnifiedDeal {
+  id: string;
+  type: DealType;
+  address: string;
+  price: number;
+  commission: number;
+  status: string;
+  statusLabel: string;
+  createdAt: string;
+  paymentModel?: string;
+}
+
 export default function DealsPage() {
-  const [deals, setDeals] = useState<Deal[]>([]);
+  const [deals, setDeals] = useState<UnifiedDeal[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
 
   useEffect(() => {
     loadDeals();
@@ -38,8 +60,46 @@ export default function DealsPage() {
 
   async function loadDeals() {
     try {
-      const response = await getDeals();
-      setDeals(response.items);
+      // Load both legacy and bank-split deals
+      const [legacyResponse, bankSplitResponse] = await Promise.all([
+        getDeals().catch(() => ({ items: [] })),
+        getBankSplitDeals().catch(() => ({ items: [] })),
+      ]);
+
+      // Convert legacy deals to unified format
+      const legacyDeals: UnifiedDeal[] = legacyResponse.items.map((deal: Deal) => ({
+        id: deal.id,
+        type: 'legacy' as DealType,
+        address: deal.address,
+        price: deal.price,
+        commission: deal.commission_agent,
+        status: deal.status,
+        statusLabel: STATUS_LABELS[deal.status] || deal.status,
+        createdAt: deal.created_at,
+      }));
+
+      // Convert bank-split deals to unified format
+      const bankSplitDeals: UnifiedDeal[] = bankSplitResponse.items.map(
+        (deal: BankSplitDeal) => ({
+          id: deal.id,
+          type: 'bank_split' as DealType,
+          address: deal.property_address,
+          price: deal.price,
+          commission: deal.commission_total,
+          status: deal.status,
+          statusLabel: BANK_SPLIT_STATUS_LABELS[deal.status] || deal.status,
+          createdAt: deal.created_at,
+          paymentModel: 'Instant Split',
+        })
+      );
+
+      // Combine and sort by creation date
+      const allDeals = [...legacyDeals, ...bankSplitDeals].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      setDeals(allDeals);
     } catch (error) {
       console.error('Failed to load deals:', error);
     } finally {
@@ -51,6 +111,13 @@ export default function DealsPage() {
     if (filter === 'all') return true;
     return deal.status === filter;
   });
+
+  const getDealLink = (deal: UnifiedDeal) => {
+    if (deal.type === 'bank_split') {
+      return `/agent/deals/bank-split/${deal.id}`;
+    }
+    return `/agent/deals/${deal.id}`;
+  };
 
   if (loading) {
     return (
@@ -67,9 +134,58 @@ export default function DealsPage() {
           <h1 className="text-3xl font-semibold text-gray-900">Сделки</h1>
           <p className="text-gray-600 mt-1">Управление вашими сделками</p>
         </div>
-        <Link href="/agent/deals/new">
-          <Button>Создать сделку</Button>
-        </Link>
+        <div className="relative">
+          <Button onClick={() => setShowCreateMenu(!showCreateMenu)}>
+            Создать сделку
+            <svg
+              className={`w-4 h-4 ml-2 transition-transform ${showCreateMenu ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </Button>
+          {showCreateMenu && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setShowCreateMenu(false)}
+              />
+              <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-300 rounded-lg shadow-lg z-20">
+                <Link
+                  href="/agent/deals/new"
+                  className="block px-4 py-3 hover:bg-gray-50 border-b border-gray-200"
+                  onClick={() => setShowCreateMenu(false)}
+                >
+                  <div className="font-medium text-gray-900">
+                    Обычная сделка
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    Стандартный договор
+                  </div>
+                </Link>
+                <Link
+                  href="/agent/deals/bank-split/new"
+                  className="block px-4 py-3 hover:bg-gray-50"
+                  onClick={() => setShowCreateMenu(false)}
+                >
+                  <div className="font-medium text-gray-900">
+                    Instant Split
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    Автоматическое распределение
+                  </div>
+                </Link>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       <Card className="mb-6">
@@ -100,7 +216,7 @@ export default function DealsPage() {
           {filteredDeals.length === 0 ? (
             <div className="text-center py-12 text-gray-600">
               <p className="mb-4">Сделок не найдено</p>
-              <Link href="/agent/deals/new">
+              <Link href="/agent/deals/bank-split/new">
                 <Button>Создать сделку</Button>
               </Link>
             </div>
@@ -108,18 +224,26 @@ export default function DealsPage() {
             <div className="space-y-4">
               {filteredDeals.map((deal) => (
                 <Link
-                  key={deal.id}
-                  href={`/agent/deals/${deal.id}`}
+                  key={`${deal.type}-${deal.id}`}
+                  href={getDealLink(deal)}
                   className="block p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <p className="font-medium text-gray-900">{deal.address}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-gray-900">{deal.address}</p>
+                        {deal.paymentModel && (
+                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                            {deal.paymentModel}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-sm text-gray-600 mt-1">
-                        Цена: {formatPrice(deal.price)} • Комиссия: {formatPrice(deal.commission_agent)}
+                        Цена: {formatPrice(deal.price)} • Комиссия:{' '}
+                        {formatPrice(deal.commission)}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
-                        Создано {formatDate(deal.created_at)}
+                        Создано {formatDate(deal.createdAt)}
                       </p>
                     </div>
                     <div className="flex items-center gap-4">
@@ -129,10 +253,14 @@ export default function DealsPage() {
                             ? 'bg-gray-200 text-gray-900'
                             : deal.status === 'closed'
                             ? 'bg-black text-white'
+                            : deal.status === 'cancelled'
+                            ? 'bg-gray-100 text-gray-500'
+                            : deal.status === 'hold_period'
+                            ? 'bg-gray-400 text-white'
                             : 'bg-gray-100 text-gray-900'
                         }`}
                       >
-                        {STATUS_LABELS[deal.status]}
+                        {deal.statusLabel}
                       </span>
                     </div>
                   </div>
@@ -145,4 +273,3 @@ export default function DealsPage() {
     </div>
   );
 }
-

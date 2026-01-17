@@ -2,7 +2,7 @@
 
 from enum import Enum as PyEnum
 
-from sqlalchemy import Column, String, Enum, Integer, ForeignKey, Text, Numeric, Boolean
+from sqlalchemy import Column, String, Enum, Integer, ForeignKey, Text, Numeric, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 
@@ -89,6 +89,18 @@ class Deal(BaseModel, SoftDeleteMixin):
     price = Column(Numeric(15, 2), nullable=True)
     commission_agent = Column(Numeric(15, 2), nullable=True)
 
+    # Bank Split fields (NEW for T-Bank integration)
+    payment_model = Column(String(30), default="mor", nullable=False)  # mor/bank_hold_split
+    external_provider = Column(String(50), nullable=True)  # tbank
+    external_deal_id = Column(String(255), nullable=True, index=True)  # T-Bank deal ID
+    external_account_number = Column(String(50), nullable=True)  # Nominal account number
+    payment_link_url = Column(String(500), nullable=True)  # SBP/card payment link
+    payment_qr_payload = Column(Text, nullable=True)  # QR code data
+    expires_at = Column(DateTime, nullable=True)  # Payment link expiry
+    hold_expires_at = Column(DateTime, nullable=True)  # Hold period expiry (for instant split)
+    payer_email = Column(String(255), nullable=True)  # For receipt
+    description = Column(Text, nullable=True)  # Deal description for bank
+
     # Relationships
     creator = relationship("User", foreign_keys=[created_by_user_id], back_populates="deals_created")
     agent = relationship("User", foreign_keys=[agent_user_id], back_populates="deals_as_agent")
@@ -96,6 +108,12 @@ class Deal(BaseModel, SoftDeleteMixin):
     terms = relationship("DealTerms", back_populates="deal", uselist=False, cascade="all, delete-orphan")
     documents = relationship("Document", back_populates="deal", cascade="all, delete-orphan")
     payment_schedules = relationship("PaymentSchedule", back_populates="deal", cascade="all, delete-orphan")
+
+    # Bank Split relationships
+    split_recipients = relationship("DealSplitRecipient", back_populates="deal", cascade="all, delete-orphan")
+    bank_events = relationship("BankEvent", back_populates="deal", cascade="all, delete-orphan")
+    evidence_files = relationship("EvidenceFile", back_populates="deal", cascade="all, delete-orphan")
+    milestones = relationship("DealMilestone", back_populates="deal", cascade="all, delete-orphan")
 
 
 class DealParty(BaseModel):

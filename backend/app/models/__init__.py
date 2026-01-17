@@ -9,6 +9,14 @@ from app.models.payment import PaymentSchedule, PaymentIntent, Payment
 from app.models.ledger import LedgerEntry, Split, Payout
 from app.models.receipt import Receipt, NPDTask
 from app.models.antifraud import AntiFraudCheck, UserLimit, Blacklist
+from app.models.bank_split import (
+    DealSplitRecipient,
+    SplitRuleTemplate,
+    BankEvent,
+    SelfEmployedRegistry,
+    EvidenceFile,
+    DealMilestone,
+)
 
 __all__ = [
     "Base",
@@ -37,4 +45,11 @@ __all__ = [
     "AntiFraudCheck",
     "UserLimit",
     "Blacklist",
+    # Bank Split models
+    "DealSplitRecipient",
+    "SplitRuleTemplate",
+    "BankEvent",
+    "SelfEmployedRegistry",
+    "EvidenceFile",
+    "DealMilestone",
 ]

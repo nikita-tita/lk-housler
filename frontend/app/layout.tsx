@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { CookieBanner } from "@/components/shared/CookieBanner";
+import { ToastProvider } from "@/components/ui/Toast";
 
 const inter = Inter({
   subsets: ["latin", "cyrillic"],
@@ -22,8 +23,10 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body className={`${inter.variable} antialiased`}>
-        {children}
-        <CookieBanner />
+        <ToastProvider>
+          {children}
+          <CookieBanner />
+        </ToastProvider>
       </body>
     </html>
   );

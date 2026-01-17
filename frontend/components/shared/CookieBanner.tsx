@@ -7,7 +7,7 @@
  */
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 const COOKIE_CONSENT_KEY = 'housler_cookie_consent';
@@ -23,12 +23,17 @@ interface CookieConsent {
 }
 
 export function CookieBanner() {
-  // Lazy initialization to avoid setState in useEffect
-  const [isVisible, setIsVisible] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return !localStorage.getItem(COOKIE_CONSENT_KEY);
-  });
+  // Start hidden to avoid hydration mismatch, then check localStorage
+  const [isVisible, setIsVisible] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+
+  useEffect(() => {
+    // Check localStorage only on client after hydration
+    const hasConsent = localStorage.getItem(COOKIE_CONSENT_KEY);
+    if (!hasConsent) {
+      setIsVisible(true);
+    }
+  }, []);
 
   const saveConsent = (status: ConsentStatus, analytics: boolean) => {
     const consent: CookieConsent = {
