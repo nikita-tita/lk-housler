@@ -265,3 +265,52 @@ class SplitService:
         await self.db.flush()
 
         return recipient
+
+    async def apply_split_adjustment(
+        self,
+        deal_id: UUID,
+        new_split: dict,
+    ) -> List[DealSplitRecipient]:
+        """
+        Apply an approved split adjustment to deal recipients.
+
+        Args:
+            deal_id: Deal ID
+            new_split: Dict mapping user_id (as string) to new percentage
+
+        Returns:
+            Updated recipients
+        """
+        recipients = await self.get_deal_recipients(deal_id)
+
+        if not recipients:
+            raise ValueError(f"No recipients found for deal {deal_id}")
+
+        # Get total amount from first recipient's deal
+        # (all recipients share the same deal's total)
+        total_amount = sum(r.calculated_amount for r in recipients)
+
+        # Update each recipient's split value and recalculate amount
+        for recipient in recipients:
+            user_id_str = str(recipient.user_id)
+            if user_id_str in new_split:
+                new_percent = Decimal(str(new_split[user_id_str]))
+                recipient.split_value = new_percent
+                recipient.split_percent = new_percent  # Legacy field
+                # Recalculate amount
+                recipient.calculated_amount = (
+                    total_amount * new_percent / Decimal("100")
+                ).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+
+        # Handle rounding adjustment
+        total_calculated = sum(r.calculated_amount for r in recipients)
+        rounding_diff = total_amount - total_calculated
+
+        if rounding_diff > 0 and recipients:
+            # Add rounding difference to first recipient
+            recipients[0].calculated_amount += rounding_diff
+
+        await self.db.flush()
+
+        logger.info(f"Applied split adjustment for deal {deal_id}: {new_split}")
+        return recipients

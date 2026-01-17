@@ -114,6 +114,12 @@ class Deal(BaseModel, SoftDeleteMixin):
     bank_events = relationship("BankEvent", back_populates="deal", cascade="all, delete-orphan")
     evidence_files = relationship("EvidenceFile", back_populates="deal", cascade="all, delete-orphan")
     milestones = relationship("DealMilestone", back_populates="deal", cascade="all, delete-orphan")
+    consents = relationship("DealConsent", back_populates="deal", cascade="all, delete-orphan")
+    invitations = relationship("DealInvitation", back_populates="deal", cascade="all, delete-orphan")
+    disputes = relationship("Dispute", back_populates="deal", cascade="all, delete-orphan")
+    service_completions = relationship("ServiceCompletion", back_populates="deal", cascade="all, delete-orphan")
+    split_adjustments = relationship("SplitAdjustment", back_populates="deal", cascade="all, delete-orphan")
+    contracts = relationship("SignedContract", back_populates="deal", cascade="all, delete-orphan")
 
 
 class DealParty(BaseModel):

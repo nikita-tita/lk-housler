@@ -149,6 +149,7 @@ class Settings(BaseSettings):
     TBANK_SE_TOKEN: str = ""
     TBANK_WEBHOOK_SECRET: str = ""
     TBANK_HOLD_PERIOD_SECONDS: int = 3600  # 1 hour max
+    PLATFORM_FEE_PERCENT: float = 4.0  # Platform commission for bank-split deals
 
     # Limits
     MIN_PAYMENT_AMOUNT: int = 10000

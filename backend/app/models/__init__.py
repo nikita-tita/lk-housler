@@ -17,6 +17,12 @@ from app.models.bank_split import (
     EvidenceFile,
     DealMilestone,
 )
+from app.models.consent import DealConsent, ConsentType
+from app.models.invitation import DealInvitation, InvitationStatus, InvitationRole
+from app.models.dispute import Dispute, DisputeEvidence, DisputeStatus, DisputeReason, RefundStatus
+from app.models.service_completion import ServiceCompletion
+from app.models.split_adjustment import SplitAdjustment, AdjustmentStatus
+from app.models.contract import SignedContract, ContractSignature, ContractStatus
 
 __all__ = [
     "Base",
@@ -52,4 +58,26 @@ __all__ = [
     "SelfEmployedRegistry",
     "EvidenceFile",
     "DealMilestone",
+    # Consent models
+    "DealConsent",
+    "ConsentType",
+    # Invitation models
+    "DealInvitation",
+    "InvitationStatus",
+    "InvitationRole",
+    # Dispute models
+    "Dispute",
+    "DisputeEvidence",
+    "DisputeStatus",
+    "DisputeReason",
+    "RefundStatus",
+    # Service completion
+    "ServiceCompletion",
+    # Split adjustment
+    "SplitAdjustment",
+    "AdjustmentStatus",
+    # Contract models
+    "SignedContract",
+    "ContractSignature",
+    "ContractStatus",
 ]

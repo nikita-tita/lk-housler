@@ -50,3 +50,172 @@ class NotificationService:
             return True
         except Exception:
             return False
+
+    # ============================================
+    # Bank-Split notifications
+    # ============================================
+
+    async def send_bank_split_payment_link(
+        self,
+        phone: str,
+        payment_url: str,
+        address: str,
+        amount: float,
+    ) -> bool:
+        """Send payment link to client"""
+        short_address = address[:30] + "..." if len(address) > 30 else address
+        amount_str = f"{amount:,.0f}".replace(",", " ")
+
+        message = f"Housler: оплатите комиссию {amount_str} руб. по сделке {short_address}. Ссылка: {payment_url}"
+
+        try:
+            await self.sms.send(phone, message)
+            return True
+        except Exception:
+            return False
+
+    async def send_bank_split_payment_received(
+        self,
+        phone: str,
+        client_name: Optional[str] = None,
+        address: Optional[str] = None,
+    ) -> bool:
+        """Notify agent about payment received"""
+        short_name = client_name.split()[0] if client_name else "Клиент"
+        short_address = address[:25] + "..." if address and len(address) > 25 else address
+
+        message = f"Housler: {short_name} оплатил комиссию по сделке {short_address}. Средства на удержании."
+
+        try:
+            await self.sms.send(phone, message)
+            return True
+        except Exception:
+            return False
+
+    async def send_bank_split_hold_released(
+        self,
+        phone: str,
+        address: Optional[str] = None,
+        amount: Optional[float] = None,
+    ) -> bool:
+        """Notify agent about funds released from hold"""
+        short_address = address[:25] + "..." if address and len(address) > 25 else address
+        amount_str = f"{amount:,.0f}".replace(",", " ") if amount else ""
+
+        message = f"Housler: средства {amount_str} руб. по сделке {short_address} выплачены на ваш счёт."
+
+        try:
+            await self.sms.send(phone, message)
+            return True
+        except Exception:
+            return False
+
+    async def send_bank_split_deal_cancelled(
+        self,
+        phone: str,
+        address: Optional[str] = None,
+        reason: Optional[str] = None,
+    ) -> bool:
+        """Notify about deal cancellation"""
+        short_address = address[:25] + "..." if address and len(address) > 25 else address
+
+        message = f"Housler: сделка по адресу {short_address} отменена."
+        if reason:
+            message += f" Причина: {reason[:50]}"
+
+        try:
+            await self.sms.send(phone, message)
+            return True
+        except Exception:
+            return False
+
+    async def send_bank_split_invitation(
+        self,
+        phone: str,
+        inviter_name: str,
+        address: str,
+        invite_url: str,
+    ) -> bool:
+        """Send invitation to partner"""
+        short_address = address[:25] + "..." if len(address) > 25 else address
+
+        message = f"Housler: {inviter_name} приглашает вас в сделку по адресу {short_address}. Подробности: {invite_url}"
+
+        try:
+            await self.sms.send(phone, message)
+            return True
+        except Exception:
+            return False
+
+    async def send_bank_split_invitation_accepted(
+        self,
+        phone: str,
+        partner_name: str,
+        address: str,
+    ) -> bool:
+        """Notify inviter that invitation was accepted"""
+        short_address = address[:25] + "..." if len(address) > 25 else address
+
+        message = f"Housler: {partner_name} принял приглашение в сделку по адресу {short_address}."
+
+        try:
+            await self.sms.send(phone, message)
+            return True
+        except Exception:
+            return False
+
+    async def send_bank_split_awaiting_signature(
+        self,
+        phone: str,
+        address: str,
+        sign_url: str,
+    ) -> bool:
+        """Notify about awaiting signature"""
+        short_address = address[:25] + "..." if len(address) > 25 else address
+
+        message = f"Housler: требуется ваша подпись по сделке {short_address}. Ссылка: {sign_url}"
+
+        try:
+            await self.sms.send(phone, message)
+            return True
+        except Exception:
+            return False
+
+
+# Singleton instance
+notification_service = NotificationService()
+
+
+async def notify_deal_status_change(
+    deal_id: str,
+    old_status: str,
+    new_status: str,
+    phone: str,
+    address: str,
+    **kwargs,
+) -> bool:
+    """Convenience function to send status change notifications"""
+    service = notification_service
+
+    if new_status == "awaiting_signatures":
+        sign_url = kwargs.get("sign_url", f"{settings.FRONTEND_URL}/sign/{deal_id}")
+        return await service.send_bank_split_awaiting_signature(phone, address, sign_url)
+
+    elif new_status == "payment_pending":
+        payment_url = kwargs.get("payment_url", f"{settings.FRONTEND_URL}/pay/{deal_id}")
+        amount = kwargs.get("amount", 0)
+        return await service.send_bank_split_payment_link(phone, payment_url, address, amount)
+
+    elif new_status == "hold_period":
+        client_name = kwargs.get("client_name")
+        return await service.send_bank_split_payment_received(phone, client_name, address)
+
+    elif new_status == "payout_ready" or new_status == "closed":
+        amount = kwargs.get("amount")
+        return await service.send_bank_split_hold_released(phone, address, amount)
+
+    elif new_status == "cancelled":
+        reason = kwargs.get("reason")
+        return await service.send_bank_split_deal_cancelled(phone, address, reason)
+
+    return False

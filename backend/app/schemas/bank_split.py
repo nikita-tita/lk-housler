@@ -5,7 +5,7 @@ from typing import Optional, List
 from uuid import UUID
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ============================================
@@ -27,6 +27,15 @@ class SplitRecipientCreate(SplitRecipientBase):
     inn: Optional[str] = None
     kpp: Optional[str] = None
     legal_type: Optional[str] = None
+
+    @field_validator('inn')
+    @classmethod
+    def validate_inn(cls, v: Optional[str]) -> Optional[str]:
+        """Validate INN checksum if provided"""
+        if v is None:
+            return v
+        from app.utils.inn_validator import validate_inn
+        return validate_inn(v)
 
 
 class SplitRecipientResponse(SplitRecipientBase):
@@ -84,6 +93,11 @@ class BankSplitDealResponse(BaseModel):
     property_address: str
     price: Decimal
     commission_agent: Decimal
+
+    # Platform fee (computed)
+    platform_fee_percent: Decimal = Field(default=Decimal("4.0"), description="Platform fee percent")
+    platform_fee_amount: Decimal = Field(default=Decimal("0"), description="Platform fee amount in rubles")
+    total_client_payment: Decimal = Field(default=Decimal("0"), description="Total amount client pays (commission + platform fee)")
 
     # Client
     client_name: Optional[str] = None
@@ -215,3 +229,39 @@ class SendPaymentLinkResponse(BaseModel):
     method: str
     recipient: str  # Masked phone or email
     message: str
+
+
+# ============================================
+# Consent schemas
+# ============================================
+
+
+class ConsentCreate(BaseModel):
+    """Create consent record"""
+    consent_type: str = Field(..., description="platform_commission/data_processing/terms_of_service/split_agreement")
+    consent_version: str = Field(default="1.0", description="Version of the agreement")
+    document_url: Optional[str] = Field(None, description="URL to the agreement document")
+
+
+class ConsentResponse(BaseModel):
+    """Consent record response"""
+    id: UUID
+    deal_id: UUID
+    user_id: int
+    consent_type: str
+    consent_version: str
+    agreed_at: datetime
+    document_url: Optional[str] = None
+    revoked_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ConsentCheckResponse(BaseModel):
+    """Response for checking required consents"""
+    deal_id: UUID
+    required_consents: List[str]
+    given_consents: List[str]
+    missing_consents: List[str]
+    all_consents_given: bool

@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, users, organizations, deals, documents, payments, sign, templates, bank_split
+from app.api.v1.endpoints import auth, users, organizations, deals, documents, payments, sign, templates, bank_split, invitations, disputes, admin
 
 api_router = APIRouter()
 
@@ -18,3 +18,12 @@ api_router.include_router(templates.router, prefix="/templates", tags=["template
 
 # Bank Split (T-Bank instant split)
 api_router.include_router(bank_split.router, prefix="/bank-split", tags=["bank-split"])
+
+# Invitations (uses /bank-split/{id}/invite and /invitations/{token})
+api_router.include_router(invitations.router, tags=["invitations"])
+
+# Disputes (uses /bank-split/{id}/dispute and /disputes/{id})
+api_router.include_router(disputes.router, tags=["disputes"])
+
+# Admin / Analytics
+api_router.include_router(admin.router, tags=["admin"])

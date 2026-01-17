@@ -496,3 +496,211 @@ async def send_password_reset_email(email: str, code: str) -> bool:
     html = _get_html_wrapper(html_content)
 
     return await provider.send(email, subject, html, html=True)
+
+
+# =============================================================================
+# Bank-Split Email Notifications
+# =============================================================================
+
+
+async def send_bank_split_payment_link_email(
+    email: str,
+    client_name: str,
+    address: str,
+    amount: float,
+    payment_url: str,
+) -> bool:
+    """Send payment link to client via email"""
+    provider = get_email_provider()
+
+    formatted_amount = f"{amount:,.0f}".replace(",", " ")
+    subject = f"Housler: оплата комиссии {formatted_amount} руб."
+
+    html_content = f"""
+<h2>Оплата комиссии агента</h2>
+<p>Здравствуйте, {client_name}!</p>
+<p>По вашей сделке по адресу <strong>{address}</strong> необходимо оплатить комиссию агента.</p>
+<p><strong>Сумма к оплате:</strong> {formatted_amount} руб.</p>
+<a href="{payment_url}" class="button">Перейти к оплате</a>
+<p>Ссылка для оплаты действительна 24 часа.</p>
+<p>Если у вас возникли вопросы, свяжитесь с вашим агентом.</p>
+"""
+    html = _get_html_wrapper(html_content)
+
+    return await provider.send(email, subject, html, html=True)
+
+
+async def send_bank_split_payment_received_email(
+    email: str,
+    agent_name: str,
+    client_name: str,
+    address: str,
+    amount: float,
+    deal_id: str,
+) -> bool:
+    """Notify agent about payment received"""
+    provider = get_email_provider()
+
+    formatted_amount = f"{amount:,.0f}".replace(",", " ")
+    subject = f"Housler: платеж получен - {formatted_amount} руб."
+
+    html_content = f"""
+<h2>Платеж получен</h2>
+<p>Здравствуйте, {agent_name}!</p>
+<p>Клиент <strong>{client_name}</strong> оплатил комиссию по сделке {address}.</p>
+<p><strong>Сумма:</strong> {formatted_amount} руб.</p>
+<p>Средства находятся на удержании до завершения оказания услуги.</p>
+<a href="{settings.FRONTEND_URL}/agent/deals/bank-split/{deal_id}" class="button">Подробнее о сделке</a>
+"""
+    html = _get_html_wrapper(html_content)
+
+    return await provider.send(email, subject, html, html=True)
+
+
+async def send_bank_split_hold_released_email(
+    email: str,
+    agent_name: str,
+    address: str,
+    amount: float,
+) -> bool:
+    """Notify agent about funds released from hold"""
+    provider = get_email_provider()
+
+    formatted_amount = f"{amount:,.0f}".replace(",", " ")
+    subject = f"Housler: выплата {formatted_amount} руб. выполнена"
+
+    html_content = f"""
+<h2>Выплата выполнена</h2>
+<p>Здравствуйте, {agent_name}!</p>
+<p>Средства по сделке <strong>{address}</strong> успешно перечислены на ваш счёт.</p>
+<p><strong>Сумма выплаты:</strong> {formatted_amount} руб.</p>
+<p>Спасибо за работу с Housler!</p>
+"""
+    html = _get_html_wrapper(html_content)
+
+    return await provider.send(email, subject, html, html=True)
+
+
+async def send_bank_split_deal_cancelled_email(
+    email: str,
+    recipient_name: str,
+    address: str,
+    reason: Optional[str] = None,
+) -> bool:
+    """Notify about deal cancellation"""
+    provider = get_email_provider()
+
+    subject = "Housler: сделка отменена"
+
+    reason_text = f"<p><strong>Причина:</strong> {reason}</p>" if reason else ""
+
+    html_content = f"""
+<h2>Сделка отменена</h2>
+<p>Здравствуйте, {recipient_name}!</p>
+<p>Сделка по адресу <strong>{address}</strong> была отменена.</p>
+{reason_text}
+<p>Если были произведены платежи, средства будут возвращены в течение 3-5 рабочих дней.</p>
+<p>Если у вас есть вопросы, свяжитесь со службой поддержки.</p>
+"""
+    html = _get_html_wrapper(html_content)
+
+    return await provider.send(email, subject, html, html=True)
+
+
+async def send_bank_split_invitation_email(
+    email: str,
+    partner_name: str,
+    inviter_name: str,
+    address: str,
+    split_percent: float,
+    invite_url: str,
+) -> bool:
+    """Send invitation email to partner"""
+    provider = get_email_provider()
+
+    subject = f"Housler: приглашение в сделку от {inviter_name}"
+
+    html_content = f"""
+<h2>Приглашение в сделку</h2>
+<p>Здравствуйте, {partner_name}!</p>
+<p><strong>{inviter_name}</strong> приглашает вас участвовать в сделке.</p>
+<p><strong>Адрес объекта:</strong> {address}</p>
+<p><strong>Ваша доля:</strong> {split_percent}%</p>
+<a href="{invite_url}" class="button">Просмотреть приглашение</a>
+<p>Приглашение действительно 7 дней.</p>
+"""
+    html = _get_html_wrapper(html_content)
+
+    return await provider.send(email, subject, html, html=True)
+
+
+async def send_bank_split_dispute_opened_email(
+    email: str,
+    recipient_name: str,
+    address: str,
+    dispute_reason: str,
+    deal_id: str,
+) -> bool:
+    """Notify about dispute opened"""
+    provider = get_email_provider()
+
+    subject = "Housler: открыт спор по сделке"
+
+    html_content = f"""
+<h2>Открыт спор</h2>
+<p>Здравствуйте, {recipient_name}!</p>
+<p>По сделке <strong>{address}</strong> был открыт спор.</p>
+<p><strong>Причина:</strong> {dispute_reason}</p>
+<p>Выплаты по сделке приостановлены до разрешения спора.</p>
+<a href="{settings.FRONTEND_URL}/agent/deals/bank-split/{deal_id}/dispute" class="button">Подробнее о споре</a>
+"""
+    html = _get_html_wrapper(html_content)
+
+    return await provider.send(email, subject, html, html=True)
+
+
+async def send_bank_split_contract_ready_email(
+    email: str,
+    recipient_name: str,
+    contract_number: str,
+    deal_id: str,
+    sign_url: str,
+) -> bool:
+    """Notify about contract ready for signing"""
+    provider = get_email_provider()
+
+    subject = f"Housler: договор {contract_number} готов к подписанию"
+
+    html_content = f"""
+<h2>Договор готов к подписанию</h2>
+<p>Здравствуйте, {recipient_name}!</p>
+<p>Договор <strong>{contract_number}</strong> готов к подписанию.</p>
+<p>Для подписания используется простая электронная подпись (ПЭП) с подтверждением по СМС.</p>
+<a href="{sign_url}" class="button">Подписать договор</a>
+<p>Ссылка действительна 14 дней.</p>
+"""
+    html = _get_html_wrapper(html_content)
+
+    return await provider.send(email, subject, html, html=True)
+
+
+async def send_bank_split_contract_signed_email(
+    email: str,
+    recipient_name: str,
+    contract_number: str,
+) -> bool:
+    """Notify about contract fully signed"""
+    provider = get_email_provider()
+
+    subject = f"Housler: договор {contract_number} подписан"
+
+    html_content = f"""
+<h2>Договор подписан</h2>
+<p>Здравствуйте, {recipient_name}!</p>
+<p>Договор <strong>{contract_number}</strong> успешно подписан всеми сторонами.</p>
+<p>Копия договора доступна в вашем личном кабинете.</p>
+<a href="{settings.FRONTEND_URL}/agent/deals" class="button">Перейти в личный кабинет</a>
+"""
+    html = _get_html_wrapper(html_content)
+
+    return await provider.send(email, subject, html, html=True)

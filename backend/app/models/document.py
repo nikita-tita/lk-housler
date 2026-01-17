@@ -19,6 +19,10 @@ class TemplateType(str, PyEnum):
     ADDITIONAL_AGREEMENT = "additional_agreement"
     TERMINATION = "termination"
     PD_CONSENT = "pd_consent"
+    # Bank-split contract types
+    BANK_SPLIT_AGENT_AGREEMENT = "bank_split_agent_agreement"
+    BANK_SPLIT_CLIENT_AGREEMENT = "bank_split_client_agreement"
+    BANK_SPLIT_AGENCY_AGREEMENT = "bank_split_agency_agreement"
 
 
 class TemplateStatus(str, PyEnum):
