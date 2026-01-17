@@ -19,6 +19,7 @@ import {
   releaseDeal,
   cancelBankSplitDeal,
   getDealTimeline,
+  sendPaymentLink,
   BankSplitDeal,
   TimelineEvent,
   BANK_SPLIT_STATUS_LABELS,
@@ -44,6 +45,11 @@ export default function BankSplitDealDetailPage() {
     url: string;
     qrCode?: string;
     expiresAt: string;
+  } | null>(null);
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsResult, setSmsResult] = useState<{
+    success: boolean;
+    message: string;
   } | null>(null);
 
   const loadDeal = useCallback(async (id: string) => {
@@ -146,6 +152,30 @@ export default function BankSplitDealDetailPage() {
     if (!reason) return;
 
     await handleAction(() => cancelBankSplitDeal(deal.id, reason));
+  };
+
+  const handleSendPaymentSMS = async () => {
+    if (!deal) return;
+
+    setSmsSending(true);
+    setSmsResult(null);
+
+    try {
+      const result = await sendPaymentLink(deal.id, 'sms');
+      setSmsResult({
+        success: true,
+        message: result.message,
+      });
+    } catch (error: unknown) {
+      console.error('Failed to send SMS:', error);
+      const axiosError = error as { response?: { data?: { detail?: string } } };
+      setSmsResult({
+        success: false,
+        message: axiosError.response?.data?.detail || 'Ошибка отправки SMS',
+      });
+    } finally {
+      setSmsSending(false);
+    }
   };
 
   if (loading) {
@@ -351,6 +381,39 @@ export default function BankSplitDealDetailPage() {
                           )}
                         </p>
                       )}
+
+                      {/* SMS Send Section */}
+                      <div className="pt-4 border-t border-gray-200">
+                        <p className="text-sm text-gray-600 mb-3 text-center">
+                          Отправить ссылку клиенту
+                        </p>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleSendPaymentSMS}
+                          loading={smsSending}
+                          disabled={!deal.client_phone}
+                          fullWidth
+                        >
+                          Отправить SMS
+                        </Button>
+                        {!deal.client_phone && (
+                          <p className="text-xs text-gray-400 text-center mt-2">
+                            Телефон клиента не указан
+                          </p>
+                        )}
+                        {smsResult && (
+                          <div
+                            className={`mt-3 p-3 rounded-lg text-sm text-center ${
+                              smsResult.success
+                                ? 'bg-gray-50 text-gray-900'
+                                : 'bg-gray-100 text-gray-700'
+                            }`}
+                          >
+                            {smsResult.message}
+                          </div>
+                        )}
+                      </div>
                     </>
                   )}
                 </div>

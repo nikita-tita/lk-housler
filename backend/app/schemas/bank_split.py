@@ -197,3 +197,21 @@ class DealStatusResponse(BaseModel):
     old_status: str
     new_status: str
     timestamp: datetime
+
+
+# ============================================
+# Payment link delivery schemas
+# ============================================
+
+
+class SendPaymentLinkRequest(BaseModel):
+    """Request to send payment link to client"""
+    method: str = Field(default="sms", description="Delivery method: sms/email")
+
+
+class SendPaymentLinkResponse(BaseModel):
+    """Response after sending payment link"""
+    success: bool
+    method: str
+    recipient: str  # Masked phone or email
+    message: str

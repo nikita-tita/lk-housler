@@ -23,6 +23,8 @@ from app.schemas.bank_split import (
     WebhookResponse,
     DealStatusTransition,
     DealStatusResponse,
+    SendPaymentLinkRequest,
+    SendPaymentLinkResponse,
 )
 from app.services.bank_split import (
     BankSplitDealService,
@@ -316,6 +318,84 @@ async def regenerate_payment_link(
         )
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.post("/{deal_id}/send-payment-link", response_model=SendPaymentLinkResponse)
+async def send_payment_link(
+    deal_id: UUID,
+    request: SendPaymentLinkRequest = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Send payment link to client via SMS or Email.
+
+    This sends the payment URL to the client's phone or email.
+    """
+    from app.services.sms.provider import get_sms_provider
+    from app.core.config import settings
+
+    service = BankSplitDealService(db)
+    deal = await service.get_deal(deal_id)
+
+    if not deal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
+
+    if deal.created_by_user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only deal creator can send payment link")
+
+    if not deal.payment_link_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Deal has no payment link. Create invoice first."
+        )
+
+    method = request.method if request else "sms"
+
+    if method == "sms":
+        if not deal.client_phone:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Client phone not set"
+            )
+
+        # Format message
+        payment_page_url = f"{settings.FRONTEND_URL}/pay/{deal.id}"
+        message = f"Housler: ссылка для оплаты комиссии по сделке {deal.property_address[:30]}... - {payment_page_url}"
+
+        # Send SMS
+        sms_provider = get_sms_provider()
+        success = await sms_provider.send(deal.client_phone, message)
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send SMS"
+            )
+
+        # Mask phone for response
+        phone = deal.client_phone
+        masked = f"+7 (***) ***-**-{phone[-2:]}" if len(phone) >= 2 else "***"
+
+        return SendPaymentLinkResponse(
+            success=True,
+            method="sms",
+            recipient=masked,
+            message="SMS со ссылкой на оплату отправлено клиенту"
+        )
+
+    elif method == "email":
+        # Email sending not implemented yet
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Email delivery not implemented yet"
+        )
+
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown delivery method: {method}"
+        )
 
 
 @router.post("/{deal_id}/cancel", response_model=DealStatusResponse)

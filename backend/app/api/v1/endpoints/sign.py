@@ -35,13 +35,17 @@ def mask_phone(phone: str) -> str:
 
 async def get_signing_token(token: str, db: AsyncSession) -> SigningToken:
     """Get and validate signing token"""
-    stmt = (
-        select(SigningToken)
-        .where(SigningToken.token == token)
-        .options(selectinload(SigningToken.document), selectinload(SigningToken.party))
-    )
-    result = await db.execute(stmt)
-    signing_token = result.scalar_one_or_none()
+    try:
+        stmt = (
+            select(SigningToken)
+            .where(SigningToken.token == token)
+            .options(selectinload(SigningToken.document), selectinload(SigningToken.party))
+        )
+        result = await db.execute(stmt)
+        signing_token = result.scalar_one_or_none()
+    except Exception:
+        # Database error or invalid token format
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signing link not found")
 
     if not signing_token:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signing link not found or expired")

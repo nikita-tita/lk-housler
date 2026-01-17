@@ -201,6 +201,25 @@ export async function getDealTimeline(id: string): Promise<TimelineEvent[]> {
   return data;
 }
 
+// Send payment link response
+export interface SendPaymentLinkResponse {
+  success: boolean;
+  method: string;
+  recipient: string;
+  message: string;
+}
+
+export async function sendPaymentLink(
+  id: string,
+  method: 'sms' | 'email' = 'sms'
+): Promise<SendPaymentLinkResponse> {
+  const { data } = await apiClient.post<SendPaymentLinkResponse>(
+    `/bank-split/${id}/send-payment-link`,
+    { method }
+  );
+  return data;
+}
+
 // Status labels for UI
 export const BANK_SPLIT_STATUS_LABELS: Record<BankSplitStatus, string> = {
   draft: 'Черновик',

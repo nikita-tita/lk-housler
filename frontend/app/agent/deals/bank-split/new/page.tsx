@@ -19,6 +19,9 @@ const DEAL_TYPE_OPTIONS = [
   { value: 'newbuild_booking', label: 'Бронирование новостройки' },
 ];
 
+// Комиссия платформы Housler (4%)
+const PLATFORM_FEE_PERCENT = 4;
+
 type Step = 1 | 2 | 3 | 4;
 
 const STEPS = [
@@ -49,6 +52,7 @@ export default function CreateBankSplitDealPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [hasSplit, setHasSplit] = useState(false);
+  const [feeConsent, setFeeConsent] = useState(false);
 
   const [formData, setFormData] = useState<FormData>({
     type: 'secondary_sell',
@@ -70,12 +74,16 @@ export default function CreateBankSplitDealPage() {
     formData.coagent_split_percent +
     formData.agency_split_percent;
 
+  // Расчёт комиссии платформы
+  const platformFee = Math.round(formData.commission_total * (PLATFORM_FEE_PERCENT / 100));
+  const totalClientPayment = formData.commission_total + platformFee;
+
   const validateStep1 = (): boolean => {
     return formData.type && formData.property_address.length > 5;
   };
 
   const validateStep2 = (): boolean => {
-    return formData.price > 0 && formData.commission_total > 0;
+    return formData.price > 0 && formData.commission_total > 0 && feeConsent;
   };
 
   const validateStep3 = (): boolean => {
@@ -335,17 +343,63 @@ export default function CreateBankSplitDealPage() {
               />
 
               {formData.price > 0 && formData.commission_total > 0 && (
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-600">
-                    Комиссия составляет{' '}
-                    <span className="font-medium text-gray-900">
-                      {((formData.commission_total / formData.price) * 100).toFixed(
-                        2
-                      )}
-                      %
-                    </span>{' '}
-                    от стоимости объекта
-                  </p>
+                <div className="space-y-3">
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600">
+                      Комиссия составляет{' '}
+                      <span className="font-medium text-gray-900">
+                        {((formData.commission_total / formData.price) * 100).toFixed(2)}%
+                      </span>{' '}
+                      от стоимости объекта
+                    </p>
+                  </div>
+
+                  {/* Комиссия платформы */}
+                  <div className="p-4 bg-gray-100 rounded-lg border border-gray-200">
+                    <h4 className="text-sm font-medium text-gray-900 mb-3">
+                      Расчёт оплаты клиентом
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Комиссия агента:</span>
+                        <span className="font-medium text-gray-900">
+                          {formData.commission_total.toLocaleString('ru-RU')} руб.
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">
+                          Комиссия сервиса ({PLATFORM_FEE_PERCENT}%):
+                        </span>
+                        <span className="font-medium text-gray-900">
+                          {platformFee.toLocaleString('ru-RU')} руб.
+                        </span>
+                      </div>
+                      <div className="border-t border-gray-300 pt-2 mt-2">
+                        <div className="flex justify-between">
+                          <span className="font-medium text-gray-900">Итого к оплате:</span>
+                          <span className="font-semibold text-gray-900">
+                            {totalClientPayment.toLocaleString('ru-RU')} руб.
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Согласие на комиссию */}
+                  <label className="flex items-start gap-3 cursor-pointer p-4 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={feeConsent}
+                      onChange={(e) => setFeeConsent(e.target.checked)}
+                      className="mt-0.5 h-5 w-5 rounded border-gray-300 text-black focus:ring-black cursor-pointer"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Я ознакомлен и согласен с тем, что комиссия сервиса Housler составляет{' '}
+                      <span className="font-medium text-gray-900">{PLATFORM_FEE_PERCENT}%</span> от суммы
+                      комиссии агента ({platformFee.toLocaleString('ru-RU')} руб.) и будет
+                      удержана из платежа клиента.
+                    </span>
+                  </label>
                 </div>
               )}
             </div>
@@ -531,13 +585,13 @@ export default function CreateBankSplitDealPage() {
                 </h4>
                 <div className="text-sm text-gray-600">
                   <div className="flex justify-between">
-                    <span>Стоимость:</span>
+                    <span>Стоимость объекта:</span>
                     <span className="font-medium text-gray-900">
                       {formData.price.toLocaleString('ru-RU')} руб.
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Комиссия:</span>
+                    <span>Комиссия агента:</span>
                     <span className="font-medium text-gray-900">
                       {formData.commission_total.toLocaleString('ru-RU')} руб.
                     </span>
@@ -585,6 +639,31 @@ export default function CreateBankSplitDealPage() {
                       )}
                     </>
                   )}
+                </div>
+              </div>
+
+              {/* Итого к оплате клиентом */}
+              <div className="p-4 bg-gray-100 rounded-lg border border-gray-200">
+                <h4 className="text-sm font-medium text-gray-900 mb-3">
+                  Клиент оплачивает
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between text-gray-600">
+                    <span>Комиссия агента:</span>
+                    <span>{formData.commission_total.toLocaleString('ru-RU')} руб.</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600">
+                    <span>Комиссия сервиса ({PLATFORM_FEE_PERCENT}%):</span>
+                    <span>{platformFee.toLocaleString('ru-RU')} руб.</span>
+                  </div>
+                  <div className="border-t border-gray-300 pt-2 mt-2">
+                    <div className="flex justify-between">
+                      <span className="font-medium text-gray-900">Итого к оплате:</span>
+                      <span className="font-semibold text-lg text-gray-900">
+                        {totalClientPayment.toLocaleString('ru-RU')} руб.
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
