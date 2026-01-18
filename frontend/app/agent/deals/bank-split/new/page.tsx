@@ -12,6 +12,7 @@ import {
   BankSplitDealCreate,
   BankSplitDealType,
 } from '@/lib/api/bank-split';
+import { createInvitation } from '@/lib/api/invitations';
 
 const DEAL_TYPE_OPTIONS = [
   { value: 'secondary_sell', label: 'Продажа вторички' },
@@ -54,7 +55,7 @@ interface FormData {
   use_spread: boolean; // использовать спред
   agent_split_percent: number;
   coagent_split_percent: number;
-  coagent_user_id: number | null;
+  coagent_phone: string; // Телефон со-агента для приглашения
   agency_split_percent: number;
   client_name: string;
   client_phone: string;
@@ -80,7 +81,7 @@ export default function CreateBankSplitDealPage() {
     use_spread: false,
     agent_split_percent: 100,
     coagent_split_percent: 0,
-    coagent_user_id: null,
+    coagent_phone: '',
     agency_split_percent: 0,
     client_name: '',
     client_phone: '',
@@ -123,7 +124,11 @@ export default function CreateBankSplitDealPage() {
 
   const validateStep3 = (): boolean => {
     if (totalSplitPercent !== 100) return false;
-    if (formData.coagent_split_percent > 0 && !formData.coagent_user_id) return false;
+    // Если есть доля со-агента, нужен валидный телефон для приглашения
+    if (formData.coagent_split_percent > 0) {
+      const phone = formData.coagent_phone.replace(/\D/g, '');
+      if (phone.length !== 11 || !phone.startsWith('7')) return false;
+    }
     return true;
   };
 
@@ -191,10 +196,9 @@ export default function CreateBankSplitDealPage() {
         agent_split_percent: formData.agent_split_percent,
       };
 
-      // Add split data if enabled
+      // Add split data if enabled (percentages only, coagent will be invited)
       if (hasSplit) {
-        if (formData.coagent_split_percent > 0 && formData.coagent_user_id) {
-          dealData.coagent_user_id = formData.coagent_user_id;
+        if (formData.coagent_split_percent > 0) {
           dealData.coagent_split_percent = formData.coagent_split_percent;
         }
         if (formData.agency_split_percent > 0) {
@@ -203,6 +207,22 @@ export default function CreateBankSplitDealPage() {
       }
 
       const deal = await createBankSplitDeal(dealData);
+
+      // Send invitation to co-agent if phone provided
+      if (hasSplit && formData.coagent_split_percent > 0 && formData.coagent_phone) {
+        const phone = formData.coagent_phone.replace(/\D/g, '');
+        try {
+          await createInvitation(deal.id, {
+            invited_phone: phone,
+            role: 'coagent',
+            split_percent: formData.coagent_split_percent,
+          });
+        } catch {
+          // Invitation failed but deal was created - show warning on deal page
+          console.warn('Failed to send invitation, but deal was created');
+        }
+      }
+
       router.push(`/agent/deals/bank-split/${deal.id}`);
     } catch (err: unknown) {
       const errorMessage =
@@ -241,6 +261,37 @@ export default function CreateBankSplitDealPage() {
     setFormData({ ...formData, client_phone: value });
   };
 
+  // Coagent phone handling
+  const formatCoagentPhone = (value: string): string => {
+    const digits = value.replace(/\D/g, '');
+    if (digits.length <= 1) return digits;
+    if (digits.length <= 4) return `+7 (${digits.slice(1)}`;
+    if (digits.length <= 7)
+      return `+7 (${digits.slice(1, 4)}) ${digits.slice(4)}`;
+    if (digits.length <= 9)
+      return `+7 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    return `+7 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7, 9)}-${digits.slice(9, 11)}`;
+  };
+
+  const handleCoagentPhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length > 0 && value[0] === '8') {
+      value = '7' + value.slice(1);
+    }
+    if (value.length === 0) {
+      value = '7';
+    }
+    if (value.length > 11) {
+      value = value.slice(0, 11);
+    }
+    setFormData({ ...formData, coagent_phone: value });
+  };
+
+  const isValidCoagentPhone = (phone: string): boolean => {
+    const digits = phone.replace(/\D/g, '');
+    return digits.length === 11 && digits.startsWith('7');
+  };
+
   const handleSplitToggle = (enabled: boolean) => {
     setHasSplit(enabled);
     if (!enabled) {
@@ -248,7 +299,7 @@ export default function CreateBankSplitDealPage() {
         ...formData,
         agent_split_percent: 100,
         coagent_split_percent: 0,
-        coagent_user_id: null,
+        coagent_phone: '',
         agency_split_percent: 0,
       });
     }
@@ -664,26 +715,25 @@ export default function CreateBankSplitDealPage() {
                         }
                       />
                       {formData.coagent_split_percent > 0 && (
-                        <Input
-                          label="ID со-агента"
-                          type="number"
-                          placeholder="Введите ID пользователя"
-                          value={formData.coagent_user_id || ''}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              coagent_user_id: e.target.value
-                                ? Number(e.target.value)
-                                : null,
-                            })
-                          }
-                          error={
-                            formData.coagent_split_percent > 0 &&
-                            !formData.coagent_user_id
-                              ? 'Укажите ID со-агента'
-                              : undefined
-                          }
-                        />
+                        <div className="space-y-2">
+                          <Input
+                            label="Телефон со-агента"
+                            type="tel"
+                            placeholder="+7 (999) 123-45-67"
+                            value={formatCoagentPhone(formData.coagent_phone)}
+                            onChange={handleCoagentPhoneChange}
+                            helperText="На этот номер будет отправлено приглашение"
+                            error={
+                              formData.coagent_phone.length > 0 &&
+                              !isValidCoagentPhone(formData.coagent_phone)
+                                ? 'Введите корректный номер телефона'
+                                : undefined
+                            }
+                          />
+                          <p className="text-xs text-gray-500">
+                            После создания сделки со-агент получит SMS с приглашением
+                          </p>
+                        </div>
                       )}
                     </div>
 
