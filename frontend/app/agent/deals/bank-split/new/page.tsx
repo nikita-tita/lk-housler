@@ -19,8 +19,20 @@ const DEAL_TYPE_OPTIONS = [
   { value: 'newbuild_booking', label: 'Бронирование новостройки' },
 ];
 
-// Комиссия платформы Housler (4%)
+// Комиссия платформы Housler (4%) - удерживается ИЗ комиссии агента
 const PLATFORM_FEE_PERCENT = 4;
+
+// Форматирование числа с разделителями тысяч
+const formatNumber = (value: number): string => {
+  return value.toLocaleString('ru-RU');
+};
+
+// Парсинг числа из строки с разделителями
+const parseFormattedNumber = (value: string): number => {
+  const cleaned = value.replace(/\s/g, '').replace(/,/g, '.');
+  const parsed = parseFloat(cleaned);
+  return isNaN(parsed) ? 0 : parsed;
+};
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -35,7 +47,11 @@ interface FormData {
   type: BankSplitDealType;
   property_address: string;
   price: number;
-  commission_total: number;
+  // Спред для комиссии: если commission_max > 0, используется диапазон
+  commission_total: number; // или min при использовании спреда
+  commission_max: number; // max при использовании спреда (0 = без спреда)
+  commission_percent: number; // процент от стоимости (для расчёта)
+  use_spread: boolean; // использовать спред
   agent_split_percent: number;
   coagent_split_percent: number;
   coagent_user_id: number | null;
@@ -59,6 +75,9 @@ export default function CreateBankSplitDealPage() {
     property_address: '',
     price: 0,
     commission_total: 0,
+    commission_max: 0,
+    commission_percent: 0,
+    use_spread: false,
     agent_split_percent: 100,
     coagent_split_percent: 0,
     coagent_user_id: null,
@@ -74,21 +93,32 @@ export default function CreateBankSplitDealPage() {
     formData.coagent_split_percent +
     formData.agency_split_percent;
 
-  // Расчёт комиссии платформы
+  // Расчёт комиссии платформы (удерживается ИЗ доли агента, а не добавляется сверху)
+  // Клиент платит: commission_total
+  // Платформа берёт: 4% от commission_total
+  // Агент получает: commission_total - platformFee
   const platformFee = Math.round(formData.commission_total * (PLATFORM_FEE_PERCENT / 100));
-  const totalClientPayment = formData.commission_total + platformFee;
+  const agentReceives = formData.commission_total - platformFee;
 
   const validateStep1 = (): boolean => {
     return formData.type && formData.property_address.length > 5;
   };
 
   const validateStep2 = (): boolean => {
-    return (
-      formData.price >= 100000 &&
-      formData.commission_total >= 1000 &&
-      formData.commission_total <= formData.price * 0.3 &&
-      feeConsent
-    );
+    if (formData.price < 100000) return false;
+    if (formData.commission_total < 1000) return false;
+    if (!feeConsent) return false;
+
+    if (formData.use_spread) {
+      // Для спреда: проверяем что max > min и оба в пределах 30%
+      if (formData.commission_max <= formData.commission_total) return false;
+      if (formData.commission_max > formData.price * 0.3) return false;
+    } else {
+      // Без спреда: обычная проверка
+      if (formData.commission_total > formData.price * 0.3) return false;
+    }
+
+    return true;
   };
 
   const validateStep3 = (): boolean => {
@@ -341,11 +371,12 @@ export default function CreateBankSplitDealPage() {
             <div className="space-y-6">
               <Input
                 label="Стоимость объекта"
-                type="number"
+                type="text"
+                inputMode="numeric"
                 placeholder="15 000 000"
-                value={formData.price || ''}
+                value={formData.price ? formatNumber(formData.price) : ''}
                 onChange={(e) => {
-                  const value = Math.max(0, Number(e.target.value));
+                  const value = parseFormattedNumber(e.target.value);
                   setFormData({ ...formData, price: value });
                 }}
                 helperText="Цена объекта недвижимости в рублях"
@@ -356,69 +387,177 @@ export default function CreateBankSplitDealPage() {
                 }
               />
 
-              <Input
-                label="Общая комиссия"
-                type="number"
-                placeholder="450 000"
-                value={formData.commission_total || ''}
-                onChange={(e) => {
-                  const value = Math.max(0, Number(e.target.value));
-                  setFormData({
-                    ...formData,
-                    commission_total: value,
-                  });
-                }}
-                helperText="Общая сумма комиссии по сделке в рублях"
-                error={
-                  formData.commission_total > 0 && formData.commission_total < 1000
-                    ? 'Минимальная комиссия 1 000 руб.'
-                    : formData.price > 0 && formData.commission_total > formData.price * 0.3
-                    ? 'Комиссия не может превышать 30% от стоимости объекта'
-                    : undefined
-                }
-              />
+              {/* Переключатель спреда */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <span className="text-sm font-medium text-gray-900">
+                    Диапазон комиссии (спред)
+                  </span>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Используйте, если финальная сумма ещё неизвестна
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, use_spread: !formData.use_spread })}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 ${
+                    formData.use_spread ? 'bg-black' : 'bg-gray-200'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      formData.use_spread ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {formData.use_spread ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Комиссия от"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="300 000"
+                    value={formData.commission_total ? formatNumber(formData.commission_total) : ''}
+                    onChange={(e) => {
+                      const value = parseFormattedNumber(e.target.value);
+                      setFormData({ ...formData, commission_total: value });
+                    }}
+                    helperText="Минимальная сумма"
+                    error={
+                      formData.commission_total > 0 && formData.commission_total < 1000
+                        ? 'Мин. 1 000 руб.'
+                        : undefined
+                    }
+                  />
+                  <Input
+                    label="Комиссия до"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="500 000"
+                    value={formData.commission_max ? formatNumber(formData.commission_max) : ''}
+                    onChange={(e) => {
+                      const value = parseFormattedNumber(e.target.value);
+                      setFormData({ ...formData, commission_max: value });
+                    }}
+                    helperText="Максимальная сумма"
+                    error={
+                      formData.commission_max > 0 && formData.commission_max <= formData.commission_total
+                        ? 'Должна быть больше минимальной'
+                        : undefined
+                    }
+                  />
+                </div>
+              ) : (
+                <Input
+                  label="Комиссия"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="450 000"
+                  value={formData.commission_total ? formatNumber(formData.commission_total) : ''}
+                  onChange={(e) => {
+                    const value = parseFormattedNumber(e.target.value);
+                    setFormData({
+                      ...formData,
+                      commission_total: value,
+                      commission_max: 0,
+                    });
+                  }}
+                  helperText="Сумма комиссии по сделке в рублях"
+                  error={
+                    formData.commission_total > 0 && formData.commission_total < 1000
+                      ? 'Минимальная комиссия 1 000 руб.'
+                      : formData.price > 0 && formData.commission_total > formData.price * 0.3
+                      ? 'Комиссия не может превышать 30% от стоимости объекта'
+                      : undefined
+                  }
+                />
+              )}
 
               {formData.price > 0 && formData.commission_total > 0 && (
                 <div className="space-y-3">
                   <div className="p-4 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-600">
-                      Комиссия составляет{' '}
-                      <span className="font-medium text-gray-900">
-                        {((formData.commission_total / formData.price) * 100).toFixed(2)}%
-                      </span>{' '}
-                      от стоимости объекта
-                    </p>
+                    {formData.use_spread && formData.commission_max > 0 ? (
+                      <p className="text-sm text-gray-600">
+                        Комиссия составляет{' '}
+                        <span className="font-medium text-gray-900">
+                          {((formData.commission_total / formData.price) * 100).toFixed(2)}% - {((formData.commission_max / formData.price) * 100).toFixed(2)}%
+                        </span>{' '}
+                        от стоимости объекта
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-600">
+                        Комиссия составляет{' '}
+                        <span className="font-medium text-gray-900">
+                          {((formData.commission_total / formData.price) * 100).toFixed(2)}%
+                        </span>{' '}
+                        от стоимости объекта
+                      </p>
+                    )}
                   </div>
 
-                  {/* Комиссия платформы */}
+                  {/* Расчёт комиссии */}
                   <div className="p-4 bg-gray-100 rounded-lg border border-gray-200">
                     <h4 className="text-sm font-medium text-gray-900 mb-3">
-                      Расчёт оплаты клиентом
+                      {formData.use_spread && formData.commission_max > 0
+                        ? 'Расчёт комиссии (диапазон)'
+                        : 'Расчёт комиссии'}
                     </h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Комиссия агента:</span>
-                        <span className="font-medium text-gray-900">
-                          {formData.commission_total.toLocaleString('ru-RU')} руб.
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">
-                          Комиссия сервиса ({PLATFORM_FEE_PERCENT}%):
-                        </span>
-                        <span className="font-medium text-gray-900">
-                          {platformFee.toLocaleString('ru-RU')} руб.
-                        </span>
-                      </div>
-                      <div className="border-t border-gray-300 pt-2 mt-2">
+                    {formData.use_spread && formData.commission_max > 0 ? (
+                      <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
-                          <span className="font-medium text-gray-900">Итого к оплате:</span>
-                          <span className="font-semibold text-gray-900">
-                            {totalClientPayment.toLocaleString('ru-RU')} руб.
+                          <span className="text-gray-600">Клиент платит:</span>
+                          <span className="font-medium text-gray-900">
+                            {formatNumber(formData.commission_total)} - {formatNumber(formData.commission_max)} руб.
                           </span>
                         </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">
+                            Комиссия сервиса ({PLATFORM_FEE_PERCENT}%):
+                          </span>
+                          <span className="font-medium text-gray-500">
+                            -{formatNumber(Math.round(formData.commission_total * PLATFORM_FEE_PERCENT / 100))} - {formatNumber(Math.round(formData.commission_max * PLATFORM_FEE_PERCENT / 100))} руб.
+                          </span>
+                        </div>
+                        <div className="border-t border-gray-300 pt-2 mt-2">
+                          <div className="flex justify-between">
+                            <span className="font-medium text-gray-900">Агент получает:</span>
+                            <span className="font-semibold text-gray-900">
+                              {formatNumber(Math.round(formData.commission_total * (100 - PLATFORM_FEE_PERCENT) / 100))} - {formatNumber(Math.round(formData.commission_max * (100 - PLATFORM_FEE_PERCENT) / 100))} руб.
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Точная сумма будет определена при выставлении счёта
+                        </p>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Клиент платит:</span>
+                          <span className="font-medium text-gray-900">
+                            {formatNumber(formData.commission_total)} руб.
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">
+                            Комиссия сервиса ({PLATFORM_FEE_PERCENT}%):
+                          </span>
+                          <span className="font-medium text-gray-500">
+                            -{formatNumber(platformFee)} руб.
+                          </span>
+                        </div>
+                        <div className="border-t border-gray-300 pt-2 mt-2">
+                          <div className="flex justify-between">
+                            <span className="font-medium text-gray-900">Агент получает:</span>
+                            <span className="font-semibold text-gray-900">
+                              {formatNumber(agentReceives)} руб.
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Согласие на комиссию */}
@@ -429,12 +568,24 @@ export default function CreateBankSplitDealPage() {
                       onChange={(e) => setFeeConsent(e.target.checked)}
                       className="mt-0.5 h-5 w-5 rounded border-gray-300 text-black focus:ring-black cursor-pointer"
                     />
-                    <span className="text-sm text-gray-700">
-                      Я ознакомлен и согласен с тем, что комиссия сервиса Housler составляет{' '}
-                      <span className="font-medium text-gray-900">{PLATFORM_FEE_PERCENT}%</span> от суммы
-                      комиссии агента ({platformFee.toLocaleString('ru-RU')} руб.) и будет
-                      удержана из платежа клиента.
-                    </span>
+                    {formData.use_spread && formData.commission_max > 0 ? (
+                      <span className="text-sm text-gray-700">
+                        Я ознакомлен и согласен с тем, что комиссия сервиса Housler составляет{' '}
+                        <span className="font-medium text-gray-900">{PLATFORM_FEE_PERCENT}%</span>{' '}
+                        и будет удержана из моей комиссии. Диапазон комиссии:{' '}
+                        <span className="font-medium text-gray-900">
+                          {formatNumber(formData.commission_total)} - {formatNumber(formData.commission_max)} руб.
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-sm text-gray-700">
+                        Я ознакомлен и согласен с тем, что комиссия сервиса Housler составляет{' '}
+                        <span className="font-medium text-gray-900">{PLATFORM_FEE_PERCENT}%</span>{' '}
+                        ({formatNumber(platformFee)} руб.) и будет удержана из моей комиссии.
+                        После удержания я получу{' '}
+                        <span className="font-medium text-gray-900">{formatNumber(agentReceives)} руб.</span>
+                      </span>
+                    )}
                   </label>
                 </div>
               )}
@@ -638,13 +789,15 @@ export default function CreateBankSplitDealPage() {
                   <div className="flex justify-between">
                     <span>Стоимость объекта:</span>
                     <span className="font-medium text-gray-900">
-                      {formData.price.toLocaleString('ru-RU')} руб.
+                      {formatNumber(formData.price)} руб.
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Комиссия агента:</span>
+                    <span>Комиссия:</span>
                     <span className="font-medium text-gray-900">
-                      {formData.commission_total.toLocaleString('ru-RU')} руб.
+                      {formData.use_spread && formData.commission_max > 0
+                        ? `${formatNumber(formData.commission_total)} - ${formatNumber(formData.commission_max)} руб.`
+                        : `${formatNumber(formData.commission_total)} руб.`}
                     </span>
                   </div>
                   {hasSplit && (
@@ -696,26 +849,56 @@ export default function CreateBankSplitDealPage() {
               {/* Итого к оплате клиентом */}
               <div className="p-4 bg-gray-100 rounded-lg border border-gray-200">
                 <h4 className="text-sm font-medium text-gray-900 mb-3">
-                  Клиент оплачивает
+                  Расчёт платежа
                 </h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between text-gray-600">
-                    <span>Комиссия агента:</span>
-                    <span>{formData.commission_total.toLocaleString('ru-RU')} руб.</span>
-                  </div>
-                  <div className="flex justify-between text-gray-600">
-                    <span>Комиссия сервиса ({PLATFORM_FEE_PERCENT}%):</span>
-                    <span>{platformFee.toLocaleString('ru-RU')} руб.</span>
-                  </div>
-                  <div className="border-t border-gray-300 pt-2 mt-2">
+                {formData.use_spread && formData.commission_max > 0 ? (
+                  <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="font-medium text-gray-900">Итого к оплате:</span>
+                      <span className="text-gray-600">Клиент платит:</span>
                       <span className="font-semibold text-lg text-gray-900">
-                        {totalClientPayment.toLocaleString('ru-RU')} руб.
+                        {formatNumber(formData.commission_total)} - {formatNumber(formData.commission_max)} руб.
                       </span>
                     </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>Комиссия сервиса ({PLATFORM_FEE_PERCENT}%):</span>
+                      <span className="text-gray-500">
+                        -{formatNumber(Math.round(formData.commission_total * PLATFORM_FEE_PERCENT / 100))} - {formatNumber(Math.round(formData.commission_max * PLATFORM_FEE_PERCENT / 100))} руб.
+                      </span>
+                    </div>
+                    <div className="border-t border-gray-300 pt-2 mt-2">
+                      <div className="flex justify-between">
+                        <span className="font-medium text-gray-900">Агент получает:</span>
+                        <span className="font-semibold text-gray-900">
+                          {formatNumber(Math.round(formData.commission_total * (100 - PLATFORM_FEE_PERCENT) / 100))} - {formatNumber(Math.round(formData.commission_max * (100 - PLATFORM_FEE_PERCENT) / 100))} руб.
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Точная сумма будет определена при выставлении счёта
+                    </p>
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Клиент платит:</span>
+                      <span className="font-semibold text-lg text-gray-900">
+                        {formatNumber(formData.commission_total)} руб.
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>Комиссия сервиса ({PLATFORM_FEE_PERCENT}%):</span>
+                      <span className="text-gray-500">-{formatNumber(platformFee)} руб.</span>
+                    </div>
+                    <div className="border-t border-gray-300 pt-2 mt-2">
+                      <div className="flex justify-between">
+                        <span className="font-medium text-gray-900">Агент получает:</span>
+                        <span className="font-semibold text-gray-900">
+                          {formatNumber(agentReceives)} руб.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
