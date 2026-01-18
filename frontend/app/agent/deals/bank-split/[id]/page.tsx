@@ -11,6 +11,8 @@ import {
 } from '@/components/deals/BankSplitStatusBadge';
 import { SplitRecipients } from '@/components/deals/SplitRecipients';
 import { DealTimeline } from '@/components/deals/DealTimeline';
+import { ContractSection } from '@/components/deals/ContractSection';
+import { useAuth } from '@/lib/hooks/useAuth';
 import {
   getBankSplitDeal,
   submitForSigning,
@@ -57,6 +59,7 @@ const DISPUTE_REASON_LABELS: Record<string, string> = {
 export default function BankSplitDealDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useAuth();
   const [deal, setDeal] = useState<BankSplitDeal | null>(null);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -610,6 +613,14 @@ export default function BankSplitDealDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Contracts Section */}
+          <ContractSection
+            dealId={deal.id}
+            dealStatus={deal.status}
+            currentUserId={user?.id}
+            onContractGenerated={() => loadDeal(deal.id)}
+          />
 
           {/* Payment Info */}
           {(deal.payment_link_url || paymentData) && (

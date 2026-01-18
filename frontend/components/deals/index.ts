@@ -15,3 +15,5 @@ export {
 
 export { SplitSlider } from './SplitSlider';
 export type { SplitParticipant } from './SplitSlider';
+
+export { ContractSection } from './ContractSection';

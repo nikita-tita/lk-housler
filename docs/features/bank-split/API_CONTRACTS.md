@@ -1,7 +1,7 @@
 # API Contracts: Bank Split
 
-**Версия:** 1.0
-**Дата:** 2026-01-17
+**Версия:** 1.1
+**Дата:** 2026-01-18
 **Base URL:** `/api/v1/bank-split`
 
 ---
@@ -13,8 +13,9 @@
 3. [Status Transitions](#status-transitions)
 4. [Invoice & Payment](#invoice--payment)
 5. [Webhooks](#webhooks)
-6. [Schemas](#schemas)
-7. [Error Codes](#error-codes)
+6. [Contract Endpoints](#contract-endpoints)
+7. [Schemas](#schemas)
+8. [Error Codes](#error-codes)
 
 ---
 
@@ -409,6 +410,111 @@ draft → awaiting_signatures → signed → invoiced → payment_pending → ho
   ]
 }
 ```
+
+---
+
+## Contract Endpoints
+
+### POST /{deal_id}/contracts/generate
+
+Генерация нового договора для сделки.
+
+**Query Parameters:**
+- `contract_type` (string, optional): Тип договора
+  - `bank_split_agent_agreement` (default) — Договор с агентом
+  - `bank_split_client_agreement` — Договор с клиентом
+  - `bank_split_agency_agreement` — Договор с агентством
+
+**Response: 201 Created**
+```json
+{
+  "id": "uuid",
+  "contract_number": "BSA-2026-000001",
+  "contract_type": "bank_split_agent_agreement",
+  "status": "pending_signature",
+  "generated_at": "2026-01-18T12:00:00Z",
+  "expires_at": "2026-01-25T12:00:00Z",
+  "required_signers": [
+    {"user_id": 1, "role": "agent", "signed_at": null},
+    {"user_id": 2, "role": "client", "signed_at": null}
+  ]
+}
+```
+
+---
+
+### GET /{deal_id}/contracts
+
+Список всех договоров для сделки.
+
+**Response: 200 OK**
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "contract_number": "BSA-2026-000001",
+      "contract_type": "bank_split_agent_agreement",
+      "status": "pending_signature",
+      "generated_at": "2026-01-18T12:00:00Z",
+      "signed_at": null,
+      "expires_at": "2026-01-25T12:00:00Z",
+      "required_signers": [
+        {"user_id": 1, "role": "agent", "signed_at": null}
+      ]
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+### GET /contracts/{contract_id}
+
+Получение детальной информации о договоре.
+
+**Response: 200 OK**
+```json
+{
+  "id": "uuid",
+  "contract_number": "BSA-2026-000001",
+  "contract_type": "bank_split_agent_agreement",
+  "status": "pending_signature",
+  "html_content": "<html>...</html>",
+  "document_hash": "sha256:abc123...",
+  "contract_data": {"agent_name": "...", "client_name": "..."},
+  "commission_amount": 450000.00,
+  "generated_at": "2026-01-18T12:00:00Z",
+  "signed_at": null,
+  "expires_at": "2026-01-25T12:00:00Z",
+  "required_signers": [...]
+}
+```
+
+---
+
+### POST /contracts/{contract_id}/sign
+
+Подписание договора текущим пользователем (ПЭП).
+
+**Response: 200 OK**
+```json
+{
+  "message": "Contract signed successfully",
+  "signed_at": "2026-01-18T14:30:00Z",
+  "contract_status": "fully_signed",
+  "all_signed": true
+}
+```
+
+**Possible Statuses:**
+- `draft` — Черновик
+- `pending_signature` — Ожидает подписи
+- `partially_signed` — Частично подписан
+- `fully_signed` — Полностью подписан
+- `cancelled` — Отменён
+- `expired` — Истёк срок подписания
 
 ---
 
