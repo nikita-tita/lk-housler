@@ -39,6 +39,15 @@ const TYPE_LABELS = {
   newbuild_booking: 'Бронирование новостройки',
 };
 
+const DISPUTE_REASON_LABELS: Record<string, string> = {
+  service_not_provided: 'Услуга не оказана',
+  service_quality: 'Качество услуги',
+  incorrect_amount: 'Неверная сумма',
+  duplicate_payment: 'Дублирующий платеж',
+  unauthorized_payment: 'Несанкционированный платеж',
+  other: 'Другое',
+};
+
 export default function BankSplitDealDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -611,7 +620,9 @@ export default function BankSplitDealDetailPage() {
                     <>
                       <div className="p-4 bg-gray-100 rounded-lg">
                         <p className="text-sm text-gray-600">Причина</p>
-                        <p className="text-gray-900 mt-1">{dispute.reason}</p>
+                        <p className="text-gray-900 mt-1">
+                          {DISPUTE_REASON_LABELS[dispute.reason] || dispute.reason}
+                        </p>
                         {dispute.description && (
                           <p className="text-sm text-gray-600 mt-2">{dispute.description}</p>
                         )}
@@ -901,8 +912,9 @@ export default function BankSplitDealDetailPage() {
                   <option value="">Выберите причину</option>
                   <option value="service_not_provided">Услуга не оказана</option>
                   <option value="service_quality">Качество услуги</option>
-                  <option value="wrong_amount">Неверная сумма</option>
-                  <option value="unauthorized_transaction">Несанкционированная транзакция</option>
+                  <option value="incorrect_amount">Неверная сумма</option>
+                  <option value="duplicate_payment">Дублирующий платеж</option>
+                  <option value="unauthorized_payment">Несанкционированный платеж</option>
                   <option value="other">Другое</option>
                 </select>
               </div>
