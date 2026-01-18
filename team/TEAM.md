@@ -2,36 +2,54 @@
 
 ## Проект: Личный кабинет клиента
 
-**Стек:** Python 3.11+ / FastAPI + Next.js 14
+**Стек:** Python 3.11+ / FastAPI + Next.js 16
 **Домен:** lk.housler.ru
 **Статус:** Production
+**Обновлено:** 2026-01-18
+
+---
+
+## Статус проекта
+
+| Компонент | Прогресс | Описание |
+|-----------|----------|----------|
+| **Backend** | 95% | 16 моделей, 13 endpoints, 13 миграций |
+| **Frontend** | 90% | 23 страницы, все основные flows |
+| **T-Bank Integration** | 100% | Instant Split production ready |
+| **ПЭП (Подпись)** | 100% | SMS OTP работает |
+| **SMS Уведомления** | 100% | SMS.RU интеграция |
+| **Email Уведомления** | 0% | В планах |
 
 ---
 
 ## Архитектура проекта
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    LK.HOUSLER.RU                            │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─────────────┐         ┌─────────────┐                   │
-│  │  Frontend   │         │  Backend    │                   │
-│  │  (Next.js)  │────────►│  (FastAPI)  │                   │
-│  │  Port 3000  │         │  Port 8000  │                   │
-│  └─────────────┘         └──────┬──────┘                   │
-│                                 │                           │
-│         ┌───────────────────────┼───────────────┐          │
-│         ▼                       ▼               ▼          │
-│  ┌─────────────┐         ┌─────────────┐  ┌─────────┐     │
-│  │agent-postgres│         │  lk-redis   │  │lk-minio │     │
-│  │ (SHARED DB) │         │   (OTP)     │  │  (S3)   │     │
-│  └─────────────┘         └─────────────┘  └─────────┘     │
-│                                 │                           │
-│  Auth: делегируется → agent.housler.ru                     │
-│  Payments: Т-Банк API (Instant Split) [95% READY]          │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                       LK.HOUSLER.RU                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────────────┐         ┌─────────────┐     ┌─────────────┐   │
+│  │  Frontend   │         │  Backend    │     │   Celery    │   │
+│  │  (Next.js)  │────────►│  (FastAPI)  │◄───►│  (Workers)  │   │
+│  │  Port 3000  │         │  Port 8000  │     │  (Async)    │   │
+│  └─────────────┘         └──────┬──────┘     └──────┬──────┘   │
+│        │                        │                    │          │
+│        │    ┌───────────────────┼───────────────────┤          │
+│        │    ▼                   ▼                   ▼          │
+│        │  ┌─────────────┐ ┌─────────────┐   ┌─────────┐       │
+│        │  │agent-postgres│ │  lk-redis   │   │lk-minio │       │
+│        │  │ (SHARED DB) │ │ (OTP+Queue) │   │  (S3)   │       │
+│        │  └─────────────┘ └─────────────┘   └─────────┘       │
+│        │                                                        │
+│        │  ┌─────────────────────────────────────────────────┐  │
+│        │  │              External Services                   │  │
+│        │  ├─────────────┬─────────────┬─────────────────────┤  │
+│        └─►│ agent.housler│ T-Bank API  │      SMS.RU         │  │
+│           │   (Auth)     │(Instant Split)│   (Notifications) │  │
+│           └─────────────┴─────────────┴─────────────────────┘  │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -95,17 +113,25 @@
 ```
 backend/
 ├── app/
-│   ├── api/v1/endpoints/    # API endpoints
-│   ├── services/            # Бизнес-логика
-│   │   ├── auth/            # OTP, интеграция с agent
-│   │   ├── sms/             # SMS.RU провайдер
-│   │   └── documents/       # Документооборот
-│   ├── models/              # SQLAlchemy models
-│   └── schemas/             # Pydantic schemas
-└── alembic/                 # Миграции
+│   ├── api/v1/endpoints/    # 13 endpoint файлов
+│   │   ├── bank_split.py    # 14+ bank-split endpoints
+│   │   ├── disputes.py      # Споры и возвраты
+│   │   ├── invitations.py   # Приглашения партнёров
+│   │   ├── admin.py         # Admin panel
+│   │   └── sign.py          # ПЭП подписание
+│   ├── models/              # 16 моделей
+│   │   ├── bank_split.py    # Split recipients, rules
+│   │   ├── dispute.py       # Disputes, evidence
+│   │   ├── invitation.py    # Deal invitations
+│   │   ├── consent.py       # Deal consents
+│   │   └── contract.py      # Templates, signed
+│   ├── integrations/
+│   │   └── tbank/           # T-Bank Instant Split
+│   └── services/            # Бизнес-логика
+└── alembic/                 # 13 миграций
 ```
 
-**Текущий фокус:** Документооборот, электронная подпись, интеграция с agent
+**Текущий фокус:** Frontend интеграция для споров, приглашений, admin panel
 
 **Промпт:** `prompts/BE_LK.md`
 
@@ -154,18 +180,23 @@ backend/
 **Ключевые директории:**
 ```
 frontend/
-├── src/
-│   ├── app/                 # Pages (App Router)
-│   │   ├── (auth)/          # Login pages
-│   │   ├── (dashboard)/     # Protected area
-│   │   │   ├── documents/   # Документы
-│   │   │   ├── deals/       # Сделки
-│   │   │   └── profile/     # Профиль
-│   ├── components/          # UI компоненты
-│   └── services/            # API клиенты
+├── app/                       # 23 страницы
+│   ├── (auth)/                # Login: realtor, client, agency
+│   ├── agent/                 # Агент
+│   │   ├── dashboard/         # Dashboard с аналитикой
+│   │   ├── deals/             # Список + детали сделок
+│   │   │   └── bank-split/    # Bank-split сделки
+│   │   └── profile/           # Профиль
+│   ├── agency/                # Агентство (5 страниц)
+│   ├── client/                # Клиент (3 страницы)
+│   ├── sign/[token]/          # ПЭП подписание
+│   ├── pay/[dealId]/          # Оплата (QR + URL)
+│   └── invite/[token]/        # Приглашение партнёра
+├── components/ui/             # UI компоненты
+└── lib/api/                   # API клиенты
 ```
 
-**Текущий фокус:** Dashboard, просмотр документов, UI подписания
+**Текущий фокус:** UI для споров, подтверждения услуги, admin panel
 
 **Промпт:** `prompts/FE_LK.md`
 
