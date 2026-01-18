@@ -334,6 +334,97 @@ export async function getServiceCompletionStatus(
   }
 }
 
+// Split adjustment types
+export type AdjustmentStatus = 'pending' | 'approved' | 'rejected' | 'expired';
+
+export interface SplitAdjustmentApproval {
+  user_id: number;
+  approved_at?: string;
+  rejected_at?: string;
+  reason?: string;
+}
+
+export interface SplitAdjustment {
+  id: string;
+  deal_id: string;
+  requested_by_user_id: number;
+  old_split: Record<string, number>;
+  new_split: Record<string, number>;
+  reason: string;
+  status: AdjustmentStatus;
+  required_approvers: number[];
+  approvals: SplitAdjustmentApproval[];
+  rejections: SplitAdjustmentApproval[];
+  expires_at?: string;
+  created_at: string;
+}
+
+export interface SplitAdjustmentCreateRequest {
+  new_split: Record<number, number>; // user_id -> percent
+  reason: string;
+}
+
+export interface SplitAdjustmentCreateResponse {
+  id: string;
+  deal_id: string;
+  status: string;
+  required_approvers: number[];
+  expires_at: string;
+}
+
+export interface SplitAdjustmentsListResponse {
+  items: SplitAdjustment[];
+  total: number;
+}
+
+// Split adjustment API functions
+
+export async function requestSplitAdjustment(
+  dealId: string,
+  request: SplitAdjustmentCreateRequest
+): Promise<SplitAdjustmentCreateResponse> {
+  const { data } = await apiClient.post<SplitAdjustmentCreateResponse>(
+    `/bank-split/${dealId}/adjust-split`,
+    request
+  );
+  return data;
+}
+
+export async function getSplitAdjustments(
+  dealId: string
+): Promise<SplitAdjustmentsListResponse> {
+  const { data } = await apiClient.get<SplitAdjustmentsListResponse>(
+    `/bank-split/${dealId}/adjustments`
+  );
+  return data;
+}
+
+export async function approveSplitAdjustment(
+  adjustmentId: string
+): Promise<{ adjustment_id: string; status: string; all_approved: boolean }> {
+  const { data } = await apiClient.post<{
+    adjustment_id: string;
+    status: string;
+    all_approved: boolean;
+    approvals_count: number;
+    required_count: number;
+  }>(`/bank-split/adjustments/${adjustmentId}/approve`);
+  return data;
+}
+
+export async function rejectSplitAdjustment(
+  adjustmentId: string,
+  reason: string
+): Promise<{ adjustment_id: string; status: string }> {
+  const { data } = await apiClient.post<{
+    adjustment_id: string;
+    status: string;
+    rejected_by: number;
+    reason: string;
+  }>(`/bank-split/adjustments/${adjustmentId}/reject`, { reason });
+  return data;
+}
+
 // Status labels for UI
 export const BANK_SPLIT_STATUS_LABELS: Record<BankSplitStatus, string> = {
   draft: 'Черновик',
@@ -373,4 +464,20 @@ export const RECIPIENT_ROLE_LABELS: Record<RecipientRole, string> = {
   agent: 'Агент',
   coagent: 'Со-агент',
   agency: 'Агентство',
+};
+
+// Adjustment status labels
+export const ADJUSTMENT_STATUS_LABELS: Record<AdjustmentStatus, string> = {
+  pending: 'Ожидает согласования',
+  approved: 'Одобрено',
+  rejected: 'Отклонено',
+  expired: 'Истекло',
+};
+
+// Adjustment status styles
+export const ADJUSTMENT_STATUS_STYLES: Record<AdjustmentStatus, string> = {
+  pending: 'bg-gray-200 text-gray-900',
+  approved: 'bg-gray-800 text-white',
+  rejected: 'bg-gray-300 text-gray-700',
+  expired: 'bg-gray-100 text-gray-500',
 };

@@ -25,11 +25,17 @@ import {
   getDispute,
   confirmServiceCompletion,
   getServiceCompletionStatus,
+  getSplitAdjustments,
+  requestSplitAdjustment,
+  approveSplitAdjustment,
+  rejectSplitAdjustment,
   BankSplitDeal,
   TimelineEvent,
   DisputeResponse,
   ServiceCompletionStatus,
+  SplitAdjustment,
   BANK_SPLIT_STATUS_LABELS,
+  ADJUSTMENT_STATUS_LABELS,
 } from '@/lib/api/bank-split';
 import { formatPrice, formatDate, formatDateTime } from '@/lib/utils/format';
 
@@ -74,6 +80,14 @@ export default function BankSplitDealDetailPage() {
   const [disputeDescription, setDisputeDescription] = useState('');
   const [completionStatus, setCompletionStatus] = useState<ServiceCompletionStatus | null>(null);
 
+  // Split adjustment state
+  const [adjustments, setAdjustments] = useState<SplitAdjustment[]>([]);
+  const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+  const [adjustmentReason, setAdjustmentReason] = useState('');
+  const [newSplitPercents, setNewSplitPercents] = useState<Record<number, number>>({});
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectingAdjustmentId, setRejectingAdjustmentId] = useState<string | null>(null);
+
   const loadDeal = useCallback(async (id: string) => {
     try {
       const data = await getBankSplitDeal(id);
@@ -112,14 +126,24 @@ export default function BankSplitDealDetailPage() {
     }
   }, []);
 
+  const loadAdjustments = useCallback(async (id: string) => {
+    try {
+      const result = await getSplitAdjustments(id);
+      setAdjustments(result.items);
+    } catch (error) {
+      console.error('Failed to load adjustments:', error);
+    }
+  }, []);
+
   useEffect(() => {
     if (params.id) {
       loadDeal(params.id as string);
       loadTimeline(params.id as string);
       loadDispute(params.id as string);
       loadCompletionStatus(params.id as string);
+      loadAdjustments(params.id as string);
     }
-  }, [params.id, loadDeal, loadTimeline, loadDispute, loadCompletionStatus]);
+  }, [params.id, loadDeal, loadTimeline, loadDispute, loadCompletionStatus, loadAdjustments]);
 
   const handleAction = async (
     actionFn: () => Promise<unknown>,
@@ -137,6 +161,7 @@ export default function BankSplitDealDetailPage() {
       await loadTimeline(deal.id);
       await loadDispute(deal.id);
       await loadCompletionStatus(deal.id);
+      await loadAdjustments(deal.id);
       if (message) {
         setSuccessMessage(message);
         setTimeout(() => setSuccessMessage(''), 5000);
@@ -286,6 +311,115 @@ export default function BankSplitDealDetailPage() {
     await handleAction(() => cancelBankSplitDeal(deal.id, reason));
   };
 
+  // Split adjustment handlers
+  const handleOpenAdjustmentModal = () => {
+    if (!deal) return;
+    // Initialize with current split from recipients
+    const currentSplit: Record<number, number> = {};
+    deal.recipients.forEach((r) => {
+      if (r.user_id) {
+        currentSplit[r.user_id] = r.split_value;
+      }
+    });
+    setNewSplitPercents(currentSplit);
+    setAdjustmentReason('');
+    setShowAdjustmentModal(true);
+  };
+
+  const handleRequestAdjustment = async () => {
+    if (!deal || !adjustmentReason.trim()) return;
+
+    // Validate that split sums to 100
+    const total = Object.values(newSplitPercents).reduce((sum, v) => sum + v, 0);
+    if (total !== 100) {
+      setActionError(`Сумма долей должна равняться 100%, текущая: ${total}%`);
+      return;
+    }
+
+    setActionLoading(true);
+    setActionError('');
+
+    try {
+      await requestSplitAdjustment(deal.id, {
+        new_split: newSplitPercents,
+        reason: adjustmentReason,
+      });
+      setShowAdjustmentModal(false);
+      setAdjustmentReason('');
+      setNewSplitPercents({});
+      await loadDeal(deal.id);
+      await loadTimeline(deal.id);
+      await loadAdjustments(deal.id);
+      setSuccessMessage('Запрос на корректировку отправлен');
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (error: unknown) {
+      console.error('Failed to request adjustment:', error);
+      const axiosError = error as { response?: { data?: { detail?: string } } };
+      setActionError(
+        axiosError.response?.data?.detail || 'Ошибка запроса корректировки'
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleApproveAdjustment = async (adjustmentId: string) => {
+    setActionLoading(true);
+    setActionError('');
+
+    try {
+      const result = await approveSplitAdjustment(adjustmentId);
+      if (deal) {
+        await loadDeal(deal.id);
+        await loadTimeline(deal.id);
+        await loadAdjustments(deal.id);
+      }
+      setSuccessMessage(
+        result.all_approved ? 'Корректировка применена' : 'Ваше согласие записано'
+      );
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (error: unknown) {
+      console.error('Failed to approve adjustment:', error);
+      const axiosError = error as { response?: { data?: { detail?: string } } };
+      setActionError(
+        axiosError.response?.data?.detail || 'Ошибка одобрения'
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectAdjustment = async (adjustmentId: string) => {
+    if (!rejectReason.trim()) {
+      setActionError('Укажите причину отклонения');
+      return;
+    }
+
+    setActionLoading(true);
+    setActionError('');
+
+    try {
+      await rejectSplitAdjustment(adjustmentId, rejectReason);
+      setRejectingAdjustmentId(null);
+      setRejectReason('');
+      if (deal) {
+        await loadDeal(deal.id);
+        await loadTimeline(deal.id);
+        await loadAdjustments(deal.id);
+      }
+      setSuccessMessage('Корректировка отклонена');
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (error: unknown) {
+      console.error('Failed to reject adjustment:', error);
+      const axiosError = error as { response?: { data?: { detail?: string } } };
+      setActionError(
+        axiosError.response?.data?.detail || 'Ошибка отклонения'
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleSendPaymentSMS = async () => {
     if (!deal) return;
 
@@ -344,6 +478,13 @@ export default function BankSplitDealDetailPage() {
   const isRefunded = deal.status === 'refunded';
   const isPayoutReady = deal.status === 'payout_ready';
   const isPayoutInProgress = deal.status === 'payout_in_progress';
+
+  // Split adjustment flags
+  const canRequestAdjustment =
+    ['draft', 'awaiting_signatures', 'signed'].includes(deal.status) &&
+    deal.recipients.length > 1 &&
+    !adjustments.some((a) => a.status === 'pending');
+  const pendingAdjustment = adjustments.find((a) => a.status === 'pending');
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -727,8 +868,112 @@ export default function BankSplitDealDetailPage() {
                 recipients={deal.recipients}
                 totalCommission={deal.commission_total}
               />
+              {canRequestAdjustment && (
+                <Button
+                  variant="secondary"
+                  onClick={handleOpenAdjustmentModal}
+                  fullWidth
+                  className="mt-4"
+                >
+                  Изменить пропорции
+                </Button>
+              )}
             </CardContent>
           </Card>
+
+          {/* Pending Adjustment */}
+          {pendingAdjustment && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Запрос на изменение пропорций</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="p-3 bg-gray-100 rounded-lg">
+                    <p className="text-sm text-gray-600">Причина:</p>
+                    <p className="text-gray-900">{pendingAdjustment.reason}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600 mb-2">Было:</p>
+                      {Object.entries(pendingAdjustment.old_split).map(([userId, percent]) => (
+                        <p key={userId} className="text-sm text-gray-900">
+                          ID {userId}: {percent}%
+                        </p>
+                      ))}
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600 mb-2">Станет:</p>
+                      {Object.entries(pendingAdjustment.new_split).map(([userId, percent]) => (
+                        <p key={userId} className="text-sm text-gray-900">
+                          ID {userId}: {percent}%
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="text-sm text-gray-600">
+                    Ожидает согласия: {pendingAdjustment.required_approvers.length - pendingAdjustment.approvals.length} из {pendingAdjustment.required_approvers.length}
+                  </div>
+
+                  {pendingAdjustment.expires_at && (
+                    <div className="text-sm text-gray-500">
+                      Истекает: {formatDateTime(pendingAdjustment.expires_at)}
+                    </div>
+                  )}
+
+                  {rejectingAdjustmentId === pendingAdjustment.id ? (
+                    <div className="space-y-3">
+                      <textarea
+                        value={rejectReason}
+                        onChange={(e) => setRejectReason(e.target.value)}
+                        placeholder="Укажите причину отклонения..."
+                        rows={2}
+                        className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            setRejectingAdjustmentId(null);
+                            setRejectReason('');
+                          }}
+                          fullWidth
+                        >
+                          Отмена
+                        </Button>
+                        <Button
+                          onClick={() => handleRejectAdjustment(pendingAdjustment.id)}
+                          loading={actionLoading}
+                          fullWidth
+                        >
+                          Отклонить
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={() => setRejectingAdjustmentId(pendingAdjustment.id)}
+                        fullWidth
+                      >
+                        Отклонить
+                      </Button>
+                      <Button
+                        onClick={() => handleApproveAdjustment(pendingAdjustment.id)}
+                        loading={actionLoading}
+                        fullWidth
+                      >
+                        Согласиться
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Actions */}
           <Card>
@@ -950,6 +1195,98 @@ export default function BankSplitDealDetailPage() {
                 fullWidth
               >
                 Открыть спор
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Split Adjustment Modal */}
+      {showAdjustmentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Изменить пропорции
+            </h3>
+            <div className="space-y-4">
+              {/* Current recipients with editable percentages */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Новые пропорции
+                </label>
+                <div className="space-y-3">
+                  {deal.recipients
+                    .filter((r) => r.user_id)
+                    .map((recipient) => (
+                      <div key={recipient.id} className="flex items-center gap-3">
+                        <span className="text-sm text-gray-600 flex-1">
+                          {recipient.role === 'agent' ? 'Агент' : 'Со-агент'} (ID: {recipient.user_id})
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={newSplitPercents[recipient.user_id!] ?? recipient.split_value}
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value) || 0;
+                              setNewSplitPercents((prev) => ({
+                                ...prev,
+                                [recipient.user_id!]: Math.min(100, Math.max(0, value)),
+                              }));
+                            }}
+                            className="w-20 p-2 border border-gray-300 rounded-lg text-right"
+                          />
+                          <span className="text-gray-500">%</span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Сумма: {Object.values(newSplitPercents).reduce((sum, v) => sum + v, 0)}% (должно быть 100%)
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Причина изменения
+                </label>
+                <textarea
+                  value={adjustmentReason}
+                  onChange={(e) => setAdjustmentReason(e.target.value)}
+                  placeholder="Укажите причину изменения пропорций (минимум 10 символов)..."
+                  rows={3}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black resize-none"
+                />
+              </div>
+
+              <p className="text-xs text-gray-500">
+                После отправки запроса все другие участники сделки должны будут согласиться с изменением.
+              </p>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowAdjustmentModal(false);
+                  setAdjustmentReason('');
+                  setNewSplitPercents({});
+                }}
+                fullWidth
+              >
+                Отмена
+              </Button>
+              <Button
+                onClick={handleRequestAdjustment}
+                loading={actionLoading}
+                disabled={
+                  !adjustmentReason.trim() ||
+                  adjustmentReason.length < 10 ||
+                  Object.values(newSplitPercents).reduce((sum, v) => sum + v, 0) !== 100
+                }
+                fullWidth
+              >
+                Отправить запрос
               </Button>
             </div>
           </div>
