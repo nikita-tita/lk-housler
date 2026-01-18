@@ -108,20 +108,97 @@ def process_payment_webhook(self, event_id: str, payload: dict):
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
-def notify_deal_status_change(self, deal_id: str, old_status: str, new_status: str):
+def notify_deal_status_change_task(
+    self,
+    deal_id: str,
+    old_status: str,
+    new_status: str,
+    phone: str = None,
+    email: str = None,
+    address: str = "",
+    **kwargs,
+):
     """
-    Send notifications when deal status changes.
+    Send notifications when deal status changes via SMS and Email.
 
     Args:
         deal_id: UUID of the deal
         old_status: Previous deal status
         new_status: New deal status
+        phone: Phone number for SMS notifications (optional)
+        email: Email address for email notifications (optional)
+        address: Property address
+        **kwargs: Additional data (client_name, agent_name, amount, etc.)
     """
+    import asyncio
+    from app.services.notification.service import notify_deal_status_change
+
     logger.info(f"Deal {deal_id} status changed: {old_status} -> {new_status}")
 
-    # TODO: Implement notification logic
-    # from app.services.notifications import NotificationService
-    # service = NotificationService()
-    # service.notify_deal_status_change(deal_id, old_status, new_status)
+    async def _notify():
+        return await notify_deal_status_change(
+            deal_id=deal_id,
+            old_status=old_status,
+            new_status=new_status,
+            phone=phone,
+            email=email,
+            address=address,
+            **kwargs,
+        )
 
-    return {"status": "ok", "deal_id": deal_id, "transition": f"{old_status}->{new_status}"}
+    try:
+        result = asyncio.get_event_loop().run_until_complete(_notify())
+        logger.info(f"Notification result for deal {deal_id}: SMS={result.get('sms')}, Email={result.get('email')}")
+        return {
+            "status": "ok",
+            "deal_id": deal_id,
+            "transition": f"{old_status}->{new_status}",
+            "sms_sent": result.get("sms", False),
+            "email_sent": result.get("email", False),
+        }
+    except Exception as e:
+        logger.error(f"Notification failed for deal {deal_id}: {e}")
+        self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def send_invitation_notification_task(
+    self,
+    phone: str = None,
+    email: str = None,
+    partner_name: str = "Партнёр",
+    inviter_name: str = "Агент",
+    address: str = "",
+    split_percent: float = 0,
+    invite_url: str = "",
+):
+    """
+    Send invitation notification to partner via SMS and Email.
+    """
+    import asyncio
+    from app.services.notification.service import notify_invitation
+
+    logger.info(f"Sending invitation to {phone or email} for deal at {address}")
+
+    async def _notify():
+        return await notify_invitation(
+            phone=phone,
+            email=email,
+            partner_name=partner_name,
+            inviter_name=inviter_name,
+            address=address,
+            split_percent=split_percent,
+            invite_url=invite_url,
+        )
+
+    try:
+        result = asyncio.get_event_loop().run_until_complete(_notify())
+        logger.info(f"Invitation notification result: SMS={result.get('sms')}, Email={result.get('email')}")
+        return {
+            "status": "ok",
+            "sms_sent": result.get("sms", False),
+            "email_sent": result.get("email", False),
+        }
+    except Exception as e:
+        logger.error(f"Invitation notification failed: {e}")
+        self.retry(exc=e)
