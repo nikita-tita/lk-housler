@@ -23,9 +23,12 @@ import {
   regeneratePaymentLink,
   createDispute,
   getDispute,
+  confirmServiceCompletion,
+  getServiceCompletionStatus,
   BankSplitDeal,
   TimelineEvent,
   DisputeResponse,
+  ServiceCompletionStatus,
   BANK_SPLIT_STATUS_LABELS,
 } from '@/lib/api/bank-split';
 import { formatPrice, formatDate, formatDateTime } from '@/lib/utils/format';
@@ -60,6 +63,7 @@ export default function BankSplitDealDetailPage() {
   const [showDisputeModal, setShowDisputeModal] = useState(false);
   const [disputeReason, setDisputeReason] = useState('');
   const [disputeDescription, setDisputeDescription] = useState('');
+  const [completionStatus, setCompletionStatus] = useState<ServiceCompletionStatus | null>(null);
 
   const loadDeal = useCallback(async (id: string) => {
     try {
@@ -90,13 +94,23 @@ export default function BankSplitDealDetailPage() {
     }
   }, []);
 
+  const loadCompletionStatus = useCallback(async (id: string) => {
+    try {
+      const status = await getServiceCompletionStatus(id);
+      setCompletionStatus(status);
+    } catch (error) {
+      console.error('Failed to load completion status:', error);
+    }
+  }, []);
+
   useEffect(() => {
     if (params.id) {
       loadDeal(params.id as string);
       loadTimeline(params.id as string);
       loadDispute(params.id as string);
+      loadCompletionStatus(params.id as string);
     }
-  }, [params.id, loadDeal, loadTimeline, loadDispute]);
+  }, [params.id, loadDeal, loadTimeline, loadDispute, loadCompletionStatus]);
 
   const handleAction = async (
     actionFn: () => Promise<unknown>,
@@ -113,6 +127,7 @@ export default function BankSplitDealDetailPage() {
       await loadDeal(deal.id);
       await loadTimeline(deal.id);
       await loadDispute(deal.id);
+      await loadCompletionStatus(deal.id);
       if (message) {
         setSuccessMessage(message);
         setTimeout(() => setSuccessMessage(''), 5000);
@@ -229,6 +244,30 @@ export default function BankSplitDealDetailPage() {
     }
   };
 
+  const handleConfirmCompletion = async () => {
+    if (!deal) return;
+
+    setActionLoading(true);
+    setActionError('');
+
+    try {
+      await confirmServiceCompletion(deal.id);
+      await loadDeal(deal.id);
+      await loadTimeline(deal.id);
+      await loadCompletionStatus(deal.id);
+      setSuccessMessage('Выполнение услуги подтверждено');
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (error: unknown) {
+      console.error('Failed to confirm completion:', error);
+      const axiosError = error as { response?: { data?: { detail?: string } } };
+      setActionError(
+        axiosError.response?.data?.detail || 'Ошибка подтверждения'
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleCancel = async () => {
     if (!deal) return;
 
@@ -290,6 +329,8 @@ export default function BankSplitDealDetailPage() {
   const canRelease = deal.status === 'hold_period';
   const canRetryPayment = deal.status === 'payment_failed' || (deal.status === 'invoiced' && !deal.payment_link_url);
   const canOpenDispute = deal.status === 'hold_period' && !dispute;
+  const canConfirmCompletion = deal.status === 'hold_period' && (!completionStatus || !completionStatus.confirmed);
+  const hasConfirmedCompletion = completionStatus?.confirmed ?? false;
   const isInDispute = deal.status === 'dispute';
   const isRefunded = deal.status === 'refunded';
   const isPayoutReady = deal.status === 'payout_ready';
@@ -733,6 +774,23 @@ export default function BankSplitDealDetailPage() {
                   >
                     Новая ссылка оплаты
                   </Button>
+                )}
+
+                {canConfirmCompletion && (
+                  <Button
+                    variant="secondary"
+                    onClick={handleConfirmCompletion}
+                    loading={actionLoading}
+                    fullWidth
+                  >
+                    Подтвердить выполнение
+                  </Button>
+                )}
+
+                {hasConfirmedCompletion && deal.status === 'hold_period' && (
+                  <div className="text-center p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600">Вы подтвердили выполнение услуги</p>
+                  </div>
                 )}
 
                 {canOpenDispute && (

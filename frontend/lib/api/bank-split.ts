@@ -287,6 +287,53 @@ export async function getDispute(dealId: string): Promise<DisputeResponse | null
   }
 }
 
+// Service completion types
+export interface ServiceCompletionRequest {
+  notes?: string;
+}
+
+export interface ServiceCompletionResponse {
+  deal_id: string;
+  confirmed_by_user_id: number;
+  confirmed_at: string;
+  notes?: string;
+}
+
+export interface ServiceCompletionStatus {
+  confirmed: boolean;
+  confirmed_at?: string;
+  confirmed_by_user_id?: number;
+  all_confirmed: boolean;
+  confirmations: Array<{
+    user_id: number;
+    confirmed_at: string;
+  }>;
+}
+
+export async function confirmServiceCompletion(
+  dealId: string,
+  notes?: string
+): Promise<ServiceCompletionResponse> {
+  const { data } = await apiClient.post<ServiceCompletionResponse>(
+    `/bank-split/${dealId}/confirm-completion`,
+    notes ? { notes } : undefined
+  );
+  return data;
+}
+
+export async function getServiceCompletionStatus(
+  dealId: string
+): Promise<ServiceCompletionStatus | null> {
+  try {
+    const { data } = await apiClient.get<ServiceCompletionStatus>(
+      `/bank-split/${dealId}/completion-status`
+    );
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 // Status labels for UI
 export const BANK_SPLIT_STATUS_LABELS: Record<BankSplitStatus, string> = {
   draft: 'Черновик',
