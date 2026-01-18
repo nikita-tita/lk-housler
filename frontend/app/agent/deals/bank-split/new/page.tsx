@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { SplitSlider, SplitParticipant } from '@/components/deals';
 import {
   createBankSplitDeal,
   BankSplitDealCreate,
@@ -311,6 +312,53 @@ export default function CreateBankSplitDealPage() {
   ) => {
     const clamped = Math.max(0, Math.min(100, value));
     setFormData({ ...formData, [field]: clamped });
+  };
+
+  // Handler for SplitSlider component
+  const handleSplitSliderChange = (participants: SplitParticipant[]) => {
+    const agent = participants.find((p) => p.role === 'agent');
+    const coagent = participants.find((p) => p.role === 'coagent');
+    const agency = participants.find((p) => p.role === 'agency');
+
+    setFormData((prev) => ({
+      ...prev,
+      agent_split_percent: agent?.percent ?? 100,
+      coagent_split_percent: coagent?.percent ?? 0,
+      agency_split_percent: agency?.percent ?? 0,
+    }));
+  };
+
+  // Build participants array for SplitSlider
+  const buildSplitParticipants = (): SplitParticipant[] => {
+    const participants: SplitParticipant[] = [
+      {
+        id: 'agent',
+        name: 'Вы',
+        role: 'agent',
+        percent: formData.agent_split_percent,
+      },
+    ];
+
+    // Always show coagent slider when split is enabled
+    if (hasSplit) {
+      participants.push({
+        id: 'coagent',
+        name: 'Со-агент',
+        role: 'coagent',
+        percent: formData.coagent_split_percent,
+      });
+    }
+
+    if (formData.agency_split_percent > 0 || hasSplit) {
+      participants.push({
+        id: 'agency',
+        name: 'Агентство',
+        role: 'agency',
+        percent: formData.agency_split_percent,
+      });
+    }
+
+    return participants;
   };
 
   return (
@@ -677,109 +725,40 @@ export default function CreateBankSplitDealPage() {
                   )}
                 </div>
               ) : (
-                <>
-                  <div className="space-y-4">
-                    <Input
-                      label="Доля агента (%)"
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={formData.agent_split_percent}
-                      onChange={(e) =>
-                        updateSplit('agent_split_percent', Number(e.target.value))
-                      }
-                      helperText={
-                        formData.commission_total > 0
-                          ? `${Math.round(formData.commission_total * (formData.agent_split_percent / 100)).toLocaleString('ru-RU')} руб.`
-                          : undefined
-                      }
-                    />
+                <div className="space-y-6">
+                  {/* Split Slider */}
+                  <SplitSlider
+                    totalAmount={formData.commission_total}
+                    platformFeePercent={PLATFORM_FEE_PERCENT}
+                    participants={buildSplitParticipants()}
+                    onChange={handleSplitSliderChange}
+                    minPercent={0}
+                    showAmounts={formData.commission_total > 0}
+                  />
 
-                    <div className="space-y-2">
+                  {/* Co-agent phone input */}
+                  {formData.coagent_split_percent > 0 && (
+                    <div className="p-4 bg-gray-50 rounded-lg space-y-3">
                       <Input
-                        label="Доля со-агента (%)"
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={formData.coagent_split_percent}
-                        onChange={(e) =>
-                          updateSplit(
-                            'coagent_split_percent',
-                            Number(e.target.value)
-                          )
-                        }
-                        helperText={
-                          formData.commission_total > 0
-                            ? `${Math.round(formData.commission_total * (formData.coagent_split_percent / 100)).toLocaleString('ru-RU')} руб.`
+                        label="Телефон со-агента"
+                        type="tel"
+                        placeholder="+7 (999) 123-45-67"
+                        value={formatCoagentPhone(formData.coagent_phone)}
+                        onChange={handleCoagentPhoneChange}
+                        helperText="На этот номер будет отправлено приглашение"
+                        error={
+                          formData.coagent_phone.length > 0 &&
+                          !isValidCoagentPhone(formData.coagent_phone)
+                            ? 'Введите корректный номер телефона'
                             : undefined
                         }
                       />
-                      {formData.coagent_split_percent > 0 && (
-                        <div className="space-y-2">
-                          <Input
-                            label="Телефон со-агента"
-                            type="tel"
-                            placeholder="+7 (999) 123-45-67"
-                            value={formatCoagentPhone(formData.coagent_phone)}
-                            onChange={handleCoagentPhoneChange}
-                            helperText="На этот номер будет отправлено приглашение"
-                            error={
-                              formData.coagent_phone.length > 0 &&
-                              !isValidCoagentPhone(formData.coagent_phone)
-                                ? 'Введите корректный номер телефона'
-                                : undefined
-                            }
-                          />
-                          <p className="text-xs text-gray-500">
-                            После создания сделки со-агент получит SMS с приглашением
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    <Input
-                      label="Доля агентства (%)"
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={formData.agency_split_percent}
-                      onChange={(e) =>
-                        updateSplit('agency_split_percent', Number(e.target.value))
-                      }
-                      helperText={
-                        formData.commission_total > 0
-                          ? `${Math.round(formData.commission_total * (formData.agency_split_percent / 100)).toLocaleString('ru-RU')} руб.`
-                          : undefined
-                      }
-                    />
-                  </div>
-
-                  <div
-                    className={`p-4 rounded-lg ${
-                      totalSplitPercent === 100 ? 'bg-gray-50' : 'bg-gray-100 border border-gray-300'
-                    }`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">
-                        Общий процент:
-                      </span>
-                      <span
-                        className={`text-sm font-semibold ${
-                          totalSplitPercent === 100
-                            ? 'text-gray-900'
-                            : 'text-gray-900'
-                        }`}
-                      >
-                        {totalSplitPercent}%
-                      </span>
-                    </div>
-                    {totalSplitPercent !== 100 && (
-                      <p className="text-xs text-gray-600 mt-1">
-                        Сумма долей должна быть равна 100%
+                      <p className="text-xs text-gray-500">
+                        После создания сделки со-агент получит SMS с приглашением
                       </p>
-                    )}
-                  </div>
-                </>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}

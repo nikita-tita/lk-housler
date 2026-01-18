@@ -12,3 +12,6 @@ export {
   DealTimeline,
   DealTimelineCompact,
 } from './DealTimeline';
+
+export { SplitSlider } from './SplitSlider';
+export type { SplitParticipant } from './SplitSlider';
