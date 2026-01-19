@@ -170,7 +170,15 @@ async def create_deal(
             updated_at=deal.updated_at,
         )
     except ValueError as e:
+        await db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        await db.rollback()
+        logger.exception(f"Failed to create deal: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка при создании сделки. Попробуйте позже."
+        )
 
 
 @router.get("/{deal_id}", response_model=DealSimpleResponse)

@@ -135,8 +135,24 @@ export function SplitSlider({
               />
             </div>
 
-            <div className="w-20 text-right">
-              <div className="text-sm font-medium">{p.percent}%</div>
+            <div className="w-24 flex flex-col items-end gap-1">
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  value={p.percent}
+                  onChange={(e) => {
+                    const value = Math.max(minPercent, Math.min(100, Number(e.target.value) || 0));
+                    handlePercentChange(p.id, value);
+                  }}
+                  disabled={p.locked}
+                  min={minPercent}
+                  max={100}
+                  className={`w-14 px-2 py-1 text-sm text-right border rounded ${
+                    p.locked ? 'bg-gray-100 cursor-not-allowed border-gray-200' : 'border-gray-300 focus:border-black focus:outline-none'
+                  }`}
+                />
+                <span className="text-sm text-gray-600">%</span>
+              </div>
               {showAmounts && (
                 <div className="text-xs text-gray-500">
                   {((totalAmount * p.percent) / 100).toLocaleString('ru-RU')} RUB

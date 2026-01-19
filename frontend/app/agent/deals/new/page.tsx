@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { CurrencyInput } from '@/components/ui/CurrencyInput';
 import { Select } from '@/components/ui/Select';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { SplitSlider, SplitParticipant } from '@/components/deals';
 import {
   createDeal,
   calculateCommission,
@@ -22,6 +24,7 @@ import {
   PAYMENT_TYPE_LABELS,
   ADVANCE_TYPE_LABELS,
 } from '@/lib/api/deals';
+import { createInvitation } from '@/lib/api/invitations';
 
 // Опции для типов сделок (основные)
 const DEAL_TYPE_OPTIONS = [
@@ -89,6 +92,11 @@ interface FormData {
   // Шаг 5 (клиент)
   client_name: string;
   client_phone: string;
+  // Разделение комиссии
+  agent_split_percent: number;
+  coagent_split_percent: number;
+  coagent_phone: string;
+  agency_split_percent: number;
 }
 
 const STEPS = [
@@ -99,12 +107,16 @@ const STEPS = [
   { number: 5, title: 'Клиент' },
 ];
 
+// Комиссия платформы Housler (4%)
+const PLATFORM_FEE_PERCENT = 4;
+
 export default function CreateDealPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [calculation, setCalculation] = useState<CommissionCalculateResponse | null>(null);
+  const [hasSplit, setHasSplit] = useState(false);
 
   const [formData, setFormData] = useState<FormData>({
     deal_type: 'sale_buy',
@@ -127,6 +139,10 @@ export default function CreateDealPage() {
     price: 0,
     client_name: '',
     client_phone: '',
+    agent_split_percent: 100,
+    coagent_split_percent: 0,
+    coagent_phone: '',
+    agency_split_percent: 0,
   });
 
   const updateAddress = (field: keyof AddressInput, value: string) => {
@@ -175,6 +191,17 @@ export default function CreateDealPage() {
     }
     if (formData.advance_type === 'advance_fixed' && formData.advance_amount <= 0) return false;
     if (formData.advance_type === 'advance_percent' && (formData.advance_percent <= 0 || formData.advance_percent > 100)) return false;
+
+    // Validate split if enabled
+    if (hasSplit) {
+      const totalSplit = formData.agent_split_percent + formData.coagent_split_percent + formData.agency_split_percent;
+      if (totalSplit !== 100) return false;
+      // If coagent has a share, phone is required
+      if (formData.coagent_split_percent > 0) {
+        if (!isValidCoagentPhone(formData.coagent_phone)) return false;
+      }
+    }
+
     return true;
   };
 
@@ -258,9 +285,31 @@ export default function CreateDealPage() {
         exclusive_until: formData.is_exclusive && formData.exclusive_until ? formData.exclusive_until : undefined,
         client_name: formData.client_name,
         client_phone: formData.client_phone,
+        // Add split data if enabled
+        ...(hasSplit && {
+          agent_split_percent: formData.agent_split_percent,
+          coagent_split_percent: formData.coagent_split_percent > 0 ? formData.coagent_split_percent : undefined,
+          agency_split_percent: formData.agency_split_percent > 0 ? formData.agency_split_percent : undefined,
+        }),
       };
 
       const deal = await createDeal(dealData);
+
+      // Send invitation to co-agent if phone provided
+      if (hasSplit && formData.coagent_split_percent > 0 && formData.coagent_phone) {
+        const phone = formData.coagent_phone.replace(/\D/g, '');
+        try {
+          await createInvitation(deal.id, {
+            invited_phone: phone,
+            role: 'coagent',
+            split_percent: formData.coagent_split_percent,
+          });
+        } catch {
+          // Invitation failed but deal was created - warning will be shown on deal page
+          console.warn('Failed to send invitation, but deal was created');
+        }
+      }
+
       router.push(`/agent/deals/${deal.id}`);
     } catch (err: unknown) {
       const errorMessage =
@@ -299,6 +348,100 @@ export default function CreateDealPage() {
   const formatMoney = (value: number): string => {
     return new Intl.NumberFormat('ru-RU').format(value);
   };
+
+  // Split handling functions
+  const handleSplitToggle = (enabled: boolean) => {
+    setHasSplit(enabled);
+    if (!enabled) {
+      setFormData({
+        ...formData,
+        agent_split_percent: 100,
+        coagent_split_percent: 0,
+        coagent_phone: '',
+        agency_split_percent: 0,
+      });
+    }
+  };
+
+  const handleSplitSliderChange = (participants: SplitParticipant[]) => {
+    const agent = participants.find((p) => p.role === 'agent');
+    const coagent = participants.find((p) => p.role === 'coagent');
+    const agency = participants.find((p) => p.role === 'agency');
+
+    setFormData((prev) => ({
+      ...prev,
+      agent_split_percent: agent?.percent ?? 100,
+      coagent_split_percent: coagent?.percent ?? 0,
+      agency_split_percent: agency?.percent ?? 0,
+    }));
+  };
+
+  const buildSplitParticipants = (): SplitParticipant[] => {
+    const participants: SplitParticipant[] = [
+      {
+        id: 'agent',
+        name: 'Вы',
+        role: 'agent',
+        percent: formData.agent_split_percent,
+      },
+    ];
+
+    if (hasSplit) {
+      participants.push({
+        id: 'coagent',
+        name: 'Со-агент',
+        role: 'coagent',
+        percent: formData.coagent_split_percent,
+      });
+      participants.push({
+        id: 'agency',
+        name: 'Агентство',
+        role: 'agency',
+        percent: formData.agency_split_percent,
+      });
+    }
+
+    return participants;
+  };
+
+  const formatCoagentPhone = (value: string): string => {
+    const digits = value.replace(/\D/g, '');
+    if (digits.length <= 1) return digits;
+    if (digits.length <= 4) return `+7 (${digits.slice(1)}`;
+    if (digits.length <= 7) return `+7 (${digits.slice(1, 4)}) ${digits.slice(4)}`;
+    if (digits.length <= 9) return `+7 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    return `+7 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7, 9)}-${digits.slice(9, 11)}`;
+  };
+
+  const handleCoagentPhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length > 0 && value[0] === '8') {
+      value = '7' + value.slice(1);
+    }
+    if (value.length === 0) {
+      value = '7';
+    }
+    if (value.length > 11) {
+      value = value.slice(0, 11);
+    }
+    setFormData({ ...formData, coagent_phone: value });
+  };
+
+  const isValidCoagentPhone = (phone: string): boolean => {
+    const digits = phone.replace(/\D/g, '');
+    return digits.length === 11 && digits.startsWith('7');
+  };
+
+  // Get calculated commission for display
+  const calculatedCommission = formData.price > 0 && calculation
+    ? calculation.total_commission
+    : formData.price > 0
+      ? formData.payment_type === 'percent'
+        ? formData.price * (formData.commission_percent / 100)
+        : formData.payment_type === 'fixed'
+          ? formData.commission_fixed
+          : formData.commission_fixed + formData.price * (formData.commission_percent / 100)
+      : 0;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -434,13 +577,12 @@ export default function CreateDealPage() {
               )}
 
               {(formData.payment_type === 'fixed' || formData.payment_type === 'mixed') && (
-                <Input
+                <CurrencyInput
                   label="Фиксированная сумма"
-                  type="number"
-                  placeholder="100000"
-                  value={formData.commission_fixed || ''}
-                  onChange={(e) => setFormData({ ...formData, commission_fixed: Number(e.target.value) })}
-                  helperText="Сумма в рублях"
+                  placeholder="100 000"
+                  value={formData.commission_fixed || undefined}
+                  onChange={(value) => setFormData({ ...formData, commission_fixed: value })}
+                  helperText="Сумма комиссии"
                 />
               )}
 
@@ -454,13 +596,12 @@ export default function CreateDealPage() {
 
                 {formData.advance_type === 'advance_fixed' && (
                   <div className="mt-4">
-                    <Input
+                    <CurrencyInput
                       label="Сумма аванса"
-                      type="number"
-                      placeholder="50000"
-                      value={formData.advance_amount || ''}
-                      onChange={(e) => setFormData({ ...formData, advance_amount: Number(e.target.value) })}
-                      helperText="Сумма аванса в рублях"
+                      placeholder="50 000"
+                      value={formData.advance_amount || undefined}
+                      onChange={(value) => setFormData({ ...formData, advance_amount: value })}
+                      helperText="Сумма аванса"
                     />
                   </div>
                 )}
@@ -507,19 +648,86 @@ export default function CreateDealPage() {
                   </div>
                 )}
               </div>
+
+              {/* Разделение комиссии */}
+              <div className="border-t pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <span className="text-gray-900 font-medium">Разделить комиссию</span>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Распределите комиссию между участниками сделки
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSplitToggle(!hasSplit)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 ${
+                      hasSplit ? 'bg-black' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        hasSplit ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {!hasSplit ? (
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600">
+                      100% комиссии получит основной агент
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Split Slider */}
+                    <SplitSlider
+                      totalAmount={calculatedCommission}
+                      platformFeePercent={PLATFORM_FEE_PERCENT}
+                      participants={buildSplitParticipants()}
+                      onChange={handleSplitSliderChange}
+                      minPercent={0}
+                      showAmounts={calculatedCommission > 0}
+                    />
+
+                    {/* Co-agent phone input */}
+                    {formData.coagent_split_percent > 0 && (
+                      <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                        <Input
+                          label="Телефон со-агента"
+                          type="tel"
+                          placeholder="+7 (999) 123-45-67"
+                          value={formatCoagentPhone(formData.coagent_phone)}
+                          onChange={handleCoagentPhoneChange}
+                          helperText="На этот номер будет отправлено приглашение"
+                          error={
+                            formData.coagent_phone.length > 0 &&
+                            !isValidCoagentPhone(formData.coagent_phone)
+                              ? 'Введите корректный номер телефона'
+                              : undefined
+                          }
+                        />
+                        <p className="text-xs text-gray-500">
+                          После создания сделки со-агент получит SMS с приглашением
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
           {/* Шаг 4: Данные объекта */}
           {step === 4 && (
             <div className="space-y-6">
-              <Input
+              <CurrencyInput
                 label="Стоимость объекта"
-                type="number"
-                placeholder="5000000"
-                value={formData.price || ''}
-                onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
-                helperText="Цена объекта недвижимости в рублях"
+                placeholder="5 000 000"
+                value={formData.price || undefined}
+                onChange={(value) => setFormData({ ...formData, price: value })}
+                helperText="Цена объекта недвижимости"
                 error={
                   formData.price > 0 && formData.price < 1000
                     ? 'Минимальная стоимость 1 000 руб.'
@@ -661,6 +869,37 @@ export default function CreateDealPage() {
                         До {formData.exclusive_until || 'не указано'}
                       </span>
                     </div>
+                  )}
+
+                  {/* Split info */}
+                  {hasSplit && (
+                    <>
+                      <div className="border-t pt-3 mt-3">
+                        <div className="text-sm font-medium text-gray-900 mb-2">Распределение комиссии:</div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Агент ({formData.agent_split_percent}%):</span>
+                          <span className="text-gray-900">
+                            {formatMoney(Math.round(calculatedCommission * (formData.agent_split_percent / 100)))} руб.
+                          </span>
+                        </div>
+                        {formData.coagent_split_percent > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Со-агент ({formData.coagent_split_percent}%):</span>
+                            <span className="text-gray-900">
+                              {formatMoney(Math.round(calculatedCommission * (formData.coagent_split_percent / 100)))} руб.
+                            </span>
+                          </div>
+                        )}
+                        {formData.agency_split_percent > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Агентство ({formData.agency_split_percent}%):</span>
+                            <span className="text-gray-900">
+                              {formatMoney(Math.round(calculatedCommission * (formData.agency_split_percent / 100)))} руб.
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
               </div>

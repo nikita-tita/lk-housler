@@ -77,6 +77,12 @@ export interface DealCreateSimple {
   // Клиент
   client_name: string;
   client_phone: string;
+
+  // Разделение комиссии (опционально)
+  agent_split_percent?: number;
+  coagent_split_percent?: number;
+  coagent_phone?: string;
+  agency_split_percent?: number;
 }
 
 // Запрос на расчет комиссии

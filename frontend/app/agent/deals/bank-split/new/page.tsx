@@ -45,9 +45,17 @@ const STEPS = [
   { number: 4, title: 'Клиент' },
 ];
 
+interface AddressInput {
+  city: string;
+  street: string;
+  house: string;
+  building: string;
+  apartment: string;
+}
+
 interface FormData {
   type: BankSplitDealType;
-  property_address: string;
+  address: AddressInput;
   price: number;
   // Спред для комиссии: если commission_max > 0, используется диапазон
   commission_total: number; // или min при использовании спреда
@@ -74,7 +82,13 @@ export default function CreateBankSplitDealPage() {
 
   const [formData, setFormData] = useState<FormData>({
     type: 'secondary_sell',
-    property_address: '',
+    address: {
+      city: '',
+      street: '',
+      house: '',
+      building: '',
+      apartment: '',
+    },
     price: 0,
     commission_total: 0,
     commission_max: 0,
@@ -102,8 +116,26 @@ export default function CreateBankSplitDealPage() {
   const platformFee = Math.round(formData.commission_total * (PLATFORM_FEE_PERCENT / 100));
   const agentReceives = formData.commission_total - platformFee;
 
+  const updateAddress = (field: keyof AddressInput, value: string) => {
+    setFormData({
+      ...formData,
+      address: { ...formData.address, [field]: value },
+    });
+  };
+
+  const buildFullAddress = (): string => {
+    const parts = [`г. ${formData.address.city}`, formData.address.street, `д. ${formData.address.house}`];
+    if (formData.address.building) parts.push(`корп. ${formData.address.building}`);
+    if (formData.address.apartment) parts.push(`кв. ${formData.address.apartment}`);
+    return parts.join(', ');
+  };
+
   const validateStep1 = (): boolean => {
-    return formData.type && formData.property_address.length > 5;
+    // Для покупки вторички адрес может быть не известен
+    if (formData.type === 'secondary_buy') {
+      return !!formData.type;
+    }
+    return formData.type && formData.address.city.length > 0 && formData.address.street.length > 0 && formData.address.house.length > 0;
   };
 
   const validateStep2 = (): boolean => {
@@ -185,9 +217,14 @@ export default function CreateBankSplitDealPage() {
     setLoading(true);
 
     try {
+      // Собираем адрес из полей или используем placeholder для покупки
+      const propertyAddress = formData.type === 'secondary_buy' && !formData.address.city
+        ? 'Адрес уточняется'
+        : buildFullAddress();
+
       const dealData: BankSplitDealCreate = {
         type: formData.type,
-        property_address: formData.property_address,
+        property_address: propertyAddress,
         price: String(formData.price),
         commission_total: String(formData.commission_total),
         client_name: formData.client_name || undefined,
@@ -439,20 +476,60 @@ export default function CreateBankSplitDealPage() {
                 }
               />
 
-              <Input
-                label="Адрес объекта"
-                placeholder="Москва, ул. Ленина, д. 12, кв. 45"
-                value={formData.property_address}
-                onChange={(e) =>
-                  setFormData({ ...formData, property_address: e.target.value })
-                }
-                helperText="Полный адрес объекта недвижимости"
-                error={
-                  formData.property_address.length > 0 && formData.property_address.length <= 5
-                    ? 'Введите полный адрес объекта'
-                    : undefined
-                }
-              />
+              {formData.type === 'secondary_buy' ? (
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-600">
+                    Адрес объекта можно будет указать позже, когда он станет известен
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <Select
+                    label="Город"
+                    options={[
+                      { value: 'Москва', label: 'Москва' },
+                      { value: 'Санкт-Петербург', label: 'Санкт-Петербург' },
+                      { value: 'Казань', label: 'Казань' },
+                      { value: 'Новосибирск', label: 'Новосибирск' },
+                      { value: 'Екатеринбург', label: 'Екатеринбург' },
+                      { value: 'Нижний Новгород', label: 'Нижний Новгород' },
+                      { value: 'Краснодар', label: 'Краснодар' },
+                      { value: 'Сочи', label: 'Сочи' },
+                    ]}
+                    value={formData.address.city}
+                    onChange={(e) => updateAddress('city', e.target.value)}
+                    placeholder="Выберите город"
+                  />
+
+                  <Input
+                    label="Улица"
+                    placeholder="ул. Ленина"
+                    value={formData.address.street}
+                    onChange={(e) => updateAddress('street', e.target.value)}
+                  />
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <Input
+                      label="Дом"
+                      placeholder="12"
+                      value={formData.address.house}
+                      onChange={(e) => updateAddress('house', e.target.value)}
+                    />
+                    <Input
+                      label="Корпус"
+                      placeholder="2"
+                      value={formData.address.building}
+                      onChange={(e) => updateAddress('building', e.target.value)}
+                    />
+                    <Input
+                      label="Квартира"
+                      placeholder="45"
+                      value={formData.address.apartment}
+                      onChange={(e) => updateAddress('apartment', e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
 
               <Input
                 label="Описание (опционально)"

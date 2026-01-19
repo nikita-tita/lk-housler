@@ -186,29 +186,34 @@ export default function DealsPage() {
                 className="fixed inset-0 z-10"
                 onClick={() => setShowCreateMenu(false)}
               />
-              <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-300 rounded-lg shadow-lg z-20">
+              <div className="absolute right-0 mt-2 w-72 bg-white border border-gray-300 rounded-lg shadow-lg z-20">
+                <Link
+                  href="/agent/deals/bank-split/new"
+                  className="block px-4 py-3 hover:bg-gray-50 border-b border-gray-200"
+                  onClick={() => setShowCreateMenu(false)}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="font-medium text-gray-900">
+                      Безопасная сделка
+                    </div>
+                    <span className="text-xs bg-black text-white px-2 py-0.5 rounded">
+                      Рекомендуем
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    Оплата через T-Bank, автоматическое распределение комиссии
+                  </div>
+                </Link>
                 <Link
                   href="/agent/deals/new"
-                  className="block px-4 py-3 hover:bg-gray-50 border-b border-gray-200"
+                  className="block px-4 py-3 hover:bg-gray-50"
                   onClick={() => setShowCreateMenu(false)}
                 >
                   <div className="font-medium text-gray-900">
                     Обычная сделка
                   </div>
-                  <div className="text-sm text-gray-500">
-                    Стандартный договор
-                  </div>
-                </Link>
-                <Link
-                  href="/agent/deals/bank-split/new"
-                  className="block px-4 py-3 hover:bg-gray-50"
-                  onClick={() => setShowCreateMenu(false)}
-                >
-                  <div className="font-medium text-gray-900">
-                    Instant Split
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    Автоматическое распределение
+                  <div className="text-sm text-gray-500 mt-1">
+                    Гибкие условия оплаты, эксклюзивные договоры
                   </div>
                 </Link>
               </div>
@@ -245,9 +250,14 @@ export default function DealsPage() {
           {filteredDeals.length === 0 ? (
             <div className="text-center py-12 text-gray-600">
               <p className="mb-4">Сделок не найдено</p>
-              <Link href="/agent/deals/bank-split/new">
-                <Button>Создать сделку</Button>
-              </Link>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Link href="/agent/deals/bank-split/new">
+                  <Button>Создать безопасную сделку</Button>
+                </Link>
+                <Link href="/agent/deals/new">
+                  <Button variant="secondary">Обычная сделка</Button>
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="space-y-3 sm:space-y-4">
