@@ -135,6 +135,9 @@ class DealService:
 
     async def create_simple(self, deal_in: DealCreateSimple, creator: User) -> Deal:
         """Create deal with simplified schema (MVP)"""
+        from datetime import datetime
+        from app.core.encryption import encrypt_passport, encrypt_passport_issued_by, encrypt_name
+
         # Build full address from structured input
         full_address = deal_in.address.to_full_address()
 
@@ -165,6 +168,34 @@ class DealService:
             client_phone=deal_in.client_phone,
             status=DealStatus.DRAFT,
         )
+
+        # Encrypt and save passport data if provided
+        if deal_in.client_passport_series and deal_in.client_passport_number:
+            series_enc, number_enc, passport_hash = encrypt_passport(
+                deal_in.client_passport_series, deal_in.client_passport_number
+            )
+            deal.client_passport_series_encrypted = series_enc
+            deal.client_passport_number_encrypted = number_enc
+            deal.client_passport_hash = passport_hash
+
+        if deal_in.client_passport_issued_by:
+            deal.client_passport_issued_by_encrypted = encrypt_passport_issued_by(deal_in.client_passport_issued_by)
+
+        if deal_in.client_passport_issued_date:
+            deal.client_passport_issued_date = datetime.strptime(deal_in.client_passport_issued_date, "%Y-%m-%d")
+
+        if deal_in.client_passport_issued_code:
+            deal.client_passport_issued_code = deal_in.client_passport_issued_code
+
+        if deal_in.client_birth_date:
+            deal.client_birth_date = datetime.strptime(deal_in.client_birth_date, "%Y-%m-%d")
+
+        if deal_in.client_birth_place:
+            deal.client_birth_place_encrypted = encrypt_name(deal_in.client_birth_place)
+
+        if deal_in.client_registration_address:
+            deal.client_registration_address_encrypted = encrypt_name(deal_in.client_registration_address)
+
         self.db.add(deal)
         await self.db.flush()
         await self.db.refresh(deal)

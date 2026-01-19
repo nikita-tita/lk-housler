@@ -93,6 +93,15 @@ interface FormData {
   // Шаг 5 (клиент)
   client_name: string;
   client_phone: string;
+  // Паспортные данные клиента
+  client_passport_series: string;
+  client_passport_number: string;
+  client_passport_issued_by: string;
+  client_passport_issued_date: string;
+  client_passport_issued_code: string;
+  client_birth_date: string;
+  client_birth_place: string;
+  client_registration_address: string;
   // Разделение комиссии
   agent_split_percent: number;
   coagent_split_percent: number;
@@ -145,6 +154,16 @@ export default function CreateDealPage() {
     price: 0,
     client_name: '',
     client_phone: '',
+    // Паспортные данные клиента
+    client_passport_series: '',
+    client_passport_number: '',
+    client_passport_issued_by: '',
+    client_passport_issued_date: '',
+    client_passport_issued_code: '',
+    client_birth_date: '',
+    client_birth_place: '',
+    client_registration_address: '',
+    // Разделение комиссии
     agent_split_percent: 100,
     coagent_split_percent: 0,
     coagent_phone: '',
@@ -321,12 +340,23 @@ export default function CreateDealPage() {
         exclusive_until: formData.is_exclusive && formData.exclusive_until ? formData.exclusive_until : undefined,
         client_name: formData.client_name,
         client_phone: formData.client_phone,
+        // Паспортные данные (опционально)
+        ...(formData.client_passport_series && { client_passport_series: formData.client_passport_series }),
+        ...(formData.client_passport_number && { client_passport_number: formData.client_passport_number }),
+        ...(formData.client_passport_issued_by && { client_passport_issued_by: formData.client_passport_issued_by }),
+        ...(formData.client_passport_issued_date && { client_passport_issued_date: formData.client_passport_issued_date }),
+        ...(formData.client_passport_issued_code && { client_passport_issued_code: formData.client_passport_issued_code }),
+        ...(formData.client_birth_date && { client_birth_date: formData.client_birth_date }),
+        ...(formData.client_birth_place && { client_birth_place: formData.client_birth_place }),
+        ...(formData.client_registration_address && { client_registration_address: formData.client_registration_address }),
         // Add split data if enabled
         ...(hasSplit && {
           agent_split_percent: formData.agent_split_percent,
           coagent_split_percent: formData.coagent_split_percent > 0 ? formData.coagent_split_percent : undefined,
           // If co-agent is found in system, pass their user_id
           coagent_user_id: coagentFound ? coagentFound.id : undefined,
+          // Pass co-agent phone for invitation
+          coagent_phone: formData.coagent_split_percent > 0 && formData.coagent_phone ? formData.coagent_phone.replace(/\D/g, '') : undefined,
           agency_split_percent: formData.agency_split_percent > 0 ? formData.agency_split_percent : undefined,
         }),
       };
@@ -886,6 +916,104 @@ export default function CreateDealPage() {
                     : undefined
                 }
               />
+
+              {/* Паспортные данные клиента */}
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Паспортные данные клиента</h3>
+                <p className="text-sm text-gray-500 mb-4">Необходимы для формирования договора. Можно заполнить позже.</p>
+
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <Input
+                    label="Серия паспорта"
+                    placeholder="4500"
+                    maxLength={4}
+                    value={formData.client_passport_series}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                      setFormData({ ...formData, client_passport_series: value });
+                    }}
+                    error={
+                      formData.client_passport_series.length > 0 && formData.client_passport_series.length !== 4
+                        ? '4 цифры'
+                        : undefined
+                    }
+                  />
+                  <Input
+                    label="Номер паспорта"
+                    placeholder="123456"
+                    maxLength={6}
+                    value={formData.client_passport_number}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                      setFormData({ ...formData, client_passport_number: value });
+                    }}
+                    error={
+                      formData.client_passport_number.length > 0 && formData.client_passport_number.length !== 6
+                        ? '6 цифр'
+                        : undefined
+                    }
+                  />
+                </div>
+
+                <Input
+                  label="Кем выдан"
+                  placeholder="ГУ МВД России по г. Москве"
+                  value={formData.client_passport_issued_by}
+                  onChange={(e) => setFormData({ ...formData, client_passport_issued_by: e.target.value })}
+                  className="mb-4"
+                />
+
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <Input
+                    label="Дата выдачи"
+                    type="date"
+                    value={formData.client_passport_issued_date}
+                    onChange={(e) => setFormData({ ...formData, client_passport_issued_date: e.target.value })}
+                  />
+                  <Input
+                    label="Код подразделения"
+                    placeholder="770-001"
+                    value={formData.client_passport_issued_code}
+                    onChange={(e) => {
+                      let value = e.target.value.replace(/[^0-9-]/g, '');
+                      // Auto-format: XXX-XXX
+                      if (value.length === 3 && !value.includes('-')) {
+                        value = value + '-';
+                      }
+                      if (value.length > 7) value = value.slice(0, 7);
+                      setFormData({ ...formData, client_passport_issued_code: value });
+                    }}
+                    error={
+                      formData.client_passport_issued_code.length > 0 &&
+                      !/^\d{3}-\d{3}$/.test(formData.client_passport_issued_code)
+                        ? 'Формат: XXX-XXX'
+                        : undefined
+                    }
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <Input
+                    label="Дата рождения"
+                    type="date"
+                    value={formData.client_birth_date}
+                    onChange={(e) => setFormData({ ...formData, client_birth_date: e.target.value })}
+                  />
+                  <Input
+                    label="Место рождения"
+                    placeholder="г. Москва"
+                    value={formData.client_birth_place}
+                    onChange={(e) => setFormData({ ...formData, client_birth_place: e.target.value })}
+                  />
+                </div>
+
+                <Input
+                  label="Адрес регистрации"
+                  placeholder="г. Москва, ул. Ленина, д. 1, кв. 1"
+                  value={formData.client_registration_address}
+                  onChange={(e) => setFormData({ ...formData, client_registration_address: e.target.value })}
+                />
+              </div>
 
               {/* Сводка */}
               <div className="border-t pt-6">

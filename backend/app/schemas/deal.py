@@ -87,6 +87,24 @@ class DealCreateSimple(BaseModel):
     client_name: str = Field(..., min_length=2, max_length=255)
     client_phone: str = Field(..., min_length=10, max_length=20)
 
+    # Client passport data (optional, for contract generation)
+    client_passport_series: Optional[str] = Field(None, min_length=4, max_length=4, pattern=r"^\d{4}$")
+    client_passport_number: Optional[str] = Field(None, min_length=6, max_length=6, pattern=r"^\d{6}$")
+    client_passport_issued_by: Optional[str] = Field(None, max_length=500)
+    client_passport_issued_date: Optional[str] = None  # YYYY-MM-DD
+    client_passport_issued_code: Optional[str] = Field(None, pattern=r"^\d{3}-\d{3}$")  # XXX-XXX
+    client_birth_date: Optional[str] = None  # YYYY-MM-DD
+    client_birth_place: Optional[str] = Field(None, max_length=500)
+    client_registration_address: Optional[str] = Field(None, max_length=1000)
+
+    @field_validator("client_passport_issued_date", "client_birth_date", mode="before")
+    @classmethod
+    def parse_date_fields(cls, v):
+        """Accept date string in YYYY-MM-DD format"""
+        if v is None or v == "":
+            return None
+        return v  # Store as string, will be converted when saving
+
     # Split (optional)
     agent_split_percent: Optional[int] = Field(None, ge=0, le=100)
     coagent_split_percent: Optional[int] = Field(None, ge=0, le=100)

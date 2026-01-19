@@ -78,6 +78,16 @@ export interface DealCreateSimple {
   client_name: string;
   client_phone: string;
 
+  // Паспортные данные клиента (опционально, для договора)
+  client_passport_series?: string;
+  client_passport_number?: string;
+  client_passport_issued_by?: string;
+  client_passport_issued_date?: string;  // YYYY-MM-DD
+  client_passport_issued_code?: string;  // XXX-XXX
+  client_birth_date?: string;  // YYYY-MM-DD
+  client_birth_place?: string;
+  client_registration_address?: string;
+
   // Разделение комиссии (опционально)
   agent_split_percent?: number;
   coagent_split_percent?: number;
