@@ -5,10 +5,13 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import {
   getAdminDeals,
+  exportDeals,
   AdminDeal,
   AdminDealsResponse,
   DEAL_STATUS_LABELS,
+  ExportFormat,
 } from '@/lib/api/admin';
+import { ExportButton } from '@/components/shared';
 import { formatPrice, formatDate } from '@/lib/utils/format';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -76,17 +79,23 @@ export default function AdminDealsPage() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
         <div>
-          <h1 className="text-3xl font-semibold text-gray-900">Сделки</h1>
-          <p className="text-gray-600 mt-1">Всего: {total}</p>
+          <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">Сделки</h1>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">Всего: {total}</p>
         </div>
+        <ExportButton
+          label="Экспорт"
+          onExport={(format: ExportFormat) =>
+            exportDeals(format, statusFilter === 'all' ? undefined : statusFilter)
+          }
+        />
       </div>
 
       {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-2">
+      <Card className="mb-4 sm:mb-6">
+        <CardContent className="p-3 sm:pt-6 sm:px-6">
+          <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 sm:flex-wrap scrollbar-hide">
             {STATUSES.map((status) => (
               <button
                 key={status}
@@ -94,7 +103,7 @@ export default function AdminDealsPage() {
                   setStatusFilter(status);
                   setPage(0);
                 }}
-                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-colors whitespace-nowrap ${
                   statusFilter === status
                     ? 'bg-gray-900 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -129,8 +138,8 @@ export default function AdminDealsPage() {
       ) : (
         <>
           <Card>
-            <CardContent className="p-0">
-              <table className="w-full">
+            <CardContent className="p-0 overflow-x-auto">
+              <table className="w-full min-w-[700px]">
                 <thead>
                   <tr className="border-b border-gray-200">
                     <th className="text-left p-4 font-medium text-gray-600">Адрес</th>
@@ -183,11 +192,11 @@ export default function AdminDealsPage() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-6">
-              <p className="text-sm text-gray-600">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4 sm:mt-6">
+              <p className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
                 Показано {page * limit + 1}-{Math.min((page + 1) * limit, total)} из {total}
               </p>
-              <div className="flex gap-2">
+              <div className="flex gap-2 justify-center sm:justify-end">
                 <Button
                   variant="secondary"
                   size="sm"

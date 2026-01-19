@@ -17,6 +17,7 @@ from app.services.email.provider import (
     send_bank_split_dispute_opened_email,
     send_bank_split_contract_ready_email,
     send_bank_split_contract_signed_email,
+    send_npd_receipt_reminder_email,
 )
 from app.core.config import settings
 
@@ -141,6 +142,24 @@ class NotificationService:
         message = f"Housler: сделка по адресу {short_address} отменена."
         if reason:
             message += f" Причина: {reason[:50]}"
+
+        try:
+            await self.sms.send(phone, message)
+            return True
+        except Exception:
+            return False
+
+    async def send_service_confirmed(
+        self,
+        phone: str,
+        address: Optional[str] = None,
+        confirmed_by: Optional[str] = None,
+    ) -> bool:
+        """Notify about service completion confirmation"""
+        short_address = address[:25] + "..." if address and len(address) > 25 else address
+        confirmer = confirmed_by or "Исполнитель"
+
+        message = f"Housler: {confirmer} подтвердил оказание услуги по сделке {short_address}."
 
         try:
             await self.sms.send(phone, message)
@@ -512,6 +531,66 @@ class NotificationService:
 
         return result
 
+    # ============================================
+    # NPD Receipt Notifications (TASK-3.3)
+    # ============================================
+
+    async def send_npd_receipt_reminder_sms(
+        self,
+        phone: str,
+        amount: float,
+        reminder_number: int = 1,
+    ) -> bool:
+        """Send NPD receipt reminder via SMS"""
+        amount_str = f"{amount:,.0f}".replace(",", " ")
+
+        if reminder_number == 1:
+            message = f"Housler: сформируйте чек НПД на сумму {amount_str} руб. в приложении Мой налог. Загрузите данные чека в личном кабинете."
+        elif reminder_number == 2:
+            message = f"Housler: напоминаем о необходимости сформировать чек НПД на {amount_str} руб. Срок истекает через 4 дня."
+        else:
+            message = f"Housler: СРОЧНО! Чек НПД на {amount_str} руб. просрочен. Сформируйте чек в приложении Мой налог."
+
+        try:
+            await self.sms.send(phone, message)
+            return True
+        except Exception as e:
+            logger.error(f"[SMS] Failed to send NPD reminder: {e}")
+            return False
+
+    async def notify_npd_receipt_reminder(
+        self,
+        phone: Optional[str],
+        email: Optional[str],
+        recipient_name: str,
+        deal_address: str,
+        amount: float,
+        receipt_id: str,
+        reminder_number: int = 1,
+    ) -> dict:
+        """Send NPD receipt reminder via SMS and Email"""
+        result = {"sms": False, "email": False}
+
+        if phone:
+            result["sms"] = await self.send_npd_receipt_reminder_sms(
+                phone, amount, reminder_number
+            )
+
+        if email:
+            try:
+                result["email"] = await send_npd_receipt_reminder_email(
+                    email=email,
+                    recipient_name=recipient_name,
+                    deal_address=deal_address,
+                    amount=amount,
+                    receipt_id=receipt_id,
+                    reminder_number=reminder_number,
+                )
+            except Exception as e:
+                logger.error(f"[Email] Failed to send NPD reminder: {e}")
+
+        return result
+
 
 # Singleton instance
 notification_service = NotificationService()
@@ -672,4 +751,30 @@ async def notify_invitation(
         address=address,
         split_percent=split_percent,
         invite_url=invite_url,
+    )
+
+
+# ============================================
+# NPD Receipt Notifications (TASK-3.3)
+# ============================================
+
+
+async def notify_npd_receipt_reminder(
+    phone: Optional[str] = None,
+    email: Optional[str] = None,
+    recipient_name: str = "Исполнитель",
+    deal_address: str = "",
+    amount: float = 0,
+    receipt_id: str = "",
+    reminder_number: int = 1,
+) -> dict:
+    """Send NPD receipt reminder notification via SMS and Email"""
+    return await notification_service.notify_npd_receipt_reminder(
+        phone=phone,
+        email=email,
+        recipient_name=recipient_name,
+        deal_address=deal_address,
+        amount=amount,
+        receipt_id=receipt_id,
+        reminder_number=reminder_number,
     )

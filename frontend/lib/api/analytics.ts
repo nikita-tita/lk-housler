@@ -121,3 +121,78 @@ export async function getLeaderboard(
   });
   return response.data;
 }
+
+// ===================================
+// Export functions for agents
+// ===================================
+
+export type ExportFormat = 'csv' | 'xlsx';
+
+/**
+ * Export agent deals to CSV or Excel
+ */
+export async function exportAgentDeals(
+  format: ExportFormat = 'csv',
+  status?: string,
+  startDate?: string,
+  endDate?: string
+): Promise<void> {
+  const params = new URLSearchParams({ format });
+  if (status) params.append('status', status);
+  if (startDate) params.append('start_date', startDate);
+  if (endDate) params.append('end_date', endDate);
+
+  await downloadExport(`/admin/analytics/export/deals?${params.toString()}`, `my_deals.${format}`);
+}
+
+/**
+ * Export agent payouts to CSV or Excel
+ */
+export async function exportAgentPayouts(
+  format: ExportFormat = 'csv',
+  status?: string,
+  startDate?: string,
+  endDate?: string
+): Promise<void> {
+  const params = new URLSearchParams({ format });
+  if (status) params.append('status', status);
+  if (startDate) params.append('start_date', startDate);
+  if (endDate) params.append('end_date', endDate);
+
+  await downloadExport(`/admin/analytics/export/payouts?${params.toString()}`, `my_payouts.${format}`);
+}
+
+/**
+ * Export agent summary to CSV or Excel
+ */
+export async function exportAgentSummary(
+  format: ExportFormat = 'csv',
+  startDate?: string,
+  endDate?: string
+): Promise<void> {
+  const params = new URLSearchParams({ format });
+  if (startDate) params.append('start_date', startDate);
+  if (endDate) params.append('end_date', endDate);
+
+  await downloadExport(`/admin/analytics/export/summary?${params.toString()}`, `my_summary.${format}`);
+}
+
+// Helper function to download export file
+async function downloadExport(url: string, filename: string): Promise<void> {
+  const response = await apiClient.get(url, {
+    responseType: 'blob',
+  });
+
+  const blob = new Blob([response.data], {
+    type: response.headers['content-type'] || 'application/octet-stream',
+  });
+
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(downloadUrl);
+}

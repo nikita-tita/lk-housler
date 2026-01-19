@@ -9,13 +9,16 @@ import {
   getLeaderboard,
   getAdminDeals,
   getAdminDisputes,
+  exportSummary,
   GlobalAnalytics,
   LeaderboardEntry,
   AdminDeal,
   AdminDispute,
   DEAL_STATUS_LABELS,
   DISPUTE_STATUS_LABELS,
+  ExportFormat,
 } from '@/lib/api/admin';
+import { ExportButton } from '@/components/shared';
 import { formatPrice, formatDate } from '@/lib/utils/format';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -119,47 +122,51 @@ export default function AdminDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
         <div>
-          <h1 className="text-3xl font-semibold text-gray-900">Админ-панель</h1>
-          <p className="text-gray-600 mt-1">Общая статистика платформы</p>
+          <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">Админ-панель</h1>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">Общая статистика платформы</p>
         </div>
+        <ExportButton
+          label="Экспорт отчёта"
+          onExport={(format: ExportFormat) => exportSummary(format)}
+        />
       </div>
 
       {/* Main stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
         <Card>
-          <CardHeader>
-            <CardDescription>Всего сделок</CardDescription>
-            <CardTitle className="text-4xl">{dealStats.total}</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardDescription className="text-xs sm:text-sm">Всего сделок</CardDescription>
+            <CardTitle className="text-2xl sm:text-4xl">{dealStats.total}</CardTitle>
           </CardHeader>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardDescription>Общий оборот</CardDescription>
-            <CardTitle className="text-4xl">{formatPrice(dealStats.total_commission)}</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardDescription className="text-xs sm:text-sm">Общий оборот</CardDescription>
+            <CardTitle className="text-xl sm:text-4xl">{formatPrice(dealStats.total_commission)}</CardTitle>
           </CardHeader>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardDescription>К выплате</CardDescription>
-            <CardTitle className="text-4xl">{formatPrice(payoutStats.pending_amount)}</CardTitle>
-            <p className="text-sm text-gray-500">{payoutStats.pending_count} получателей</p>
+          <CardHeader className="p-4 sm:p-6">
+            <CardDescription className="text-xs sm:text-sm">К выплате</CardDescription>
+            <CardTitle className="text-xl sm:text-4xl">{formatPrice(payoutStats.pending_amount)}</CardTitle>
+            <p className="text-xs sm:text-sm text-gray-500">{payoutStats.pending_count} получателей</p>
           </CardHeader>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardDescription>Открытых споров</CardDescription>
-            <CardTitle className="text-4xl">{disputeStats.open}</CardTitle>
-            <p className="text-sm text-gray-500">из {disputeStats.total} всего</p>
+          <CardHeader className="p-4 sm:p-6">
+            <CardDescription className="text-xs sm:text-sm">Открытых споров</CardDescription>
+            <CardTitle className="text-2xl sm:text-4xl">{disputeStats.open}</CardTitle>
+            <p className="text-xs sm:text-sm text-gray-500">из {disputeStats.total} всего</p>
           </CardHeader>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8 mb-6 sm:mb-8">
         {/* Status breakdown */}
         {Object.keys(dealStats.by_status || {}).length > 0 && (
           <Card>
@@ -215,13 +222,13 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
         {/* Recent deals */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <CardTitle>Последние сделки</CardTitle>
-              <CardDescription>Недавно созданные</CardDescription>
+              <CardTitle className="text-base sm:text-lg">Последние сделки</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Недавно созданные</CardDescription>
             </div>
             <Link href="/admin/deals">
               <Button variant="secondary" size="sm">Все сделки</Button>
@@ -237,17 +244,17 @@ export default function AdminDashboard() {
                     key={deal.id}
                     className="p-3 border border-gray-200 rounded-lg"
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-gray-900 truncate max-w-[200px]">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-gray-900 truncate">
                           {deal.property_address || 'Без адреса'}
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-xs sm:text-sm text-gray-500">
                           {formatPrice(deal.commission)} | {formatDate(deal.created_at)}
                         </p>
                       </div>
                       <span
-                        className={`px-2 py-1 text-xs rounded-full ${
+                        className={`self-start sm:self-center px-2 py-1 text-xs rounded-full whitespace-nowrap ${
                           STATUS_COLORS[deal.status] || 'bg-gray-100 text-gray-900'
                         }`}
                       >
@@ -263,10 +270,10 @@ export default function AdminDashboard() {
 
         {/* Open disputes */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <CardTitle>Открытые споры</CardTitle>
-              <CardDescription>Требуют внимания</CardDescription>
+              <CardTitle className="text-base sm:text-lg">Открытые споры</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Требуют внимания</CardDescription>
             </div>
             <Link href="/admin/disputes">
               <Button variant="secondary" size="sm">Все споры</Button>
@@ -283,19 +290,19 @@ export default function AdminDashboard() {
                     href={`/admin/disputes?id=${dispute.id}`}
                     className="block p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <div className="min-w-0 flex-1">
                         <p className="font-medium text-gray-900">
                           Сделка: {dispute.deal_id.slice(0, 8)}...
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-xs sm:text-sm text-gray-500">
                           {dispute.refund_requested && dispute.refund_amount
                             ? `Возврат: ${formatPrice(dispute.refund_amount)}`
                             : 'Без возврата'}
                         </p>
                       </div>
                       <span
-                        className={`px-2 py-1 text-xs rounded-full ${
+                        className={`self-start sm:self-center px-2 py-1 text-xs rounded-full whitespace-nowrap ${
                           DISPUTE_STATUS_COLORS[dispute.status] || 'bg-gray-100'
                         }`}
                       >

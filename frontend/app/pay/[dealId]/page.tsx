@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { formatPrice, formatDateTime } from '@/lib/utils/format';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api/v1';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 interface PaymentInfo {
   deal_id: string;
@@ -212,36 +212,36 @@ export default function PaymentPage() {
       <Card className="max-w-lg w-full">
         <CardContent className="pt-6">
           {/* Header */}
-          <div className="text-center mb-6">
-            <div className="w-12 h-12 mx-auto mb-4 bg-black rounded-lg flex items-center justify-center">
-              <span className="text-white text-xl font-bold">H</span>
+          <div className="text-center mb-4 sm:mb-6">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 sm:mb-4 bg-black rounded-lg flex items-center justify-center">
+              <span className="text-white text-lg sm:text-xl font-bold">H</span>
             </div>
-            <h1 className="text-2xl font-semibold text-gray-900">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">
               Оплата комиссии
             </h1>
-            <p className="text-gray-600 mt-1">Housler</p>
+            <p className="text-gray-600 mt-1 text-sm sm:text-base">Housler</p>
           </div>
 
           {/* Deal Info */}
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
+          <div className="bg-gray-50 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
             <dl className="space-y-2">
               <div>
-                <dt className="text-sm text-gray-600">Объект</dt>
-                <dd className="text-base text-gray-900 font-medium">
+                <dt className="text-xs sm:text-sm text-gray-600">Объект</dt>
+                <dd className="text-sm sm:text-base text-gray-900 font-medium">
                   {paymentInfo.property_address}
                 </dd>
               </div>
               {paymentInfo.client_name && (
                 <div>
-                  <dt className="text-sm text-gray-600">Плательщик</dt>
-                  <dd className="text-base text-gray-900">
+                  <dt className="text-xs sm:text-sm text-gray-600">Плательщик</dt>
+                  <dd className="text-sm sm:text-base text-gray-900">
                     {paymentInfo.client_name}
                   </dd>
                 </div>
               )}
               <div className="pt-2 border-t border-gray-200">
-                <dt className="text-sm text-gray-600">Сумма к оплате</dt>
-                <dd className="text-2xl font-bold text-gray-900">
+                <dt className="text-xs sm:text-sm text-gray-600">Сумма к оплате</dt>
+                <dd className="text-xl sm:text-2xl font-bold text-gray-900">
                   {formatPrice(paymentInfo.amount)}
                 </dd>
               </div>
@@ -250,15 +250,15 @@ export default function PaymentPage() {
 
           {/* QR Code */}
           {paymentInfo.qr_code && (
-            <div className="text-center mb-6">
-              <p className="text-sm text-gray-600 mb-3">
+            <div className="text-center mb-4 sm:mb-6">
+              <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
                 Отсканируйте QR-код для оплаты через приложение банка
               </p>
-              <div className="inline-block p-4 bg-white border border-gray-200 rounded-lg">
+              <div className="inline-block p-3 sm:p-4 bg-white border border-gray-200 rounded-lg">
                 <img
                   src={`data:image/png;base64,${paymentInfo.qr_code}`}
                   alt="QR код для оплаты"
-                  className="w-48 h-48"
+                  className="w-40 h-40 sm:w-48 sm:h-48"
                 />
               </div>
             </div>

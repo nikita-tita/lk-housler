@@ -191,7 +191,8 @@ export const DEAL_STATUS_LABELS: Record<string, string> = {
 
 export const DISPUTE_STATUS_LABELS: Record<string, string> = {
   open: 'Открыт',
-  under_review: 'На рассмотрении',
+  agency_review: 'Рассмотрение агентством',
+  platform_review: 'Эскалация на платформу',
   resolved: 'Решён',
   rejected: 'Отклонён',
   cancelled: 'Отменён',
@@ -211,3 +212,82 @@ export const ROLE_LABELS: Record<string, string> = {
   coagent: 'Со-агент',
   agency: 'Агентство',
 };
+
+// Export formats
+export type ExportFormat = 'csv' | 'xlsx';
+
+// Export functions - download files directly
+
+export async function exportDeals(
+  format: ExportFormat = 'csv',
+  status?: string,
+  startDate?: string,
+  endDate?: string
+): Promise<void> {
+  const params = new URLSearchParams({ format });
+  if (status) params.append('status', status);
+  if (startDate) params.append('start_date', startDate);
+  if (endDate) params.append('end_date', endDate);
+
+  await downloadExport(`/admin/admin/export/deals?${params.toString()}`, `deals.${format}`);
+}
+
+export async function exportPayouts(
+  format: ExportFormat = 'csv',
+  status?: string,
+  startDate?: string,
+  endDate?: string
+): Promise<void> {
+  const params = new URLSearchParams({ format });
+  if (status) params.append('status', status);
+  if (startDate) params.append('start_date', startDate);
+  if (endDate) params.append('end_date', endDate);
+
+  await downloadExport(`/admin/admin/export/payouts?${params.toString()}`, `payouts.${format}`);
+}
+
+export async function exportDisputes(
+  format: ExportFormat = 'csv',
+  status?: string,
+  startDate?: string,
+  endDate?: string
+): Promise<void> {
+  const params = new URLSearchParams({ format });
+  if (status) params.append('status', status);
+  if (startDate) params.append('start_date', startDate);
+  if (endDate) params.append('end_date', endDate);
+
+  await downloadExport(`/admin/admin/export/disputes?${params.toString()}`, `disputes.${format}`);
+}
+
+export async function exportSummary(
+  format: ExportFormat = 'csv',
+  startDate?: string,
+  endDate?: string
+): Promise<void> {
+  const params = new URLSearchParams({ format });
+  if (startDate) params.append('start_date', startDate);
+  if (endDate) params.append('end_date', endDate);
+
+  await downloadExport(`/admin/admin/export/summary?${params.toString()}`, `summary.${format}`);
+}
+
+// Helper function to download export file
+async function downloadExport(url: string, filename: string): Promise<void> {
+  const response = await apiClient.get(url, {
+    responseType: 'blob',
+  });
+
+  const blob = new Blob([response.data], {
+    type: response.headers['content-type'] || 'application/octet-stream',
+  });
+
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(downloadUrl);
+}

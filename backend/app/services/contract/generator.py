@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.contract import SignedContract, ContractSignature, ContractStatus
-from app.models.document import ContractTemplate, TemplateType
+from app.models.document import ContractTemplate, TemplateType, ContractLayer
 from app.models.deal import Deal
 from app.models.user import User
 
@@ -41,15 +41,62 @@ class ContractGenerationService:
     async def get_template(
         self,
         template_type: TemplateType,
+        layer: Optional[ContractLayer] = None,
     ) -> Optional[ContractTemplate]:
-        """Get active template by type"""
+        """Get active template by type and optionally by layer"""
         stmt = select(ContractTemplate).where(
             ContractTemplate.type == template_type,
             ContractTemplate.active == True,
-        ).order_by(ContractTemplate.created_at.desc())
+        )
+
+        if layer:
+            stmt = stmt.where(ContractTemplate.layer == layer.value)
+
+        stmt = stmt.order_by(ContractTemplate.created_at.desc())
 
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def get_templates_by_layer(
+        self,
+        layer: ContractLayer,
+        active_only: bool = True,
+    ) -> List[ContractTemplate]:
+        """
+        Get all templates for a specific layer.
+
+        Args:
+            layer: ContractLayer.PLATFORM or ContractLayer.TRANSACTION
+            active_only: If True, return only active templates
+
+        Returns:
+            List of templates for the specified layer
+        """
+        stmt = select(ContractTemplate).where(
+            ContractTemplate.layer == layer.value,
+        )
+
+        if active_only:
+            stmt = stmt.where(ContractTemplate.active == True)
+
+        stmt = stmt.order_by(ContractTemplate.code)
+
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_platform_agreements(self) -> List[ContractTemplate]:
+        """
+        Get all platform-level agreements (ToS, User Agreement).
+        These are agreements between the user and Housler platform.
+        """
+        return await self.get_templates_by_layer(ContractLayer.PLATFORM)
+
+    async def get_transaction_contracts(self) -> List[ContractTemplate]:
+        """
+        Get all transaction-level contract templates.
+        These are contracts between deal participants (agent-client, agency-agent).
+        """
+        return await self.get_templates_by_layer(ContractLayer.TRANSACTION)
 
     def render_template(
         self,

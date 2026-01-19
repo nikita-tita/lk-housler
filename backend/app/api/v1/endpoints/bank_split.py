@@ -511,9 +511,17 @@ async def give_consent(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Record user consent for a deal.
+    Record user consent for a deal (T-Bank nominal account model).
 
-    Required consents: platform_commission, data_processing, terms_of_service
+    Required consents:
+    - platform_fee_deduction: Agree to platform fee deduction from payment
+    - data_processing: Personal data processing (152-FZ)
+    - terms_of_service: Platform terms
+
+    Additional consents for bank-split:
+    - bank_payment_processing: Consent for T-Bank nominal account processing
+    - service_confirmation_required: Agree that service must be confirmed before payout
+    - hold_period_acceptance: Accept hold period before payout
     """
     from datetime import datetime
     from app.models.consent import DealConsent, ConsentType
@@ -614,11 +622,14 @@ async def check_consents(
     if not is_participant:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    # Required consents for bank-split deals
+    # Required consents for bank-split deals (T-Bank nominal account model)
     required = [
-        ConsentType.PLATFORM_COMMISSION.value,
+        ConsentType.PLATFORM_FEE_DEDUCTION.value,
         ConsentType.DATA_PROCESSING.value,
         ConsentType.TERMS_OF_SERVICE.value,
+        ConsentType.BANK_PAYMENT_PROCESSING.value,
+        ConsentType.SERVICE_CONFIRMATION_REQUIRED.value,
+        ConsentType.HOLD_PERIOD_ACCEPTANCE.value,
     ]
 
     # Get user's consents
@@ -643,6 +654,44 @@ async def check_consents(
     )
 
 
+@router.get("/consent-texts")
+async def get_consent_texts():
+    """
+    Get all consent texts for bank-split deals.
+
+    Returns consent titles and texts in Russian for displaying to users.
+    Uses T-Bank nominal account terminology (no escrow/MoR).
+
+    This is a PUBLIC endpoint - no authentication required.
+    """
+    from app.models.consent import CONSENT_TEXTS, ConsentType
+
+    # Return all non-deprecated consents
+    result = {}
+    for consent_type, data in CONSENT_TEXTS.items():
+        if not data.get("deprecated", False):
+            result[consent_type] = {
+                "title": data["title"],
+                "text": data["text"],
+                "version": data["version"],
+            }
+
+    # Also return list of required consents for bank-split
+    required_types = [
+        ConsentType.PLATFORM_FEE_DEDUCTION.value,
+        ConsentType.DATA_PROCESSING.value,
+        ConsentType.TERMS_OF_SERVICE.value,
+        ConsentType.BANK_PAYMENT_PROCESSING.value,
+        ConsentType.SERVICE_CONFIRMATION_REQUIRED.value,
+        ConsentType.HOLD_PERIOD_ACCEPTANCE.value,
+    ]
+
+    return {
+        "consents": result,
+        "required_for_bank_split": required_types,
+    }
+
+
 # ============================================
 # Service completion endpoints
 # ============================================
@@ -652,6 +701,7 @@ async def check_consents(
 async def confirm_completion(
     deal_id: UUID,
     notes: str = None,
+    trigger_release: bool = True,
     request: Request = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -659,11 +709,20 @@ async def confirm_completion(
     """
     Confirm that service was completed satisfactorily.
 
-    When all parties confirm, the deal can be released from hold immediately.
+    When all parties confirm, the deal can be released from hold
+    (immediately if hold period has passed, or scheduled if still in hold).
+
+    RBAC:
+    - Agent of the deal
+    - Creator of the deal
+    - Agency admin/signer (if executor is org)
+
+    Blocks:
+    - Cannot confirm if open dispute exists
+    - Cannot confirm if already confirmed by this user
     """
-    from datetime import datetime
-    from sqlalchemy import select
-    from app.models.service_completion import ServiceCompletion
+    from app.services.bank_split.completion_service import ServiceCompletionService
+    from app.services.notification.service import notification_service
 
     service = BankSplitDealService(db)
     deal = await service.get_deal(deal_id)
@@ -671,89 +730,85 @@ async def confirm_completion(
     if not deal:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
 
-    # Check if user is participant
-    is_participant = (
-        deal.created_by_user_id == current_user.id or
-        deal.agent_user_id == current_user.id
-    )
-    if not is_participant:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only deal participants can confirm")
-
-    # Check if deal is in hold period
-    if deal.status != "hold_period":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Service confirmation is only available during hold period"
-        )
-
-    # Check if user already confirmed
-    existing = await db.execute(
-        select(ServiceCompletion).where(
-            ServiceCompletion.deal_id == deal_id,
-            ServiceCompletion.confirmed_by_user_id == current_user.id
-        )
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="You have already confirmed completion"
-        )
-
     # Get client info
     client_ip = request.client.host if request and request.client else None
     user_agent = request.headers.get("user-agent") if request else None
 
-    # Create confirmation
-    completion = ServiceCompletion(
-        deal_id=deal_id,
-        confirmed_by_user_id=current_user.id,
-        confirmed_at=datetime.utcnow(),
-        notes=notes,
-        client_ip=client_ip,
-        client_user_agent=user_agent,
-    )
+    # Use completion service for RBAC and release logic
+    completion_service = ServiceCompletionService(db)
 
-    db.add(completion)
-    await db.commit()
-
-    # Check if all parties confirmed - if so, release immediately
-    split_service = SplitService(db)
-    recipients = await split_service.get_deal_recipients(deal_id)
-
-    # Get all user IDs that need to confirm
-    required_confirmations = {deal.created_by_user_id, deal.agent_user_id}
-    for r in recipients:
-        if r.user_id:
-            required_confirmations.add(r.user_id)
-
-    # Get existing confirmations
-    result = await db.execute(
-        select(ServiceCompletion.confirmed_by_user_id).where(
-            ServiceCompletion.deal_id == deal_id
+    try:
+        result = await completion_service.confirm_service_completion(
+            deal=deal,
+            user=current_user,
+            notes=notes,
+            trigger_release=trigger_release,
+            client_ip=client_ip,
+            user_agent=user_agent,
         )
-    )
-    confirmed_user_ids = set(result.scalars().all())
-
-    # Check if all confirmed
-    all_confirmed = required_confirmations.issubset(confirmed_user_ids)
-
-    if all_confirmed:
-        # Release immediately
-        await service.release_from_hold(deal)
         await db.commit()
+
+        # Send notifications
+        try:
+            # Notify agent about confirmation (if someone else confirmed)
+            if current_user.id != deal.agent_user_id:
+                agent = await service._get_user(deal.agent_user_id)
+                if agent and agent.phone:
+                    await notification_service.send_service_confirmed(
+                        phone=agent.phone,
+                        address=deal.property_address,
+                        confirmed_by=current_user.display_name,
+                    )
+
+            # Notify client about confirmation
+            if deal.client_phone and current_user.id == deal.agent_user_id:
+                await notification_service.send_service_confirmed(
+                    phone=deal.client_phone,
+                    address=deal.property_address,
+                    confirmed_by="Исполнитель",
+                )
+
+            # If release was triggered, notify about payout
+            if result.release_triggered:
+                agent = await service._get_user(deal.agent_user_id)
+                if agent:
+                    await notification_service.notify_hold_released(
+                        phone=agent.phone,
+                        email=agent.email,
+                        agent_name=agent.display_name,
+                        address=deal.property_address or "",
+                        amount=float(deal.commission_agent) if deal.commission_agent else 0,
+                    )
+        except Exception as e:
+            logger.warning(f"Failed to send notification for completion: {e}")
+
+        if result.release_triggered:
+            return {
+                "message": "Service confirmed. All parties confirmed - funds released.",
+                "deal_status": deal.status,
+                "all_confirmed": result.all_confirmed,
+                "release_triggered": True,
+            }
+
+        if result.all_confirmed:
+            return {
+                "message": "Service confirmed. All parties confirmed - release scheduled.",
+                "deal_status": deal.status,
+                "all_confirmed": True,
+                "release_triggered": False,
+                "auto_release_at": deal.auto_release_at.isoformat() if deal.auto_release_at else None,
+            }
+
         return {
-            "message": "Service confirmed. All parties confirmed - funds released.",
+            "message": "Service completion confirmed",
             "deal_status": deal.status,
-            "all_confirmed": True
+            "all_confirmed": False,
+            "confirmations": result.confirmations_count,
+            "required": result.required_count,
         }
 
-    return {
-        "message": "Service completion confirmed",
-        "deal_status": deal.status,
-        "all_confirmed": False,
-        "confirmations": len(confirmed_user_ids),
-        "required": len(required_confirmations)
-    }
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.get("/{deal_id}/completion-status")
@@ -763,8 +818,7 @@ async def get_completion_status(
     db: AsyncSession = Depends(get_db),
 ):
     """Get service completion status for a deal"""
-    from sqlalchemy import select
-    from app.models.service_completion import ServiceCompletion
+    from app.services.bank_split.completion_service import ServiceCompletionService
 
     service = BankSplitDealService(db)
     deal = await service.get_deal(deal_id)
@@ -772,45 +826,41 @@ async def get_completion_status(
     if not deal:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
 
-    # Check access
-    is_participant = (
-        deal.created_by_user_id == current_user.id or
-        deal.agent_user_id == current_user.id
-    )
-    if not is_participant:
+    # Check access using completion service RBAC
+    completion_service = ServiceCompletionService(db)
+    can_view, _ = await completion_service.can_confirm_completion(current_user, deal)
+
+    if not can_view:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    # Get all user IDs that need to confirm
-    split_service = SplitService(db)
-    recipients = await split_service.get_deal_recipients(deal_id)
-
-    required_confirmations = {deal.created_by_user_id, deal.agent_user_id}
-    for r in recipients:
-        if r.user_id:
-            required_confirmations.add(r.user_id)
-
-    # Get confirmations
-    result = await db.execute(
-        select(ServiceCompletion).where(ServiceCompletion.deal_id == deal_id)
-    )
-    completions = result.scalars().all()
+    # Get required confirmers and existing confirmations
+    required = await completion_service.get_required_confirmers(deal)
+    completions = await completion_service.get_existing_confirmations(deal_id)
 
     confirmed_user_ids = {c.confirmed_by_user_id for c in completions}
-    pending_user_ids = required_confirmations - confirmed_user_ids
+    pending_user_ids = required - confirmed_user_ids
+
+    # Check for open disputes
+    open_dispute = await completion_service.check_open_disputes(deal_id)
 
     return {
         "deal_id": str(deal_id),
         "deal_status": deal.status,
-        "required_count": len(required_confirmations),
+        "required_count": len(required),
         "confirmed_count": len(confirmed_user_ids),
         "pending_count": len(pending_user_ids),
         "all_confirmed": len(pending_user_ids) == 0,
         "current_user_confirmed": current_user.id in confirmed_user_ids,
+        "current_user_can_confirm": can_view and current_user.id not in confirmed_user_ids,
+        "has_open_dispute": open_dispute is not None,
+        "auto_release_at": deal.auto_release_at.isoformat() if deal.auto_release_at else None,
         "confirmations": [
             {
                 "user_id": c.confirmed_by_user_id,
                 "confirmed_at": c.confirmed_at.isoformat(),
-                "notes": c.notes
+                "notes": c.notes,
+                "triggers_release": c.triggers_release,
+                "release_triggered_at": c.release_triggered_at.isoformat() if c.release_triggered_at else None,
             }
             for c in completions
         ]
@@ -1380,6 +1430,51 @@ async def get_payment_info(
 
 
 # ============================================
+# INN Validation endpoint
+# ============================================
+
+
+@router.post("/validate-inn")
+async def validate_inn(
+    inn: str,
+    role: str = "agent",
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Validate INN with comprehensive checks.
+
+    Validates:
+    - INN checksum (format)
+    - Blacklist status
+    - NPD (self-employed) status for individuals
+
+    Args:
+        inn: The INN to validate (10 or 12 digits)
+        role: Recipient role for context-specific validation (agent, agency, client)
+
+    Returns:
+        Validation result with detailed information
+    """
+    from app.services.inn import INNValidationService
+
+    service = INNValidationService(db)
+    result = await service.validate_recipient_inn(inn=inn, role=role)
+
+    return {
+        "inn": result.inn,
+        "is_valid": result.is_valid,
+        "status": result.status.value,
+        "inn_type": result.inn_type,
+        "npd_status": result.npd_status.value if result.npd_status else None,
+        "npd_registration_date": result.npd_registration_date.isoformat() if result.npd_registration_date else None,
+        "is_blacklisted": result.is_blacklisted,
+        "errors": result.errors,
+        "warnings": result.warnings,
+    }
+
+
+# ============================================
 # Webhook endpoint
 # ============================================
 
@@ -1393,39 +1488,86 @@ async def tbank_webhook(
     Handle T-Bank webhook notifications.
 
     This endpoint receives payment status updates from T-Bank.
+
+    Security features:
+    - Signature validation (HMAC-SHA256)
+    - Idempotent processing (duplicate webhooks are no-op)
+    - Dead Letter Queue for failed events
     """
     from datetime import datetime
+    from app.services.bank_split.webhook_service import (
+        verify_webhook_signature,
+        WebhookService,
+    )
 
     # Get raw body for signature verification
     body = await request.body()
-    payload_dict = await request.json()
 
-    # Parse into schema (allows extra fields)
-    payload = TBankWebhookPayload(**payload_dict)
+    # Verify signature from header
+    signature = request.headers.get("X-TBank-Signature", "")
+    signature_valid = verify_webhook_signature(
+        body,
+        signature,
+        settings.TBANK_WEBHOOK_SECRET,
+    )
 
-    # Initialize webhook handler
+    # If signature invalid and secret is configured, return 401
+    if not signature_valid and settings.TBANK_WEBHOOK_SECRET:
+        logger.warning(
+            f"Invalid webhook signature. "
+            f"IP: {request.client.host if request.client else 'unknown'}, "
+            f"Signature: {signature[:16] if signature else 'none'}..."
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid webhook signature"
+        )
+
+    # Parse payload
+    try:
+        payload_dict = await request.json()
+        payload = TBankWebhookPayload(**payload_dict)
+    except Exception as e:
+        logger.error(f"Failed to parse webhook payload: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid webhook payload"
+        )
+
+    # Initialize services
     handler = TBankWebhookHandler()
+    webhook_service = WebhookService(db)
 
-    # Verify signature
-    if not handler.verify_signature(payload_dict, payload.Token):
-        logger.warning(f"Invalid webhook signature for order {payload.OrderId}")
-        # Still return success to avoid T-Bank retries, but log the issue
-        # In production, you might want to return 401
+    # Generate idempotency key from payload
+    # Use EventId if available, otherwise PaymentId + Status
+    idempotency_key = (
+        payload_dict.get("EventId") or
+        f"{payload.PaymentId}:{payload_dict.get('Status', 'unknown')}"
+    )
+
+    # Check idempotency - if already processed, return success immediately
+    existing_event = await webhook_service.check_idempotency(idempotency_key)
+    if existing_event:
+        logger.info(f"Webhook already processed: {idempotency_key}")
+        return WebhookResponse(Success=True)
 
     # Parse event
     event = handler.parse_event(payload_dict)
 
-    # Log the event (use timezone-naive for DB compatibility)
+    # Create bank event record
     bank_event = BankEvent(
-        deal_id=None,  # Will be set below if we find the deal
+        deal_id=None,
         provider="tbank",
         external_event_id=event.event_id or payload.PaymentId,
         event_type=event.event_type.value,
         payload=payload_dict,
+        idempotency_key=idempotency_key,
         status="pending",
-        signature_valid=handler.verify_signature(payload_dict, payload.Token),
+        signature_valid=signature_valid,
         received_at=datetime.utcnow(),
     )
+
+    deal_id = None
 
     # Find deal by OrderId (which is our deal UUID)
     if payload.OrderId:
@@ -1440,27 +1582,562 @@ async def tbank_webhook(
                 # Process based on event type
                 if event.event_type.value in ("deal.paid", "payment.confirmed"):
                     await service.handle_payment_received(deal)
-                    bank_event.status = "processed"
                     logger.info(f"Payment received for deal {deal_id}")
 
                 elif event.event_type.value == "deal.released":
                     if deal.status == "hold_period":
                         await service.release_from_hold(deal)
-                    bank_event.status = "processed"
                     logger.info(f"Deal {deal_id} released")
 
                 elif event.event_type.value in ("deal.cancelled", "payment.refunded"):
                     await service.cancel_deal(deal, reason="Cancelled by bank")
-                    bank_event.status = "processed"
                     logger.info(f"Deal {deal_id} cancelled")
 
-        except (ValueError, Exception) as e:
+                # Mark as processed
+                await webhook_service.mark_processed(bank_event)
+
+            else:
+                # Deal not found - save to DLQ
+                bank_event.status = "failed"
+                bank_event.processing_error = f"Deal not found: {deal_id}"
+                await webhook_service.save_to_dlq(
+                    event_type=event.event_type.value,
+                    payload=payload_dict,
+                    error_message=f"Deal not found: {deal_id}",
+                    deal_id=None,
+                )
+
+        except ValueError as e:
+            # Invalid UUID format
+            logger.error(f"Invalid OrderId format: {payload.OrderId}")
+            bank_event.processing_error = f"Invalid OrderId: {e}"
+            bank_event.status = "failed"
+            await webhook_service.save_to_dlq(
+                event_type=event.event_type.value,
+                payload=payload_dict,
+                error_message=f"Invalid OrderId format: {payload.OrderId}",
+            )
+
+        except Exception as e:
+            # General processing error - save to DLQ
             logger.error(f"Error processing webhook: {e}")
             bank_event.processing_error = str(e)
             bank_event.status = "failed"
+            await webhook_service.save_to_dlq(
+                event_type=event.event_type.value,
+                payload=payload_dict,
+                error_message=str(e),
+                deal_id=deal_id,
+            )
+
+    else:
+        # No OrderId - save to DLQ for manual review
+        bank_event.status = "failed"
+        bank_event.processing_error = "No OrderId in webhook payload"
+        await webhook_service.save_to_dlq(
+            event_type=event.event_type.value,
+            payload=payload_dict,
+            error_message="No OrderId in webhook payload",
+        )
 
     db.add(bank_event)
-    bank_event.processed_at = datetime.utcnow()
     await db.commit()
 
+    # Always return success to prevent T-Bank retries
+    # (failed events are stored in DLQ for manual handling)
     return WebhookResponse(Success=True)
+
+
+# ============================================
+# T-Bank Checks (Fiscal Receipts) Webhook
+# ============================================
+
+
+@router.post("/webhooks/tbank-checks", response_model=WebhookResponse)
+async def tbank_checks_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Handle T-Bank Checks (fiscal receipts) webhook notifications.
+
+    TASK-3.2: T-Bank Checks Integration
+
+    This endpoint receives receipt status updates from T-Bank Checks API.
+    Notifications are sent when:
+    - Receipt is successfully created (fiscal data ready)
+    - Receipt failed to create
+    - Receipt was cancelled
+    """
+    from datetime import datetime
+    from uuid import UUID as PyUUID
+    from app.services.fiscalization import FiscalReceiptService
+    from app.models.fiscalization import FiscalReceipt, FiscalReceiptStatus
+
+    # Parse payload
+    try:
+        payload_dict = await request.json()
+    except Exception as e:
+        logger.error(f"Failed to parse T-Bank Checks webhook payload: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid webhook payload"
+        )
+
+    logger.info(f"Received T-Bank Checks webhook: {payload_dict}")
+
+    # Extract receipt info from payload
+    # T-Bank Checks webhook format may vary, handle both formats
+    receipt_id = payload_dict.get("ReceiptId") or payload_dict.get("PaymentId")
+    receipt_status = payload_dict.get("Status", "").lower()
+    order_id = payload_dict.get("OrderId")
+
+    if not receipt_id:
+        logger.warning("T-Bank Checks webhook missing ReceiptId/PaymentId")
+        return WebhookResponse(Success=True)
+
+    # Find the fiscal receipt by external_id
+    from sqlalchemy import select
+
+    stmt = select(FiscalReceipt).where(FiscalReceipt.external_id == receipt_id)
+    result = await db.execute(stmt)
+    fiscal_receipt = result.scalar_one_or_none()
+
+    if not fiscal_receipt and order_id:
+        # Try finding by deal_id (order_id is our deal UUID)
+        try:
+            deal_uuid = PyUUID(order_id)
+            stmt = select(FiscalReceipt).where(
+                FiscalReceipt.deal_id == deal_uuid,
+                FiscalReceipt.status == FiscalReceiptStatus.PENDING.value,
+            ).order_by(FiscalReceipt.created_at.desc())
+            result = await db.execute(stmt)
+            fiscal_receipt = result.scalar_one_or_none()
+        except ValueError:
+            pass
+
+    if not fiscal_receipt:
+        logger.warning(f"Fiscal receipt not found for external_id: {receipt_id}")
+        return WebhookResponse(Success=True)
+
+    # Update receipt status
+    old_status = fiscal_receipt.status
+
+    if receipt_status in ("done", "confirmed", "success"):
+        fiscal_receipt.status = FiscalReceiptStatus.CREATED.value
+        fiscal_receipt.confirmed_at = datetime.utcnow()
+
+        # Extract fiscal data if available
+        if "FiscalNumber" in payload_dict or "Fp" in payload_dict:
+            fiscal_receipt.fiscal_data = {
+                "fiscal_number": payload_dict.get("FiscalNumber"),
+                "fiscal_sign": payload_dict.get("Fp"),
+                "fiscal_document": payload_dict.get("Fd"),
+                "fn_number": payload_dict.get("FnNumber"),
+            }
+
+        # Get receipt URL if available
+        if payload_dict.get("ReceiptUrl"):
+            fiscal_receipt.receipt_url = payload_dict["ReceiptUrl"]
+
+    elif receipt_status in ("fail", "failed", "error"):
+        fiscal_receipt.status = FiscalReceiptStatus.FAILED.value
+        fiscal_receipt.error_code = payload_dict.get("ErrorCode")
+        fiscal_receipt.error_message = payload_dict.get("Message") or payload_dict.get("ErrorMessage")
+
+    elif receipt_status in ("cancelled", "canceled"):
+        fiscal_receipt.status = FiscalReceiptStatus.CANCELLED.value
+
+    await db.commit()
+
+    if old_status != fiscal_receipt.status:
+        logger.info(
+            f"Fiscal receipt {fiscal_receipt.id} status updated: "
+            f"{old_status} -> {fiscal_receipt.status}"
+        )
+
+    return WebhookResponse(Success=True)
+
+
+# ============================================
+# TASK-2.4: Milestone endpoints
+# ============================================
+
+
+@router.get("/{deal_id}/milestones")
+async def get_deal_milestones(
+    deal_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get all milestones for a deal.
+
+    Returns list of payment milestones with their status and release information.
+    """
+    from app.services.bank_split.milestone_service import MilestoneService
+    from app.schemas.bank_split import MilestoneResponse, MilestoneListResponse
+    from decimal import Decimal
+
+    # Check deal access
+    service = BankSplitDealService(db)
+    deal = await service.get_deal(deal_id)
+
+    if not deal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
+
+    is_participant = (
+        deal.created_by_user_id == current_user.id or
+        deal.agent_user_id == current_user.id
+    )
+    if not is_participant:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    # Get milestones
+    milestone_service = MilestoneService(db)
+    milestones = await milestone_service.get_deal_milestones(deal_id)
+
+    # Calculate totals
+    total_amount = Decimal("0")
+    released_amount = Decimal("0")
+    pending_amount = Decimal("0")
+
+    items = []
+    for m in milestones:
+        total_amount += m.amount
+        if m.status == "released":
+            released_amount += m.amount
+        elif m.status != "cancelled":
+            pending_amount += m.amount
+
+        items.append(MilestoneResponse(
+            id=m.id,
+            deal_id=m.deal_id,
+            step_no=m.step_no,
+            name=m.name,
+            description=m.description,
+            amount=m.amount,
+            percent=m.percent,
+            currency=m.currency,
+            status=m.status,
+            release_trigger=m.release_trigger,
+            release_delay_hours=m.release_delay_hours,
+            release_date=m.release_date,
+            release_scheduled_at=m.release_scheduled_at,
+            paid_at=m.paid_at,
+            confirmed_at=m.confirmed_at,
+            released_at=m.released_at,
+            confirmed_by_user_id=m.confirmed_by_user_id,
+            external_step_id=m.external_step_id,
+            created_at=m.created_at,
+            updated_at=m.updated_at,
+        ))
+
+    return MilestoneListResponse(
+        items=items,
+        total=len(items),
+        total_amount=total_amount,
+        released_amount=released_amount,
+        pending_amount=pending_amount,
+    )
+
+
+@router.post("/{deal_id}/milestones", status_code=status.HTTP_201_CREATED)
+async def create_milestones(
+    deal_id: UUID,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Create milestones for a deal.
+
+    Milestones define how the payment is split into stages with different release triggers:
+    - IMMEDIATE: Release after minimal hold (e.g., 1 hour)
+    - SHORT_HOLD: Release after specified hours
+    - CONFIRMATION: Release after manual confirmation
+    - DATE: Release on specific date
+
+    Example:
+    ```json
+    {
+        "milestones": [
+            {"name": "Advance", "percent": 30, "trigger": "immediate"},
+            {"name": "Remainder", "percent": 70, "trigger": "confirmation"}
+        ]
+    }
+    ```
+    """
+    from app.services.bank_split.milestone_service import MilestoneService, MilestoneConfig
+    from app.schemas.bank_split import CreateMilestonesRequest, MilestoneResponse
+    from app.models.bank_split import ReleaseTrigger
+
+    # Parse request
+    body = await request.json()
+    milestones_request = CreateMilestonesRequest(**body)
+
+    # Check deal access
+    service = BankSplitDealService(db)
+    deal = await service.get_deal(deal_id)
+
+    if not deal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
+
+    if deal.created_by_user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only deal creator can create milestones"
+        )
+
+    # Check deal status - milestones can only be created in draft/awaiting_signatures
+    if deal.status not in ("draft", "awaiting_signatures"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot create milestones: deal is in {deal.status} status"
+        )
+
+    # Check if milestones already exist
+    milestone_service = MilestoneService(db)
+    existing = await milestone_service.get_deal_milestones(deal_id)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Milestones already exist for this deal"
+        )
+
+    # Convert to MilestoneConfig
+    configs = []
+    for m in milestones_request.milestones:
+        configs.append(MilestoneConfig(
+            name=m.name,
+            percent=m.percent,
+            trigger=ReleaseTrigger(m.trigger.value),
+            description=m.description,
+            release_delay_hours=m.release_delay_hours,
+            release_date=m.release_date,
+        ))
+
+    try:
+        milestones = await milestone_service.create_milestones_for_deal(
+            deal_id=deal_id,
+            config=configs,
+            total_amount=deal.commission_agent,
+        )
+        await db.commit()
+
+        return {
+            "message": f"Created {len(milestones)} milestones",
+            "milestones": [
+                MilestoneResponse(
+                    id=m.id,
+                    deal_id=m.deal_id,
+                    step_no=m.step_no,
+                    name=m.name,
+                    description=m.description,
+                    amount=m.amount,
+                    percent=m.percent,
+                    currency=m.currency,
+                    status=m.status,
+                    release_trigger=m.release_trigger,
+                    release_delay_hours=m.release_delay_hours,
+                    release_date=m.release_date,
+                    release_scheduled_at=m.release_scheduled_at,
+                    paid_at=m.paid_at,
+                    confirmed_at=m.confirmed_at,
+                    released_at=m.released_at,
+                    confirmed_by_user_id=m.confirmed_by_user_id,
+                    external_step_id=m.external_step_id,
+                    created_at=m.created_at,
+                    updated_at=m.updated_at,
+                )
+                for m in milestones
+            ]
+        }
+
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post("/{deal_id}/milestones/{milestone_id}/release")
+async def release_milestone(
+    deal_id: UUID,
+    milestone_id: UUID,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Manually release a milestone.
+
+    For milestones with CONFIRMATION trigger, this releases the funds immediately.
+    For other triggers, use force=true to release before scheduled time.
+    """
+    from app.services.bank_split.milestone_service import MilestoneService
+    from app.schemas.bank_split import MilestoneReleaseRequest, MilestoneReleaseResponse
+
+    # Parse request
+    body = await request.json() if await request.body() else {}
+    release_request = MilestoneReleaseRequest(**body)
+
+    # Check deal access
+    service = BankSplitDealService(db)
+    deal = await service.get_deal(deal_id)
+
+    if not deal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
+
+    if deal.created_by_user_id != current_user.id and deal.agent_user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    # Get milestone
+    milestone_service = MilestoneService(db)
+    milestone = await milestone_service.get_milestone(milestone_id)
+
+    if not milestone:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Milestone not found")
+
+    if milestone.deal_id != deal_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Milestone does not belong to this deal")
+
+    # Process release
+    result = await milestone_service.process_milestone_release(
+        milestone_id=milestone_id,
+        force=release_request.force,
+    )
+    await db.commit()
+
+    return MilestoneReleaseResponse(
+        milestone_id=milestone_id,
+        success=result.success,
+        released_amount=result.released_amount,
+        error_message=result.error_message,
+        new_status=result.milestone.status if result.milestone else "unknown",
+    )
+
+
+@router.post("/{deal_id}/milestones/{milestone_id}/confirm")
+async def confirm_milestone(
+    deal_id: UUID,
+    milestone_id: UUID,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Confirm a milestone for release.
+
+    This is used for milestones with CONFIRMATION trigger.
+    After confirmation, the milestone moves to HOLD status and is released immediately.
+    """
+    from app.services.bank_split.milestone_service import MilestoneService
+    from app.schemas.bank_split import MilestoneConfirmRequest, MilestoneConfirmResponse
+
+    # Parse request
+    body = await request.json() if await request.body() else {}
+    confirm_request = MilestoneConfirmRequest(**body)
+
+    # Check deal access
+    service = BankSplitDealService(db)
+    deal = await service.get_deal(deal_id)
+
+    if not deal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
+
+    is_participant = (
+        deal.created_by_user_id == current_user.id or
+        deal.agent_user_id == current_user.id
+    )
+    if not is_participant:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    # Get milestone
+    milestone_service = MilestoneService(db)
+    milestone = await milestone_service.get_milestone(milestone_id)
+
+    if not milestone:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Milestone not found")
+
+    if milestone.deal_id != deal_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Milestone does not belong to this deal")
+
+    try:
+        milestone = await milestone_service.confirm_milestone(
+            milestone_id=milestone_id,
+            user=current_user,
+            notes=confirm_request.notes,
+        )
+        await db.commit()
+
+        return MilestoneConfirmResponse(
+            milestone_id=milestone_id,
+            confirmed_at=milestone.confirmed_at,
+            confirmed_by_user_id=milestone.confirmed_by_user_id,
+            new_status=milestone.status,
+            release_scheduled_at=milestone.release_scheduled_at,
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/{deal_id}/milestones/summary")
+async def get_milestones_summary(
+    deal_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get summary of milestones for a deal.
+
+    Returns total amounts, released amounts, and milestone details.
+    """
+    from app.services.bank_split.milestone_service import MilestoneService
+
+    # Check deal access
+    service = BankSplitDealService(db)
+    deal = await service.get_deal(deal_id)
+
+    if not deal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
+
+    is_participant = (
+        deal.created_by_user_id == current_user.id or
+        deal.agent_user_id == current_user.id
+    )
+    if not is_participant:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    milestone_service = MilestoneService(db)
+    summary = await milestone_service.get_milestones_summary(deal_id)
+
+    return summary
+
+
+@router.get("/milestones/configs")
+async def get_milestone_configs(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get available predefined milestone configurations.
+
+    Returns list of available configs that can be used when creating milestones.
+    """
+    from app.services.bank_split.milestone_service import DEFAULT_MILESTONE_CONFIGS
+
+    configs = {}
+    for name, config_list in DEFAULT_MILESTONE_CONFIGS.items():
+        configs[name] = [
+            {
+                "name": c.name,
+                "percent": float(c.percent),
+                "trigger": c.trigger.value,
+                "description": c.description,
+                "release_delay_hours": c.release_delay_hours,
+            }
+            for c in config_list
+        ]
+
+    return {
+        "configs": configs,
+        "available": list(DEFAULT_MILESTONE_CONFIGS.keys()),
+    }

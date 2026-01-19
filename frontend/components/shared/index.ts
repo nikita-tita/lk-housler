@@ -6,3 +6,4 @@
  */
 export { Footer } from './Footer';
 export { CookieBanner } from './CookieBanner';
+export { ExportButton } from './ExportButton';

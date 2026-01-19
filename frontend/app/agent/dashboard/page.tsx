@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { getDeals, Deal, DealStatus } from '@/lib/api/deals';
-import { getDashboardSummary, getTimeSeries, DashboardSummary, TimeSeriesPoint } from '@/lib/api/analytics';
+import { getDashboardSummary, getTimeSeries, DashboardSummary, TimeSeriesPoint, exportAgentSummary, ExportFormat } from '@/lib/api/analytics';
+import { ExportButton } from '@/components/shared';
 import { formatPrice, formatDate } from '@/lib/utils/format';
 
 const STATUS_LABELS: Record<DealStatus, string> = {
@@ -131,48 +132,52 @@ export default function AgentDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
         <div>
-          <h1 className="text-3xl font-semibold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 mt-1">Обзор за текущий месяц</p>
+          <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">Главная</h1>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">Обзор за текущий месяц</p>
         </div>
-        <div className="flex gap-3">
-          <Link href="/agent/deals/bank-split/new">
-            <Button variant="secondary">Bank-Split сделка</Button>
+        <div className="flex flex-wrap gap-2 sm:gap-3">
+          <ExportButton
+            label="Экспорт"
+            onExport={(format: ExportFormat) => exportAgentSummary(format)}
+          />
+          <Link href="/agent/deals/bank-split/new" className="hidden sm:block">
+            <Button variant="secondary" size="sm">Bank-Split</Button>
           </Link>
           <Link href="/agent/deals/new">
-            <Button>Создать сделку</Button>
+            <Button size="sm">Создать сделку</Button>
           </Link>
         </div>
       </div>
 
       {/* Main stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
         <Card>
-          <CardHeader>
-            <CardDescription>Всего сделок</CardDescription>
-            <CardTitle className="text-4xl">{stats.total_deals}</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardDescription className="text-xs sm:text-sm">Всего сделок</CardDescription>
+            <CardTitle className="text-2xl sm:text-4xl">{stats.total_deals}</CardTitle>
           </CardHeader>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardDescription>В работе</CardDescription>
-            <CardTitle className="text-4xl">{inProgressCount}</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardDescription className="text-xs sm:text-sm">В работе</CardDescription>
+            <CardTitle className="text-2xl sm:text-4xl">{inProgressCount}</CardTitle>
           </CardHeader>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardDescription>К выплате</CardDescription>
-            <CardTitle className="text-4xl">{formatPrice(payoutStats.total_pending)}</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardDescription className="text-xs sm:text-sm">К выплате</CardDescription>
+            <CardTitle className="text-xl sm:text-4xl">{formatPrice(payoutStats.total_pending)}</CardTitle>
           </CardHeader>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardDescription>Заработано</CardDescription>
-            <CardTitle className="text-4xl">{formatPrice(payoutStats.total_paid + stats.total_commission)}</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardDescription className="text-xs sm:text-sm">Заработано</CardDescription>
+            <CardTitle className="text-xl sm:text-4xl">{formatPrice(payoutStats.total_paid + stats.total_commission)}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -260,19 +265,19 @@ export default function AgentDashboard() {
                 <Link
                   key={deal.id}
                   href={getDealLink(deal)}
-                  className="block p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="block p-3 sm:p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-gray-900">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-900 truncate">
                         {deal.property_address || 'Без адреса'}
                       </p>
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className="text-xs sm:text-sm text-gray-600 mt-1">
                         {formatPrice(deal.commission)} • {formatDate(deal.created_at)}
                       </p>
                     </div>
                     <span
-                      className={`px-3 py-1 text-sm rounded-full ${
+                      className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-full self-start sm:self-center whitespace-nowrap ${
                         STATUS_COLORS[deal.status] || 'bg-gray-100 text-gray-900'
                       }`}
                     >

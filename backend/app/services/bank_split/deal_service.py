@@ -26,6 +26,7 @@ from app.models.user import User
 from app.models.organization import Organization
 from app.services.bank_split.split_service import SplitService, SplitRecipientInput
 from app.services.bank_split.invoice_service import InvoiceService
+from app.services.inn import INNValidationService, INNValidationLevel
 from app.integrations.tbank import get_tbank_deals_client, TBankError
 
 logger = logging.getLogger(__name__)
@@ -103,16 +104,32 @@ class BankSplitDealService:
         creator: User,
     ) -> BankSplitDealResult:
         """
-        Create a new bank-split deal.
+        Создание новой bank-split сделки.
 
         Args:
-            input: Deal creation input
-            creator: User creating the deal
+            input: Входные данные для создания сделки
+            creator: Пользователь, создающий сделку
 
         Returns:
-            BankSplitDealResult with deal and recipients
+            BankSplitDealResult со сделкой и получателями
+
+        Raises:
+            ValueError: если сумма меньше минимальной
         """
-        # Determine split percentages
+        # Валидация минимальной суммы
+        if input.commission_total < settings.MIN_DEAL_AMOUNT:
+            raise ValueError(
+                f"Сумма комиссии ({input.commission_total} руб) меньше минимальной "
+                f"({settings.MIN_DEAL_AMOUNT} руб)"
+            )
+
+        if input.commission_total > settings.MAX_DEAL_AMOUNT:
+            raise ValueError(
+                f"Сумма комиссии ({input.commission_total} руб) превышает максимальную "
+                f"({settings.MAX_DEAL_AMOUNT} руб)"
+            )
+
+        # Определение процентов распределения
         agent_percent = input.agent_split_percent
         if agent_percent is None and input.organization_id:
             agent_percent = await self.split_service.get_default_split_percent(
@@ -309,7 +326,16 @@ class BankSplitDealService:
 
         Precondition: deal.status == 'hold_period'
         Postcondition: deal.status == 'closed'
+
+        Raises:
+            ValueError: If deal is locked by dispute
         """
+        # TASK-2.3: Check dispute lock before release
+        if deal.dispute_locked:
+            raise ValueError(
+                f"Cannot release: dispute in progress. Reason: {deal.dispute_lock_reason}"
+            )
+
         self._validate_transition(deal, "closed")
 
         # Release in T-Bank
@@ -346,6 +372,7 @@ class BankSplitDealService:
         Check for deals with expired hold period and release them.
 
         Called by background task.
+        TASK-2.3: Skips deals locked by dispute.
 
         Returns:
             List of released deals
@@ -356,6 +383,7 @@ class BankSplitDealService:
             Deal.status == "hold_period",
             Deal.hold_expires_at <= now,
             Deal.deleted_at.is_(None),
+            Deal.dispute_locked == False,  # TASK-2.3: Skip disputed deals
         )
         result = await self.db.execute(stmt)
         deals = list(result.scalars().all())
@@ -388,6 +416,13 @@ class BankSplitDealService:
                 logger.warning(f"Recipient {r.id} has no INN, cannot register")
                 continue
 
+            # Validate INN before registration
+            validation_result = await self._validate_recipient_inn(r)
+            if not validation_result.is_valid:
+                errors = ", ".join(validation_result.errors)
+                logger.error(f"INN validation failed for recipient {r.id}: {errors}")
+                raise ValueError(f"INN validation failed: {errors}")
+
             try:
                 # Get name for recipient
                 name = await self._get_recipient_name(r)
@@ -409,6 +444,18 @@ class BankSplitDealService:
                 raise
 
         await self.db.flush()
+
+    async def _validate_recipient_inn(self, recipient: DealSplitRecipient):
+        """Validate recipient's INN using comprehensive validation service"""
+        inn_service = INNValidationService(self.db)
+
+        # Determine role for validation
+        role = recipient.role.value if hasattr(recipient.role, 'value') else str(recipient.role)
+
+        return await inn_service.validate_recipient_inn(
+            inn=recipient.inn,
+            role=role,
+        )
 
     async def _get_recipient_name(self, recipient: DealSplitRecipient) -> str:
         """Get display name for recipient"""

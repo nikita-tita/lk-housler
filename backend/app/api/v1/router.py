@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, users, organizations, deals, documents, payments, sign, templates, bank_split, invitations, disputes, admin
+from app.api.v1.endpoints import auth, users, organizations, deals, documents, payments, sign, templates, bank_split, invitations, disputes, admin, onboarding, inn, receipts
 
 api_router = APIRouter()
 
@@ -27,3 +27,12 @@ api_router.include_router(disputes.router, tags=["disputes"])
 
 # Admin / Analytics
 api_router.include_router(admin.router, tags=["admin"])
+
+# Onboarding (T-Bank merchant onboarding)
+api_router.include_router(onboarding.router, prefix="/onboarding", tags=["onboarding"])
+
+# INN/BIK lookup (DaData)
+api_router.include_router(inn.router, prefix="/inn", tags=["inn"])
+
+# NPD Receipts (self-employed receipt tracking)
+api_router.include_router(receipts.router, tags=["receipts"])

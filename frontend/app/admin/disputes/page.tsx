@@ -6,11 +6,14 @@ import { Button } from '@/components/ui/Button';
 import {
   getAdminDisputes,
   resolveDispute,
+  exportDisputes,
   AdminDispute,
   AdminDisputesResponse,
   DISPUTE_STATUS_LABELS,
   DISPUTE_REASON_LABELS,
+  ExportFormat,
 } from '@/lib/api/admin';
+import { ExportButton } from '@/components/shared';
 import { formatPrice, formatDate } from '@/lib/utils/format';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -88,17 +91,23 @@ export default function AdminDisputesPage() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
         <div>
-          <h1 className="text-3xl font-semibold text-gray-900">Споры</h1>
-          <p className="text-gray-600 mt-1">Всего: {total}</p>
+          <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">Споры</h1>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">Всего: {total}</p>
         </div>
+        <ExportButton
+          label="Экспорт"
+          onExport={(format: ExportFormat) =>
+            exportDisputes(format, statusFilter === 'all' ? undefined : statusFilter)
+          }
+        />
       </div>
 
       {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-2">
+      <Card className="mb-4 sm:mb-6">
+        <CardContent className="p-3 sm:pt-6 sm:px-6">
+          <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 sm:flex-wrap scrollbar-hide">
             {STATUSES.map((status) => (
               <button
                 key={status}
@@ -106,7 +115,7 @@ export default function AdminDisputesPage() {
                   setStatusFilter(status);
                   setPage(0);
                 }}
-                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-colors whitespace-nowrap ${
                   statusFilter === status
                     ? 'bg-gray-900 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -140,13 +149,13 @@ export default function AdminDisputesPage() {
         </Card>
       ) : (
         <>
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {disputes.map((dispute) => (
               <Card key={dispute.id}>
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-3">
+                <CardContent className="p-4 sm:pt-6 sm:px-6">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3">
                         <span
                           className={`px-2 py-1 text-xs rounded-full ${
                             STATUS_COLORS[dispute.status] || 'bg-gray-100'
@@ -154,29 +163,29 @@ export default function AdminDisputesPage() {
                         >
                           {DISPUTE_STATUS_LABELS[dispute.status] || dispute.status}
                         </span>
-                        <span className="text-sm text-gray-500">
+                        <span className="text-xs sm:text-sm text-gray-500">
                           {formatDate(dispute.created_at)}
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4">
                         <div>
-                          <p className="text-sm text-gray-500">ID сделки</p>
-                          <p className="font-mono text-sm">{dispute.deal_id}</p>
+                          <p className="text-xs sm:text-sm text-gray-500">ID сделки</p>
+                          <p className="font-mono text-xs sm:text-sm truncate">{dispute.deal_id}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500">Инициатор</p>
-                          <p className="font-medium">ID: {dispute.initiator_user_id}</p>
+                          <p className="text-xs sm:text-sm text-gray-500">Инициатор</p>
+                          <p className="font-medium text-sm">ID: {dispute.initiator_user_id}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500">Причина</p>
-                          <p className="font-medium">
+                          <p className="text-xs sm:text-sm text-gray-500">Причина</p>
+                          <p className="font-medium text-sm">
                             {DISPUTE_REASON_LABELS[dispute.reason] || dispute.reason}
                           </p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500">Возврат</p>
-                          <p className="font-medium">
+                          <p className="text-xs sm:text-sm text-gray-500">Возврат</p>
+                          <p className="font-medium text-sm">
                             {dispute.refund_requested
                               ? dispute.refund_amount
                                 ? formatPrice(dispute.refund_amount)
@@ -191,6 +200,7 @@ export default function AdminDisputesPage() {
                       <Button
                         onClick={() => setResolveModal(dispute)}
                         size="sm"
+                        className="w-full sm:w-auto"
                       >
                         Разрешить
                       </Button>
@@ -203,11 +213,11 @@ export default function AdminDisputesPage() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-6">
-              <p className="text-sm text-gray-600">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4 sm:mt-6">
+              <p className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
                 Показано {page * limit + 1}-{Math.min((page + 1) * limit, total)} из {total}
               </p>
-              <div className="flex gap-2">
+              <div className="flex gap-2 justify-center sm:justify-end">
                 <Button
                   variant="secondary"
                   size="sm"

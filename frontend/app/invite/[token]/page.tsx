@@ -111,10 +111,10 @@ export default function InvitationPage() {
   const canRespond = invitation.status === 'pending' && !invitation.is_expired;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
+    <div className="min-h-screen bg-gray-50 py-6 sm:py-12 px-4">
       <div className="max-w-lg mx-auto">
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h1 className="text-2xl font-semibold mb-6">Приглашение в сделку</h1>
+        <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
+          <h1 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6">Приглашение в сделку</h1>
 
           {error && (
             <div className="mb-4 p-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm">
@@ -122,30 +122,30 @@ export default function InvitationPage() {
             </div>
           )}
 
-          <div className="space-y-4 mb-6">
+          <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6">
             <div>
-              <div className="text-sm text-gray-500">Адрес объекта</div>
-              <div className="font-medium">{invitation.property_address}</div>
+              <div className="text-xs sm:text-sm text-gray-500">Адрес объекта</div>
+              <div className="font-medium text-sm sm:text-base">{invitation.property_address}</div>
             </div>
 
             <div>
-              <div className="text-sm text-gray-500">От кого</div>
-              <div className="font-medium">{invitation.inviter_name}</div>
+              <div className="text-xs sm:text-sm text-gray-500">От кого</div>
+              <div className="font-medium text-sm sm:text-base">{invitation.inviter_name}</div>
             </div>
 
             <div>
-              <div className="text-sm text-gray-500">Ваша роль</div>
-              <div className="font-medium">{INVITATION_ROLE_LABELS[invitation.role]}</div>
+              <div className="text-xs sm:text-sm text-gray-500">Ваша роль</div>
+              <div className="font-medium text-sm sm:text-base">{INVITATION_ROLE_LABELS[invitation.role]}</div>
             </div>
 
             <div>
-              <div className="text-sm text-gray-500">Ваша доля комиссии</div>
-              <div className="font-medium">{invitation.split_percent}%</div>
+              <div className="text-xs sm:text-sm text-gray-500">Ваша доля комиссии</div>
+              <div className="font-medium text-sm sm:text-base">{invitation.split_percent}%</div>
             </div>
 
             <div>
-              <div className="text-sm text-gray-500">Действует до</div>
-              <div className="font-medium">
+              <div className="text-xs sm:text-sm text-gray-500">Действует до</div>
+              <div className="font-medium text-sm sm:text-base">
                 {new Date(invitation.expires_at).toLocaleDateString('ru-RU', {
                   day: 'numeric',
                   month: 'long',
@@ -208,11 +208,11 @@ export default function InvitationPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <button
                     onClick={handleAccept}
                     disabled={actionLoading}
-                    className="flex-1 py-3 px-4 bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-50"
+                    className="flex-1 py-3 px-4 bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 text-sm sm:text-base"
                   >
                     {actionLoading
                       ? 'Загрузка...'
@@ -223,7 +223,7 @@ export default function InvitationPage() {
                   <button
                     onClick={() => setShowDeclineForm(true)}
                     disabled={actionLoading}
-                    className="py-3 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                    className="py-3 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 text-sm sm:text-base"
                   >
                     Отклонить
                   </button>
@@ -231,7 +231,7 @@ export default function InvitationPage() {
               )}
 
               {!isAuthenticated && (
-                <p className="text-sm text-gray-500 mt-4 text-center">
+                <p className="text-xs sm:text-sm text-gray-500 mt-4 text-center">
                   Для принятия приглашения необходимо войти в систему
                 </p>
               )}

@@ -1,4 +1,4 @@
-"""Deal models"""
+"""Модели сделок"""
 
 from enum import Enum as PyEnum
 
@@ -10,11 +10,40 @@ from app.db.base import BaseModel, SoftDeleteMixin
 
 
 class DealType(str, PyEnum):
-    """Deal type"""
-
+    """Тип сделки с недвижимостью"""
+    SALE_BUY = "sale_buy"           # Покупка
+    SALE_SELL = "sale_sell"         # Продажа
+    RENT_TENANT = "rent_tenant"     # Аренда (арендатор ищет)
+    RENT_LANDLORD = "rent_landlord" # Аренда (владелец сдаёт)
+    # Legacy (для обратной совместимости)
     SECONDARY_BUY = "secondary_buy"
     SECONDARY_SELL = "secondary_sell"
     NEWBUILD_BOOKING = "newbuild_booking"
+
+
+class PropertyType(str, PyEnum):
+    """Тип объекта недвижимости"""
+    APARTMENT = "apartment"       # Квартира
+    ROOM = "room"                 # Комната
+    HOUSE = "house"               # Дом / Коттедж
+    TOWNHOUSE = "townhouse"       # Таунхаус
+    LAND = "land"                 # Земельный участок
+    COMMERCIAL = "commercial"     # Коммерческая недвижимость
+    PARKING = "parking"           # Машиноместо / Гараж
+
+
+class PaymentType(str, PyEnum):
+    """Тип оплаты услуг агента"""
+    PERCENT = "percent"           # Процент от суммы сделки
+    FIXED = "fixed"               # Фиксированная сумма
+    MIXED = "mixed"               # Фикс + процент
+
+
+class AdvanceType(str, PyEnum):
+    """Тип аванса"""
+    NONE = "none"                 # Без аванса
+    FIXED = "advance_fixed"       # Фиксированный аванс
+    PERCENT = "advance_percent"   # Процент от комиссии
 
 
 class DealStatus(str, PyEnum):
@@ -27,7 +56,7 @@ class DealStatus(str, PyEnum):
     CANCELLED = "cancelled"
     DISPUTE = "dispute"
 
-    # Legacy MoR statuses
+    # Legacy statuses (kept for backward compatibility)
     PAYMENT_PENDING = "payment_pending"
     IN_PROGRESS = "in_progress"
     CLOSED = "closed"
@@ -39,6 +68,17 @@ class DealStatus(str, PyEnum):
     REFUNDED = "refunded"                    # Funds returned to client
     PAYOUT_READY = "payout_ready"            # Ready for payout to recipients
     PAYOUT_IN_PROGRESS = "payout_in_progress"  # Payouts being processed
+
+
+class BankDealStatus(str, PyEnum):
+    """Bank-side deal status for T-Bank integration"""
+    NOT_CREATED = "not_created"       # Deal not yet created in bank
+    CREATED = "created"               # Deal created, awaiting payment
+    PAYMENT_PENDING = "payment_pending"  # Payment initiated
+    HOLD = "hold"                     # Funds on hold
+    RELEASED = "released"             # Funds released to recipients
+    CANCELLED = "cancelled"           # Deal cancelled in bank
+    REFUNDED = "refunded"             # Funds refunded to payer
 
 
 class ExecutorType(str, PyEnum):
@@ -100,17 +140,28 @@ class Deal(BaseModel, SoftDeleteMixin):
     price = Column(Numeric(15, 2), nullable=True)
     commission_agent = Column(Numeric(15, 2), nullable=True)
 
-    # Bank Split fields (NEW for T-Bank integration)
-    payment_model = Column(String(30), default="mor", nullable=False)  # mor/bank_hold_split
+    # Bank Split fields (T-Bank integration)
+    payment_model = Column(String(30), default="mor", nullable=False)  # mor (legacy) / bank_hold_split
     external_provider = Column(String(50), nullable=True)  # tbank
     external_deal_id = Column(String(255), nullable=True, index=True)  # T-Bank deal ID
     external_account_number = Column(String(50), nullable=True)  # Nominal account number
     payment_link_url = Column(String(500), nullable=True)  # SBP/card payment link
     payment_qr_payload = Column(Text, nullable=True)  # QR code data
     expires_at = Column(DateTime, nullable=True)  # Payment link expiry
-    hold_expires_at = Column(DateTime, nullable=True)  # Hold period expiry (for instant split)
+    hold_expires_at = Column(DateTime, nullable=True)  # Hold period expiry (for instant split) - legacy
     payer_email = Column(String(255), nullable=True)  # For receipt
     description = Column(Text, nullable=True)  # Deal description for bank
+
+    # Configurable Hold Period (TASK-2.1)
+    hold_duration_hours = Column(Integer, default=72, nullable=False)  # Dispute window in hours
+    auto_release_days = Column(Integer, default=7, nullable=False)  # Auto-release if no disputes
+    hold_started_at = Column(DateTime, nullable=True)  # When hold period started
+    auto_release_at = Column(DateTime, nullable=True)  # Computed: hold_started_at + auto_release_days
+
+    # Bank-led status tracking (TASK-1.1)
+    bank_status = Column(String(30), default="not_created", nullable=False)  # BankDealStatus
+    bank_created_at = Column(DateTime, nullable=True)  # When deal was created in bank
+    bank_released_at = Column(DateTime, nullable=True)  # When funds were released
 
     # Relationships
     creator = relationship("User", foreign_keys=[created_by_user_id], back_populates="deals_created")
@@ -119,6 +170,30 @@ class Deal(BaseModel, SoftDeleteMixin):
     terms = relationship("DealTerms", back_populates="deal", uselist=False, cascade="all, delete-orphan")
     documents = relationship("Document", back_populates="deal", cascade="all, delete-orphan")
     payment_schedules = relationship("PaymentSchedule", back_populates="deal", cascade="all, delete-orphan")
+
+    # Тип объекта недвижимости
+    property_type = Column(String(30), nullable=True)
+
+    # Условия оплаты
+    payment_type = Column(String(20), default="percent", nullable=False)  # percent/fixed/mixed
+    commission_percent = Column(Numeric(5, 2), nullable=True)  # Процент от суммы сделки
+    commission_fixed = Column(Numeric(15, 2), nullable=True)  # Фиксированная сумма комиссии
+
+    # Аванс
+    advance_type = Column(String(20), default="none", nullable=False)  # none/advance_fixed/advance_percent
+    advance_amount = Column(Numeric(15, 2), nullable=True)  # Сумма аванса (фикс)
+    advance_percent = Column(Numeric(5, 2), nullable=True)  # Процент аванса
+    advance_paid = Column(Boolean, default=False, nullable=False)  # Аванс оплачен?
+    advance_paid_at = Column(DateTime, nullable=True)  # Дата оплаты аванса
+
+    # Эксклюзивный договор
+    is_exclusive = Column(Boolean, default=False, nullable=False)
+    exclusive_until = Column(DateTime, nullable=True)  # Срок эксклюзива
+
+    # Dispute lock (TASK-2.3)
+    dispute_locked = Column(Boolean, default=False, nullable=False)
+    dispute_locked_at = Column(DateTime, nullable=True)
+    dispute_lock_reason = Column(String(500), nullable=True)
 
     # Bank Split relationships
     split_recipients = relationship("DealSplitRecipient", back_populates="deal", cascade="all, delete-orphan")

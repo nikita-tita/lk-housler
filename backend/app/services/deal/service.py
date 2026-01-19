@@ -141,6 +141,7 @@ class DealService:
         # Create deal with simplified fields
         deal = Deal(
             type=deal_in.type,
+            property_type=deal_in.property_type.value if deal_in.property_type else None,
             created_by_user_id=creator.id,
             agent_user_id=creator.id,
             executor_type=ExecutorType.USER,
@@ -148,6 +149,18 @@ class DealService:
             property_address=full_address,
             price=deal_in.price,
             commission_agent=deal_in.commission,
+            # Payment config
+            payment_type=deal_in.payment_type.value if deal_in.payment_type else "percent",
+            commission_percent=deal_in.commission_percent,
+            commission_fixed=deal_in.commission_fixed,
+            # Advance
+            advance_type=deal_in.advance_type.value if deal_in.advance_type else "none",
+            advance_amount=deal_in.advance_amount,
+            advance_percent=deal_in.advance_percent,
+            # Exclusive
+            is_exclusive=deal_in.is_exclusive,
+            exclusive_until=deal_in.exclusive_until,
+            # Client
             client_name=deal_in.client_name,
             client_phone=deal_in.client_phone,
             status=DealStatus.DRAFT,

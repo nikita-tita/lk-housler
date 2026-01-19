@@ -33,44 +33,44 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-gray-900">Профиль</h1>
-        <p className="text-gray-600 mt-1">Управление вашим профилем</p>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">Профиль</h1>
+        <p className="text-gray-600 mt-1 text-sm sm:text-base">Управление вашим профилем</p>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Личная информация</CardTitle>
             <CardDescription>Ваши основные данные</CardDescription>
           </CardHeader>
           <CardContent>
-            <dl className="space-y-4">
+            <dl className="space-y-3 sm:space-y-4">
               <div>
-                <dt className="text-sm text-gray-600">ID пользователя</dt>
-                <dd className="text-base text-gray-900 mt-1 font-mono text-sm">
+                <dt className="text-xs sm:text-sm text-gray-600">ID пользователя</dt>
+                <dd className="text-sm sm:text-base text-gray-900 mt-1 font-mono truncate">
                   {user?.id}
                 </dd>
               </div>
               {user?.email && (
                 <div>
-                  <dt className="text-sm text-gray-600">Email</dt>
-                  <dd className="text-base text-gray-900 mt-1">{user.email}</dd>
+                  <dt className="text-xs sm:text-sm text-gray-600">Email</dt>
+                  <dd className="text-sm sm:text-base text-gray-900 mt-1">{user.email}</dd>
                 </div>
               )}
               {user?.phone && (
                 <div>
-                  <dt className="text-sm text-gray-600">Телефон</dt>
-                  <dd className="text-base text-gray-900 mt-1">{formatPhone(user.phone)}</dd>
+                  <dt className="text-xs sm:text-sm text-gray-600">Телефон</dt>
+                  <dd className="text-sm sm:text-base text-gray-900 mt-1">{formatPhone(user.phone)}</dd>
                 </div>
               )}
               <div>
-                <dt className="text-sm text-gray-600">Роль</dt>
-                <dd className="text-base text-gray-900 mt-1">{ROLE_LABELS[user?.role || ''] || user?.role}</dd>
+                <dt className="text-xs sm:text-sm text-gray-600">Роль</dt>
+                <dd className="text-sm sm:text-base text-gray-900 mt-1">{ROLE_LABELS[user?.role || ''] || user?.role}</dd>
               </div>
               <div>
-                <dt className="text-sm text-gray-600">Статус</dt>
-                <dd className="text-base text-gray-900 mt-1 capitalize">
+                <dt className="text-xs sm:text-sm text-gray-600">Статус</dt>
+                <dd className="text-sm sm:text-base text-gray-900 mt-1 capitalize">
                   {user?.is_active ? 'Активен' : 'Неактивен'}
                 </dd>
               </div>
@@ -80,7 +80,7 @@ export default function ProfilePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>КYC Верификация</CardTitle>
+            <CardTitle>KYC Верификация</CardTitle>
             <CardDescription>Статус проверки личности</CardDescription>
           </CardHeader>
           <CardContent>

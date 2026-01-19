@@ -1,18 +1,59 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { createDeal, DealCreateSimple, DealType, AddressInput } from '@/lib/api/deals';
+import {
+  createDeal,
+  calculateCommission,
+  DealCreateSimple,
+  DealType,
+  PropertyType,
+  PaymentType,
+  AdvanceType,
+  AddressInput,
+  CommissionCalculateResponse,
+  DEAL_TYPE_LABELS,
+  PROPERTY_TYPE_LABELS,
+  PAYMENT_TYPE_LABELS,
+  ADVANCE_TYPE_LABELS,
+} from '@/lib/api/deals';
 
+// Опции для типов сделок (основные)
 const DEAL_TYPE_OPTIONS = [
-  { value: 'secondary_sell', label: 'Продажа вторички' },
-  { value: 'secondary_buy', label: 'Покупка вторички' },
-  { value: 'newbuild_booking', label: 'Бронирование новостройки' },
+  { value: 'sale_buy', label: 'Покупка недвижимости' },
+  { value: 'sale_sell', label: 'Продажа недвижимости' },
+  { value: 'rent_tenant', label: 'Аренда (ищу жилье)' },
+  { value: 'rent_landlord', label: 'Аренда (сдаю жилье)' },
+];
+
+// Опции для типов объектов
+const PROPERTY_TYPE_OPTIONS = [
+  { value: 'apartment', label: 'Квартира' },
+  { value: 'room', label: 'Комната' },
+  { value: 'house', label: 'Дом / Коттедж' },
+  { value: 'townhouse', label: 'Таунхаус' },
+  { value: 'land', label: 'Земельный участок' },
+  { value: 'commercial', label: 'Коммерческая недвижимость' },
+  { value: 'parking', label: 'Машиноместо / Гараж' },
+];
+
+// Опции для типов оплаты
+const PAYMENT_TYPE_OPTIONS = [
+  { value: 'percent', label: 'Процент от суммы сделки' },
+  { value: 'fixed', label: 'Фиксированная сумма' },
+  { value: 'mixed', label: 'Фикс + процент' },
+];
+
+// Опции для аванса
+const ADVANCE_TYPE_OPTIONS = [
+  { value: 'none', label: 'Без аванса' },
+  { value: 'advance_fixed', label: 'Фиксированный аванс' },
+  { value: 'advance_percent', label: 'Процент от комиссии' },
 ];
 
 const CITY_OPTIONS = [
@@ -26,21 +67,36 @@ const CITY_OPTIONS = [
   { value: 'Сочи', label: 'Сочи' },
 ];
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4 | 5;
 
 interface FormData {
-  type: DealType;
+  // Шаг 1
+  deal_type: DealType;
+  // Шаг 2
+  property_type: PropertyType;
+  // Шаг 3
+  payment_type: PaymentType;
+  commission_percent: number;
+  commission_fixed: number;
+  advance_type: AdvanceType;
+  advance_amount: number;
+  advance_percent: number;
+  is_exclusive: boolean;
+  exclusive_until: string;
+  // Шаг 4
   address: AddressInput;
   price: number;
-  commission: number;
+  // Шаг 5 (клиент)
   client_name: string;
   client_phone: string;
 }
 
 const STEPS = [
-  { number: 1, title: 'Объект' },
-  { number: 2, title: 'Финансы' },
-  { number: 3, title: 'Клиент' },
+  { number: 1, title: 'Тип сделки' },
+  { number: 2, title: 'Объект' },
+  { number: 3, title: 'Оплата' },
+  { number: 4, title: 'Адрес' },
+  { number: 5, title: 'Клиент' },
 ];
 
 export default function CreateDealPage() {
@@ -48,9 +104,19 @@ export default function CreateDealPage() {
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [calculation, setCalculation] = useState<CommissionCalculateResponse | null>(null);
 
   const [formData, setFormData] = useState<FormData>({
-    type: 'secondary_sell',
+    deal_type: 'sale_buy',
+    property_type: 'apartment',
+    payment_type: 'percent',
+    commission_percent: 3,
+    commission_fixed: 0,
+    advance_type: 'none',
+    advance_amount: 0,
+    advance_percent: 0,
+    is_exclusive: false,
+    exclusive_until: '',
     address: {
       city: '',
       street: '',
@@ -59,7 +125,6 @@ export default function CreateDealPage() {
       apartment: '',
     },
     price: 0,
-    commission: 0,
     client_name: '',
     client_phone: '',
   });
@@ -71,18 +136,53 @@ export default function CreateDealPage() {
     });
   };
 
-  const validateStep1 = (): boolean => {
-    if (!formData.type) return false;
-    if (!formData.address.city) return false;
-    if (!formData.address.street) return false;
-    if (!formData.address.house) return false;
+  // Расчет комиссии
+  const doCalculation = useCallback(async () => {
+    if (formData.price <= 0) return;
+
+    try {
+      const result = await calculateCommission({
+        property_price: formData.price,
+        payment_type: formData.payment_type,
+        commission_percent: formData.payment_type !== 'fixed' ? formData.commission_percent : undefined,
+        commission_fixed: formData.payment_type !== 'percent' ? formData.commission_fixed : undefined,
+        advance_type: formData.advance_type,
+        advance_amount: formData.advance_type === 'advance_fixed' ? formData.advance_amount : undefined,
+        advance_percent: formData.advance_type === 'advance_percent' ? formData.advance_percent : undefined,
+      });
+      setCalculation(result);
+    } catch {
+      // Игнорируем ошибки расчета
+    }
+  }, [formData.price, formData.payment_type, formData.commission_percent, formData.commission_fixed, formData.advance_type, formData.advance_amount, formData.advance_percent]);
+
+  useEffect(() => {
+    if (step === 5 && formData.price > 0) {
+      doCalculation();
+    }
+  }, [step, doCalculation, formData.price]);
+
+  const validateStep1 = (): boolean => !!formData.deal_type;
+  const validateStep2 = (): boolean => !!formData.property_type;
+
+  const validateStep3 = (): boolean => {
+    if (!formData.payment_type) return false;
+    if (formData.payment_type === 'percent' && (!formData.commission_percent || formData.commission_percent <= 0)) return false;
+    if (formData.payment_type === 'fixed' && (!formData.commission_fixed || formData.commission_fixed <= 0)) return false;
+    if (formData.payment_type === 'mixed') {
+      if (!formData.commission_percent || formData.commission_percent <= 0) return false;
+      if (!formData.commission_fixed || formData.commission_fixed < 0) return false;
+    }
+    if (formData.advance_type === 'advance_fixed' && formData.advance_amount <= 0) return false;
+    if (formData.advance_type === 'advance_percent' && (formData.advance_percent <= 0 || formData.advance_percent > 100)) return false;
     return true;
   };
 
-  const validateStep2 = (): boolean => {
-    if (!formData.price || formData.price < 100000) return false;
-    if (!formData.commission || formData.commission < 1000) return false;
-    if (formData.commission > formData.price * 0.3) return false;
+  const validateStep4 = (): boolean => {
+    if (!formData.address.city) return false;
+    if (!formData.address.street) return false;
+    if (!formData.address.house) return false;
+    if (!formData.price || formData.price < 1000) return false;
     return true;
   };
 
@@ -90,7 +190,7 @@ export default function CreateDealPage() {
     return phone.length === 11 && phone.startsWith('7');
   };
 
-  const validateStep3 = (): boolean => {
+  const validateStep5 = (): boolean => {
     if (!formData.client_name || formData.client_name.length < 2) return false;
     if (!isValidPhone(formData.client_phone)) return false;
     return true;
@@ -98,19 +198,17 @@ export default function CreateDealPage() {
 
   const canProceed = (): boolean => {
     switch (step) {
-      case 1:
-        return validateStep1();
-      case 2:
-        return validateStep2();
-      case 3:
-        return validateStep3();
-      default:
-        return false;
+      case 1: return validateStep1();
+      case 2: return validateStep2();
+      case 3: return validateStep3();
+      case 4: return validateStep4();
+      case 5: return validateStep5();
+      default: return false;
     }
   };
 
   const handleNext = () => {
-    if (step < 3) {
+    if (step < 5) {
       setStep((step + 1) as Step);
     }
   };
@@ -128,8 +226,19 @@ export default function CreateDealPage() {
     setLoading(true);
 
     try {
+      // Рассчитываем комиссию для передачи на бэкенд
+      let commission = 0;
+      if (formData.payment_type === 'percent') {
+        commission = formData.price * (formData.commission_percent / 100);
+      } else if (formData.payment_type === 'fixed') {
+        commission = formData.commission_fixed;
+      } else {
+        commission = formData.commission_fixed + formData.price * (formData.commission_percent / 100);
+      }
+
       const dealData: DealCreateSimple = {
-        type: formData.type,
+        type: formData.deal_type,
+        property_type: formData.property_type,
         address: {
           city: formData.address.city,
           street: formData.address.street,
@@ -138,7 +247,15 @@ export default function CreateDealPage() {
           ...(formData.address.apartment && { apartment: formData.address.apartment }),
         },
         price: formData.price,
-        commission: formData.commission,
+        commission: commission,
+        payment_type: formData.payment_type,
+        commission_percent: formData.payment_type !== 'fixed' ? formData.commission_percent : undefined,
+        commission_fixed: formData.payment_type !== 'percent' ? formData.commission_fixed : undefined,
+        advance_type: formData.advance_type,
+        advance_amount: formData.advance_type === 'advance_fixed' ? formData.advance_amount : undefined,
+        advance_percent: formData.advance_type === 'advance_percent' ? formData.advance_percent : undefined,
+        is_exclusive: formData.is_exclusive,
+        exclusive_until: formData.is_exclusive && formData.exclusive_until ? formData.exclusive_until : undefined,
         client_name: formData.client_name,
         client_phone: formData.client_phone,
       };
@@ -179,6 +296,10 @@ export default function CreateDealPage() {
     setFormData({ ...formData, client_phone: value });
   };
 
+  const formatMoney = (value: number): string => {
+    return new Intl.NumberFormat('ru-RU').format(value);
+  };
+
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
@@ -189,16 +310,16 @@ export default function CreateDealPage() {
 
       <div className="mb-8">
         <h1 className="text-3xl font-semibold text-gray-900">Создать сделку</h1>
-        <p className="text-gray-600 mt-1">Шаг {step} из 3</p>
+        <p className="text-gray-600 mt-1">Шаг {step} из 5</p>
       </div>
 
       {/* Progress Steps */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-8 overflow-x-auto pb-2">
         {STEPS.map((s, index) => (
-          <div key={s.number} className="flex items-center">
+          <div key={s.number} className="flex items-center flex-shrink-0">
             <div className="flex flex-col items-center">
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium border-2 transition-colors ${
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium border-2 transition-colors ${
                   step >= s.number
                     ? 'bg-black text-white border-black'
                     : 'bg-white text-gray-400 border-gray-300'
@@ -207,7 +328,7 @@ export default function CreateDealPage() {
                 {s.number}
               </div>
               <span
-                className={`mt-2 text-sm ${
+                className={`mt-2 text-xs whitespace-nowrap ${
                   step >= s.number ? 'text-gray-900 font-medium' : 'text-gray-400'
                 }`}
               >
@@ -216,7 +337,7 @@ export default function CreateDealPage() {
             </div>
             {index < STEPS.length - 1 && (
               <div
-                className={`w-24 h-0.5 mx-4 ${
+                className={`w-12 h-0.5 mx-2 ${
                   step > s.number ? 'bg-black' : 'bg-gray-200'
                 }`}
               />
@@ -228,21 +349,181 @@ export default function CreateDealPage() {
       <Card>
         <CardHeader>
           <CardTitle>
-            {step === 1 && 'Информация об объекте'}
-            {step === 2 && 'Финансовые условия'}
-            {step === 3 && 'Данные клиента'}
+            {step === 1 && 'Выберите тип сделки'}
+            {step === 2 && 'Выберите тип объекта'}
+            {step === 3 && 'Условия оплаты'}
+            {step === 4 && 'Данные объекта'}
+            {step === 5 && 'Данные клиента и подтверждение'}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Step 1: Property */}
+          {/* Шаг 1: Тип сделки */}
           {step === 1 && (
+            <div className="space-y-4">
+              {DEAL_TYPE_OPTIONS.map((option) => (
+                <label
+                  key={option.value}
+                  className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                    formData.deal_type === option.value
+                      ? 'border-black bg-gray-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="deal_type"
+                    value={option.value}
+                    checked={formData.deal_type === option.value}
+                    onChange={(e) => setFormData({ ...formData, deal_type: e.target.value as DealType })}
+                    className="sr-only"
+                  />
+                  <span className="text-gray-900 font-medium">{option.label}</span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          {/* Шаг 2: Тип объекта */}
+          {step === 2 && (
+            <div className="grid grid-cols-2 gap-4">
+              {PROPERTY_TYPE_OPTIONS.map((option) => (
+                <label
+                  key={option.value}
+                  className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                    formData.property_type === option.value
+                      ? 'border-black bg-gray-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="property_type"
+                    value={option.value}
+                    checked={formData.property_type === option.value}
+                    onChange={(e) => setFormData({ ...formData, property_type: e.target.value as PropertyType })}
+                    className="sr-only"
+                  />
+                  <span className="text-gray-900 font-medium">{option.label}</span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          {/* Шаг 3: Условия оплаты */}
+          {step === 3 && (
             <div className="space-y-6">
               <Select
-                label="Тип сделки"
-                options={DEAL_TYPE_OPTIONS}
-                value={formData.type}
-                onChange={(e) =>
-                  setFormData({ ...formData, type: e.target.value as DealType })
+                label="Тип оплаты"
+                options={PAYMENT_TYPE_OPTIONS}
+                value={formData.payment_type}
+                onChange={(e) => setFormData({ ...formData, payment_type: e.target.value as PaymentType })}
+              />
+
+              {(formData.payment_type === 'percent' || formData.payment_type === 'mixed') && (
+                <Input
+                  label="Процент от суммы сделки"
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  max="100"
+                  placeholder="3"
+                  value={formData.commission_percent || ''}
+                  onChange={(e) => setFormData({ ...formData, commission_percent: Number(e.target.value) })}
+                  helperText="Обычно 2-5% от стоимости объекта"
+                />
+              )}
+
+              {(formData.payment_type === 'fixed' || formData.payment_type === 'mixed') && (
+                <Input
+                  label="Фиксированная сумма"
+                  type="number"
+                  placeholder="100000"
+                  value={formData.commission_fixed || ''}
+                  onChange={(e) => setFormData({ ...formData, commission_fixed: Number(e.target.value) })}
+                  helperText="Сумма в рублях"
+                />
+              )}
+
+              <div className="border-t pt-6">
+                <Select
+                  label="Аванс"
+                  options={ADVANCE_TYPE_OPTIONS}
+                  value={formData.advance_type}
+                  onChange={(e) => setFormData({ ...formData, advance_type: e.target.value as AdvanceType })}
+                />
+
+                {formData.advance_type === 'advance_fixed' && (
+                  <div className="mt-4">
+                    <Input
+                      label="Сумма аванса"
+                      type="number"
+                      placeholder="50000"
+                      value={formData.advance_amount || ''}
+                      onChange={(e) => setFormData({ ...formData, advance_amount: Number(e.target.value) })}
+                      helperText="Сумма аванса в рублях"
+                    />
+                  </div>
+                )}
+
+                {formData.advance_type === 'advance_percent' && (
+                  <div className="mt-4">
+                    <Input
+                      label="Процент аванса"
+                      type="number"
+                      step="1"
+                      min="1"
+                      max="100"
+                      placeholder="30"
+                      value={formData.advance_percent || ''}
+                      onChange={(e) => setFormData({ ...formData, advance_percent: Number(e.target.value) })}
+                      helperText="Процент от комиссии"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t pt-6">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_exclusive}
+                    onChange={(e) => setFormData({ ...formData, is_exclusive: e.target.checked })}
+                    className="w-5 h-5 border-gray-300 rounded"
+                  />
+                  <span className="text-gray-900 font-medium">Эксклюзивный договор</span>
+                </label>
+                <p className="text-sm text-gray-500 mt-1 ml-8">
+                  Только вы имеете право продавать этот объект
+                </p>
+
+                {formData.is_exclusive && (
+                  <div className="mt-4">
+                    <Input
+                      label="Срок эксклюзива до"
+                      type="date"
+                      value={formData.exclusive_until}
+                      onChange={(e) => setFormData({ ...formData, exclusive_until: e.target.value })}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Шаг 4: Данные объекта */}
+          {step === 4 && (
+            <div className="space-y-6">
+              <Input
+                label="Стоимость объекта"
+                type="number"
+                placeholder="5000000"
+                value={formData.price || ''}
+                onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
+                helperText="Цена объекта недвижимости в рублях"
+                error={
+                  formData.price > 0 && formData.price < 1000
+                    ? 'Минимальная стоимость 1 000 руб.'
+                    : undefined
                 }
               />
 
@@ -284,69 +565,14 @@ export default function CreateDealPage() {
             </div>
           )}
 
-          {/* Step 2: Financials */}
-          {step === 2 && (
-            <div className="space-y-6">
-              <Input
-                label="Стоимость объекта"
-                type="number"
-                placeholder="5 000 000"
-                value={formData.price || ''}
-                onChange={(e) => {
-                  const value = Math.max(0, Number(e.target.value));
-                  setFormData({ ...formData, price: value });
-                }}
-                helperText="Цена объекта недвижимости в рублях"
-                error={
-                  formData.price > 0 && formData.price < 100000
-                    ? 'Минимальная стоимость объекта 100 000 руб.'
-                    : undefined
-                }
-              />
-
-              <Input
-                label="Комиссия агента"
-                type="number"
-                placeholder="150 000"
-                value={formData.commission || ''}
-                onChange={(e) => {
-                  const value = Math.max(0, Number(e.target.value));
-                  setFormData({ ...formData, commission: value });
-                }}
-                helperText="Ваше вознаграждение за сделку в рублях"
-                error={
-                  formData.commission > 0 && formData.commission < 1000
-                    ? 'Минимальная комиссия 1 000 руб.'
-                    : formData.price > 0 && formData.commission > formData.price * 0.3
-                    ? 'Комиссия не может превышать 30% от стоимости объекта'
-                    : undefined
-                }
-              />
-
-              {formData.price > 0 && formData.commission > 0 && (
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-600">
-                    Комиссия составляет{' '}
-                    <span className="font-medium text-gray-900">
-                      {((formData.commission / formData.price) * 100).toFixed(2)}%
-                    </span>{' '}
-                    от стоимости объекта
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Step 3: Client */}
-          {step === 3 && (
+          {/* Шаг 5: Клиент и подтверждение */}
+          {step === 5 && (
             <div className="space-y-6">
               <Input
                 label="ФИО клиента"
                 placeholder="Иванов Иван Иванович"
                 value={formData.client_name}
-                onChange={(e) =>
-                  setFormData({ ...formData, client_name: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
                 error={
                   formData.client_name.length > 0 && formData.client_name.length < 2
                     ? 'Введите имя клиента'
@@ -367,6 +593,77 @@ export default function CreateDealPage() {
                     : undefined
                 }
               />
+
+              {/* Сводка */}
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Сводка сделки</h3>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Тип сделки:</span>
+                    <span className="text-gray-900 font-medium">{DEAL_TYPE_LABELS[formData.deal_type]}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Тип объекта:</span>
+                    <span className="text-gray-900 font-medium">{PROPERTY_TYPE_LABELS[formData.property_type]}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Адрес:</span>
+                    <span className="text-gray-900 font-medium text-right">
+                      {formData.address.city}, {formData.address.street}, д. {formData.address.house}
+                      {formData.address.building && `, корп. ${formData.address.building}`}
+                      {formData.address.apartment && `, кв. ${formData.address.apartment}`}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Стоимость:</span>
+                    <span className="text-gray-900 font-medium">{formatMoney(formData.price)} руб.</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Тип оплаты:</span>
+                    <span className="text-gray-900 font-medium">{PAYMENT_TYPE_LABELS[formData.payment_type]}</span>
+                  </div>
+
+                  {calculation && (
+                    <>
+                      <div className="border-t pt-3 mt-3">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Комиссия:</span>
+                          <span className="text-gray-900 font-medium">{formatMoney(calculation.total_commission)} руб.</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Комиссия платформы (4%):</span>
+                          <span className="text-gray-600">-{formatMoney(calculation.platform_fee)} руб.</span>
+                        </div>
+                        <div className="flex justify-between text-lg font-semibold mt-2">
+                          <span className="text-gray-900">К получению:</span>
+                          <span className="text-gray-900">{formatMoney(calculation.agent_receives)} руб.</span>
+                        </div>
+                        {calculation.advance_amount > 0 && (
+                          <div className="flex justify-between text-sm mt-1">
+                            <span className="text-gray-500">Аванс:</span>
+                            <span className="text-gray-600">{formatMoney(calculation.advance_amount)} руб.</span>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {formData.advance_type !== 'none' && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Аванс:</span>
+                      <span className="text-gray-900 font-medium">{ADVANCE_TYPE_LABELS[formData.advance_type]}</span>
+                    </div>
+                  )}
+                  {formData.is_exclusive && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Эксклюзив:</span>
+                      <span className="text-gray-900 font-medium">
+                        До {formData.exclusive_until || 'не указано'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -384,7 +681,7 @@ export default function CreateDealPage() {
               </Button>
             )}
 
-            {step < 3 ? (
+            {step < 5 ? (
               <Button
                 type="button"
                 onClick={handleNext}

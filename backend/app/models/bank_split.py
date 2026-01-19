@@ -20,8 +20,9 @@ from app.db.base import BaseModel
 
 class PaymentModel(str, PyEnum):
     """Payment model type"""
-    MOR = "mor"  # Merchant of Record (legacy)
-    BANK_HOLD_SPLIT = "bank_hold_split"  # T-Bank instant split
+    # DEPRECATED: Legacy payment model, kept for backward compatibility with existing deals
+    MOR = "mor"  # @deprecated - use BANK_HOLD_SPLIT for new deals
+    BANK_HOLD_SPLIT = "bank_hold_split"  # T-Bank instant split (current model)
 
 
 class RecipientRole(str, PyEnum):
@@ -77,6 +78,14 @@ class MilestoneStatus(str, PyEnum):
     HOLD = "hold"
     RELEASED = "released"
     CANCELLED = "cancelled"
+
+
+class ReleaseTrigger(str, PyEnum):
+    """Milestone release trigger type (TASK-2.4)"""
+    IMMEDIATE = "immediate"  # Release immediately after payment
+    SHORT_HOLD = "short_hold"  # Release after N hours hold
+    CONFIRMATION = "confirmation"  # Release after manual confirmation
+    DATE = "date"  # Release on specific date
 
 
 class EvidenceStatus(str, PyEnum):
@@ -183,6 +192,9 @@ class BankEvent(BaseModel):
     event_type = Column(String(100), nullable=False, index=True)  # payment.completed, deal.cancelled, etc.
     payload = Column(JSONB, nullable=False)
 
+    # Idempotency (for webhook deduplication)
+    idempotency_key = Column(String(255), nullable=True, unique=True, index=True)
+
     # Processing
     status = Column(String(20), default="pending", nullable=False, index=True)
     signature_valid = Column(Boolean, nullable=True)
@@ -260,7 +272,15 @@ class EvidenceFile(BaseModel):
 
 
 class DealMilestone(BaseModel):
-    """Deal payment milestone (step)"""
+    """Deal payment milestone (step)
+
+    TASK-2.4: Two-Stage Payment (Milestones)
+    Supports splitting payment into stages with different release triggers.
+
+    Example configuration:
+    - Milestone A (Advance): 30%, trigger=IMMEDIATE -> releases quickly after payment
+    - Milestone B (Remainder): 70%, trigger=CONFIRMATION -> releases after manual confirmation
+    """
 
     __tablename__ = "deal_milestones"
 
@@ -273,12 +293,23 @@ class DealMilestone(BaseModel):
 
     # Payment
     amount = Column(Numeric(15, 2), nullable=False)
+    percent = Column(Numeric(5, 2), nullable=True)  # TASK-2.4: percentage of total deal
     currency = Column(String(3), default="RUB", nullable=False)
 
-    # Trigger
+    # Trigger - TASK-2.4: Enhanced release trigger system
     trigger_type = Column(String(50), nullable=False)  # immediate, manual, date, condition
     trigger_config = Column(JSONB, nullable=True)
     # Example: {"date": "2026-02-01"} or {"condition": "registration_confirmed"}
+
+    # TASK-2.4: New release trigger fields
+    release_trigger = Column(String(20), default="confirmation", nullable=False)
+    # immediate: Release right after payment (minimal hold)
+    # short_hold: Release after release_delay_hours
+    # confirmation: Release after manual confirmation
+    # date: Release on release_date
+
+    release_delay_hours = Column(Integer, nullable=True)  # For SHORT_HOLD trigger
+    release_date = Column(DateTime, nullable=True)  # For DATE trigger
 
     # T-Bank integration
     external_step_id = Column(String(100), nullable=True)
@@ -295,6 +326,11 @@ class DealMilestone(BaseModel):
     confirmed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     confirmed_at = Column(DateTime, nullable=True)
     released_at = Column(DateTime, nullable=True)
+
+    # TASK-2.4: Release tracking
+    release_requested_at = Column(DateTime, nullable=True)  # When release was requested
+    release_scheduled_at = Column(DateTime, nullable=True)  # Scheduled release time (for SHORT_HOLD/DATE)
+    release_error = Column(Text, nullable=True)  # Error message if release failed
 
     # Relationships
     deal = relationship("Deal", back_populates="milestones")

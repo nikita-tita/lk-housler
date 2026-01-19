@@ -1,11 +1,166 @@
 """Bank Split schemas"""
 
 from datetime import datetime
+from enum import Enum
 from typing import Optional, List
 from uuid import UUID
 from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator
+
+
+# ============================================
+# TASK-2.4: Milestone schemas
+# ============================================
+
+
+class ReleaseTriggerEnum(str, Enum):
+    """Release trigger type for milestones"""
+    IMMEDIATE = "immediate"
+    SHORT_HOLD = "short_hold"
+    CONFIRMATION = "confirmation"
+    DATE = "date"
+
+
+class MilestoneStatusEnum(str, Enum):
+    """Milestone status"""
+    PENDING = "pending"
+    READY_TO_PAY = "ready_to_pay"
+    PAYMENT_PENDING = "payment_pending"
+    PAID = "paid"
+    HOLD = "hold"
+    RELEASED = "released"
+    CANCELLED = "cancelled"
+
+
+class MilestoneConfigCreate(BaseModel):
+    """Configuration for creating a single milestone"""
+    name: str = Field(..., min_length=1, max_length=255)
+    percent: Decimal = Field(..., ge=0, le=100, description="Percentage of total deal (0-100)")
+    trigger: ReleaseTriggerEnum = Field(..., description="Release trigger type")
+    description: Optional[str] = Field(None, max_length=500)
+    release_delay_hours: Optional[int] = Field(
+        None,
+        ge=1,
+        le=720,
+        description="Hours to wait before release (for SHORT_HOLD trigger, max 30 days)"
+    )
+    release_date: Optional[datetime] = Field(
+        None,
+        description="Specific date for release (for DATE trigger)"
+    )
+
+    @field_validator('release_delay_hours')
+    @classmethod
+    def validate_delay_hours(cls, v, info):
+        """Validate delay hours is set for SHORT_HOLD trigger"""
+        if info.data.get('trigger') == ReleaseTriggerEnum.SHORT_HOLD and not v:
+            raise ValueError("release_delay_hours required for SHORT_HOLD trigger")
+        return v
+
+    @field_validator('release_date')
+    @classmethod
+    def validate_release_date(cls, v, info):
+        """Validate release date is set for DATE trigger"""
+        if info.data.get('trigger') == ReleaseTriggerEnum.DATE and not v:
+            raise ValueError("release_date required for DATE trigger")
+        return v
+
+
+class CreateMilestonesRequest(BaseModel):
+    """Request to create milestones for a deal"""
+    milestones: List[MilestoneConfigCreate] = Field(
+        ...,
+        min_length=1,
+        max_length=10,
+        description="List of milestone configurations"
+    )
+
+    @field_validator('milestones')
+    @classmethod
+    def validate_milestones_sum(cls, v):
+        """Validate that milestone percentages sum to 100"""
+        total = sum(m.percent for m in v)
+        if total != Decimal("100"):
+            raise ValueError(f"Milestone percentages must sum to 100, got {total}")
+        return v
+
+
+class MilestoneResponse(BaseModel):
+    """Response schema for a milestone"""
+    id: UUID
+    deal_id: UUID
+    step_no: int
+    name: str
+    description: Optional[str] = None
+    amount: Decimal
+    percent: Optional[Decimal] = None
+    currency: str = "RUB"
+    status: str
+    release_trigger: str
+    release_delay_hours: Optional[int] = None
+    release_date: Optional[datetime] = None
+    release_scheduled_at: Optional[datetime] = None
+    paid_at: Optional[datetime] = None
+    confirmed_at: Optional[datetime] = None
+    released_at: Optional[datetime] = None
+    confirmed_by_user_id: Optional[int] = None
+    external_step_id: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MilestoneListResponse(BaseModel):
+    """Response for list of milestones"""
+    items: List[MilestoneResponse]
+    total: int
+    total_amount: Decimal
+    released_amount: Decimal
+    pending_amount: Decimal
+
+
+class MilestoneReleaseRequest(BaseModel):
+    """Request to release a milestone"""
+    force: bool = Field(
+        default=False,
+        description="Force release even if scheduled time not reached"
+    )
+
+
+class MilestoneReleaseResponse(BaseModel):
+    """Response after releasing a milestone"""
+    milestone_id: UUID
+    success: bool
+    released_amount: Optional[Decimal] = None
+    error_message: Optional[str] = None
+    new_status: str
+
+
+class MilestoneConfirmRequest(BaseModel):
+    """Request to confirm a milestone"""
+    notes: Optional[str] = Field(None, max_length=500, description="Confirmation notes")
+
+
+class MilestoneConfirmResponse(BaseModel):
+    """Response after confirming a milestone"""
+    milestone_id: UUID
+    confirmed_at: datetime
+    confirmed_by_user_id: int
+    new_status: str
+    release_scheduled_at: Optional[datetime] = None
+
+
+class MilestonesSummaryResponse(BaseModel):
+    """Summary of all milestones for a deal"""
+    total_amount: Decimal
+    released_amount: Decimal
+    pending_amount: Decimal
+    milestones_count: int
+    released_count: int
+    milestones: List[dict]
 
 
 # ============================================
@@ -237,8 +392,15 @@ class SendPaymentLinkResponse(BaseModel):
 
 
 class ConsentCreate(BaseModel):
-    """Create consent record"""
-    consent_type: str = Field(..., description="platform_commission/data_processing/terms_of_service/split_agreement")
+    """Create consent record for bank-split deals"""
+    consent_type: str = Field(
+        ...,
+        description=(
+            "Consent types: platform_fee_deduction, data_processing, terms_of_service, "
+            "split_agreement, bank_payment_processing, service_confirmation_required, "
+            "hold_period_acceptance"
+        )
+    )
     consent_version: str = Field(default="1.0", description="Version of the agreement")
     document_url: Optional[str] = Field(None, description="URL to the agreement document")
 

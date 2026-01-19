@@ -7,6 +7,7 @@ from sqlalchemy import (
     ForeignKey,
     Text,
     DateTime,
+    Boolean,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
@@ -32,6 +33,10 @@ class ServiceCompletion(BaseModel):
     # Client info at confirmation time
     client_ip = Column(String(45), nullable=True)
     client_user_agent = Column(Text, nullable=True)
+
+    # Release trigger (TASK-2.2)
+    triggers_release = Column(Boolean, default=True, nullable=False)
+    release_triggered_at = Column(DateTime, nullable=True)
 
     # Relationships
     deal = relationship("Deal", back_populates="service_completions")

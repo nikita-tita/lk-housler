@@ -1,16 +1,18 @@
-"""Deal endpoints"""
+"""Эндпоинты для работы со сделками"""
 
 import logging
+from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, require_deal_access, require_deal_owner
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
-from app.models.deal import DealStatus
+from app.models.deal import DealStatus, PaymentType, AdvanceType
 from app.schemas.deal import (
     Deal as DealSchema,
     DealUpdate,
@@ -19,9 +21,96 @@ from app.schemas.deal import (
     DealListSimple,
 )
 from app.services.deal.service import DealService
+from app.services.deal.commission import commission_calculator
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+# === Схемы для калькулятора комиссии ===
+
+class CommissionCalculateRequest(BaseModel):
+    """Запрос на расчет комиссии"""
+    property_price: Decimal = Field(..., gt=0, description="Цена объекта недвижимости")
+    payment_type: str = Field("percent", description="Тип оплаты: percent/fixed/mixed")
+    commission_percent: Optional[Decimal] = Field(None, ge=0, le=100, description="Процент комиссии")
+    commission_fixed: Optional[Decimal] = Field(None, ge=0, description="Фиксированная сумма комиссии")
+    advance_type: str = Field("none", description="Тип аванса: none/advance_fixed/advance_percent")
+    advance_amount: Optional[Decimal] = Field(None, ge=0, description="Сумма аванса (для fixed)")
+    advance_percent: Optional[Decimal] = Field(None, ge=0, le=100, description="Процент аванса")
+
+
+class PaymentStepResponse(BaseModel):
+    """Шаг в плане платежей"""
+    type: str
+    amount: float
+    when: str
+    is_paid: bool = False
+
+
+class CommissionCalculateResponse(BaseModel):
+    """Результат расчета комиссии"""
+    property_price: float
+    total_commission: float
+    platform_fee: float
+    agent_receives: float
+    advance_amount: float
+    final_payment: float
+    payment_steps: list[PaymentStepResponse]
+
+
+@router.post("/calculate", response_model=CommissionCalculateResponse)
+async def calculate_commission(
+    request: CommissionCalculateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Расчет комиссии без создания сделки.
+
+    Калькулятор для предварительного расчета:
+    - Комиссии агента (процент/фикс/смешанная)
+    - Комиссии платформы (4%)
+    - Аванса (если есть)
+    - Плана платежей
+    """
+    try:
+        # Преобразование типов из строк
+        payment_type = PaymentType(request.payment_type)
+        advance_type = AdvanceType(request.advance_type)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Неверный тип: {e}"
+        )
+
+    # Валидация входных данных
+    errors = commission_calculator.validate_commission_input(
+        payment_type=payment_type,
+        commission_percent=request.commission_percent,
+        commission_fixed=request.commission_fixed,
+    )
+    if errors:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="; ".join(errors)
+        )
+
+    try:
+        result = commission_calculator.calculate_full(
+            property_price=request.property_price,
+            payment_type=payment_type,
+            commission_percent=request.commission_percent,
+            commission_fixed=request.commission_fixed,
+            advance_type=advance_type,
+            advance_amount=request.advance_amount,
+            advance_percent=request.advance_percent,
+        )
+        return result.to_dict()
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
 
 
 @router.get("", response_model=DealListSimple)

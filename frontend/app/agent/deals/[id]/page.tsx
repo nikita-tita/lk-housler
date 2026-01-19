@@ -26,6 +26,10 @@ const STATUS_LABELS: Record<DealStatus, string> = {
 };
 
 const TYPE_LABELS: Record<DealType, string> = {
+  sale_buy: 'Покупка',
+  sale_sell: 'Продажа',
+  rent_tenant: 'Аренда (ищу жилье)',
+  rent_landlord: 'Аренда (сдаю жилье)',
   secondary_sell: 'Продажа вторички',
   secondary_buy: 'Покупка вторички',
   newbuild_booking: 'Бронирование новостройки',

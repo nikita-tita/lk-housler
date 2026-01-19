@@ -137,6 +137,10 @@ class Settings(BaseSettings):
     ANTIFRAUD_NEW_AGENT_MAX_MONTHLY_GMV: int = 100000
     ANTIFRAUD_NEW_AGENT_PAYOUT_HOLD_DAYS: int = 3
 
+    # INN Validation
+    REQUIRE_AGENT_NPD_STATUS: bool = False  # Require self-employed status for agents
+    INN_VALIDATION_CACHE_TTL: int = 86400  # 24 hours cache for NPD status
+
     # T-Bank Integration (Bank Split)
     TBANK_MODE: str = "mock"  # mock | sandbox | production
     TBANK_API_URL: str = "https://securepay.tinkoff.ru/v2"
@@ -148,16 +152,46 @@ class Settings(BaseSettings):
     TBANK_SE_PARTNER_ID: str = ""
     TBANK_SE_TOKEN: str = ""
     TBANK_WEBHOOK_SECRET: str = ""
-    TBANK_HOLD_PERIOD_SECONDS: int = 3600  # 1 hour max
+    TBANK_HOLD_PERIOD_SECONDS: int = 3600  # 1 hour max (legacy, use hold period settings below)
     PLATFORM_FEE_PERCENT: float = 4.0  # Platform commission for bank-split deals
 
-    # Limits
-    MIN_PAYMENT_AMOUNT: int = 10000
-    MAX_PAYMENT_AMOUNT: int = 10000000
+    # Hold Period Settings (configurable dispute/release windows)
+    DEFAULT_HOLD_HOURS: int = 72  # Default hold period for disputes (3 days)
+    DEFAULT_AUTO_RELEASE_DAYS: int = 7  # Auto-release funds if no disputes
+    MIN_HOLD_HOURS: int = 24  # Minimum allowed hold period
+    MAX_HOLD_HOURS: int = 168  # Maximum hold period (7 days)
+    MAX_AUTO_RELEASE_DAYS: int = 30  # Maximum auto-release period
+
+    # Лимиты сумм (в рублях)
+    MIN_DEAL_AMOUNT: int = 1000  # Минимальная сумма сделки 1000 руб
+    MAX_DEAL_AMOUNT: int = 10000000  # Максимальная сумма 10 млн руб
+
+    # Fiscalization Settings
+    FISCALIZATION_ENABLED: bool = True  # Global flag to enable/disable fiscalization
+    FISCALIZATION_REQUIRED_THRESHOLD: int = 0  # Min amount (kopeks) requiring fiscalization, 0 = always
+    NPD_ANNUAL_LIMIT: int = 240000000  # NPD annual income limit in kopeks (2.4M RUB)
+    NPD_API_URL: str = "https://lknpd.nalog.ru/api"  # MyNalog API URL
+    NPD_API_KEY: str = ""  # MyNalog API key (if needed for partner integration)
+
+    # T-Bank Checks (Fiscal Receipts) - TASK-3.2
+    TBANK_CHECKS_API_URL: str = "https://securepay.tinkoff.ru/v2"  # T-Bank Checks API URL
+    TBANK_CHECKS_API_KEY: str = ""  # T-Bank Checks API key (from merchant cabinet)
+    TBANK_CHECKS_MOCK_MODE: bool = True  # Mock mode for development (inherits from TBANK_MODE if not set)
 
     # Feature Flags (флаги для постепенного раскатывания функционала)
     INSTANT_SPLIT_ENABLED: bool = False  # Глобальное включение/выключение bank-split
     INSTANT_SPLIT_ORG_IDS: str = ""  # Список UUID организаций через запятую
+
+    # T-Bank Onboarding API (TASK-5.2)
+    TBANK_ONBOARDING_API_URL: str = "https://business.tbank.ru/openapi/api/v1/partner/onboarding"
+    TBANK_ONBOARDING_API_KEY: str = ""  # API key for onboarding
+    TBANK_ONBOARDING_MOCK_MODE: bool = True  # Mock mode for development
+
+    # DaData API (TASK-5.3) - INN/BIK lookup
+    DADATA_API_KEY: str = ""  # API key from dadata.ru cabinet
+    DADATA_SECRET_KEY: str = ""  # Secret key from dadata.ru cabinet
+    DADATA_API_URL: str = "https://suggestions.dadata.ru/suggestions/api/4_1/rs"
+    DADATA_MOCK_MODE: bool = True  # Mock mode for development
 
     @property
     def instant_split_org_ids_list(self) -> List[str]:

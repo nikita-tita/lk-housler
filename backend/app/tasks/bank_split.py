@@ -162,6 +162,59 @@ def notify_deal_status_change_task(
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def check_milestone_triggers(self):
+    """
+    TASK-2.4: Check milestones ready for automatic release.
+    Runs every 5 minutes.
+
+    Flow:
+    1. Query deal_milestones in HOLD status where release_scheduled_at < now()
+    2. For milestones with IMMEDIATE, SHORT_HOLD, or DATE triggers, process release
+    3. Update milestone status to RELEASED
+    4. Log results
+
+    Note: CONFIRMATION milestones are not auto-released - they require manual confirmation.
+    """
+    import asyncio
+    from app.db.session import async_session_maker
+    from app.services.bank_split.milestone_service import MilestoneService
+
+    logger.info("Starting milestone triggers check")
+
+    async def _check():
+        async with async_session_maker() as db:
+            service = MilestoneService(db)
+            results = await service.check_milestone_triggers()
+            await db.commit()
+            return results
+
+    try:
+        results = asyncio.get_event_loop().run_until_complete(_check())
+
+        released_count = sum(1 for r in results if r.success)
+        failed_count = sum(1 for r in results if not r.success)
+
+        logger.info(
+            f"Milestone triggers check complete: "
+            f"{released_count} released, {failed_count} failed"
+        )
+
+        return {
+            "status": "ok",
+            "released": released_count,
+            "failed": failed_count,
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"Milestone triggers check failed: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
 def send_invitation_notification_task(
     self,
     phone: str = None,

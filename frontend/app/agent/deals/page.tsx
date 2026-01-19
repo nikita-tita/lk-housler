@@ -158,13 +158,13 @@ export default function DealsPage() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
         <div>
-          <h1 className="text-3xl font-semibold text-gray-900">Сделки</h1>
-          <p className="text-gray-600 mt-1">Управление вашими сделками</p>
+          <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">Сделки</h1>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">Управление вашими сделками</p>
         </div>
         <div className="relative">
-          <Button onClick={() => setShowCreateMenu(!showCreateMenu)}>
+          <Button onClick={() => setShowCreateMenu(!showCreateMenu)} size="sm">
             Создать сделку
             <svg
               className={`w-4 h-4 ml-2 transition-transform ${showCreateMenu ? 'rotate-180' : ''}`}
@@ -217,14 +217,14 @@ export default function DealsPage() {
         </div>
       </div>
 
-      <Card className="mb-6">
-        <CardContent className="p-4">
-          <div className="flex gap-2 flex-wrap">
+      <Card className="mb-4 sm:mb-6">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 sm:flex-wrap scrollbar-hide">
             {FILTER_OPTIONS.map((option) => (
               <button
                 key={option.value}
                 onClick={() => setFilter(option.value)}
-                className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm transition-colors whitespace-nowrap ${
                   filter === option.value
                     ? 'bg-black text-white'
                     : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
@@ -250,56 +250,53 @@ export default function DealsPage() {
               </Link>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {filteredDeals.map((deal) => (
                 <Link
                   key={`${deal.type}-${deal.id}`}
                   href={getDealLink(deal)}
-                  className="block p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="block p-3 sm:p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-gray-900">{deal.address}</p>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium text-gray-900 truncate">{deal.address}</p>
                         {deal.paymentModel && (
                           <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
                             {deal.paymentModel}
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Цена: {formatPrice(deal.price)} • Комиссия:{' '}
-                        {formatPrice(deal.commission)}
+                      <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                        {formatPrice(deal.price)} • {formatPrice(deal.commission)}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
-                        Создано {formatDate(deal.createdAt)}
+                        {formatDate(deal.createdAt)}
                       </p>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <span
-                        className={`px-3 py-1 text-sm rounded-full whitespace-nowrap ${
-                          deal.status === 'draft'
-                            ? 'bg-gray-200 text-gray-900'
-                            : deal.status === 'closed'
-                            ? 'bg-black text-white'
-                            : deal.status === 'cancelled'
-                            ? 'bg-gray-100 text-gray-500'
-                            : deal.status === 'hold_period'
-                            ? 'bg-gray-400 text-white'
-                            : deal.status === 'dispute'
-                            ? 'bg-gray-900 text-white'
-                            : deal.status === 'payment_failed'
-                            ? 'bg-gray-300 text-gray-700'
-                            : deal.status === 'payout_ready' || deal.status === 'payout_in_progress'
-                            ? 'bg-gray-500 text-white'
-                            : deal.status === 'refunded'
-                            ? 'bg-gray-200 text-gray-600'
-                            : 'bg-gray-100 text-gray-900'
-                        }`}
-                      >
-                        {deal.statusLabel}
-                      </span>
-                    </div>
+                    <span
+                      className={`self-start sm:self-center px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-full whitespace-nowrap ${
+                        deal.status === 'draft'
+                          ? 'bg-gray-200 text-gray-900'
+                          : deal.status === 'closed'
+                          ? 'bg-black text-white'
+                          : deal.status === 'cancelled'
+                          ? 'bg-gray-100 text-gray-500'
+                          : deal.status === 'hold_period'
+                          ? 'bg-gray-400 text-white'
+                          : deal.status === 'dispute'
+                          ? 'bg-gray-900 text-white'
+                          : deal.status === 'payment_failed'
+                          ? 'bg-gray-300 text-gray-700'
+                          : deal.status === 'payout_ready' || deal.status === 'payout_in_progress'
+                          ? 'bg-gray-500 text-white'
+                          : deal.status === 'refunded'
+                          ? 'bg-gray-200 text-gray-600'
+                          : 'bg-gray-100 text-gray-900'
+                      }`}
+                    >
+                      {deal.statusLabel}
+                    </span>
                   </div>
                 </Link>
               ))}

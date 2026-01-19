@@ -78,42 +78,42 @@ export default function AgencyDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-gray-900">Dashboard агентства</h1>
-        <p className="text-gray-600 mt-1">Обзор деятельности вашего агентства</p>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">Главная</h1>
+        <p className="text-gray-600 mt-1 text-sm sm:text-base">Обзор деятельности вашего агентства</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
         <Card>
-          <CardHeader>
-            <CardDescription>Агенты</CardDescription>
-            <CardTitle className="text-4xl">{stats.totalAgents}</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardDescription className="text-xs sm:text-sm">Агенты</CardDescription>
+            <CardTitle className="text-2xl sm:text-4xl">{stats.totalAgents}</CardTitle>
           </CardHeader>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardDescription>Активные сделки</CardDescription>
-            <CardTitle className="text-4xl">{stats.activeDeals}</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardDescription className="text-xs sm:text-sm">Активные сделки</CardDescription>
+            <CardTitle className="text-2xl sm:text-4xl">{stats.activeDeals}</CardTitle>
           </CardHeader>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardDescription>Завершено</CardDescription>
-            <CardTitle className="text-4xl">{stats.completedDeals}</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardDescription className="text-xs sm:text-sm">Завершено</CardDescription>
+            <CardTitle className="text-2xl sm:text-4xl">{stats.completedDeals}</CardTitle>
           </CardHeader>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardDescription>Выручка</CardDescription>
-            <CardTitle className="text-3xl">{formatPrice(stats.totalRevenue)}</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardDescription className="text-xs sm:text-sm">Выручка</CardDescription>
+            <CardTitle className="text-xl sm:text-3xl">{formatPrice(stats.totalRevenue)}</CardTitle>
           </CardHeader>
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Топ агенты</CardTitle>

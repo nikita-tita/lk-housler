@@ -704,3 +704,61 @@ async def send_bank_split_contract_signed_email(
     html = _get_html_wrapper(html_content)
 
     return await provider.send(email, subject, html, html=True)
+
+
+# =============================================================================
+# NPD Receipt Email Templates (TASK-3.3)
+# =============================================================================
+
+
+async def send_npd_receipt_reminder_email(
+    email: str,
+    recipient_name: str,
+    deal_address: str,
+    amount: float,
+    receipt_id: str,
+    reminder_number: int = 1,
+) -> bool:
+    """Send NPD receipt reminder email to self-employed"""
+    provider = get_email_provider()
+
+    formatted_amount = f"{amount:,.0f}".replace(",", " ")
+
+    if reminder_number == 1:
+        subject = f"Housler: сформируйте чек НПД на {formatted_amount} руб."
+        urgency_text = ""
+        deadline_text = "У вас есть 7 дней для формирования чека."
+    elif reminder_number == 2:
+        subject = f"Housler: напоминание о чеке НПД на {formatted_amount} руб."
+        urgency_text = '<p style="color: #B91C1C; font-weight: bold;">Срок истекает через 4 дня!</p>'
+        deadline_text = "Пожалуйста, сформируйте чек как можно скорее."
+    else:
+        subject = f"Housler: СРОЧНО - чек НПД на {formatted_amount} руб. просрочен"
+        urgency_text = '<p style="color: #B91C1C; font-weight: bold;">Срок формирования чека истёк!</p>'
+        deadline_text = "Сформируйте чек немедленно во избежание штрафов."
+
+    address_text = f" по сделке <strong>{deal_address}</strong>" if deal_address else ""
+
+    html_content = f"""
+<h2>Напоминание о чеке НПД</h2>
+<p>Здравствуйте, {recipient_name}!</p>
+{urgency_text}
+<p>Вы получили выплату{address_text} на сумму <strong>{formatted_amount} руб.</strong></p>
+<p>Как самозанятый, вы обязаны сформировать чек НПД в приложении <strong>Мой налог</strong>.</p>
+<p>{deadline_text}</p>
+<h3>Как сформировать чек:</h3>
+<ol>
+    <li>Откройте приложение <strong>Мой налог</strong></li>
+    <li>Нажмите <strong>Новая продажа</strong></li>
+    <li>Выберите <strong>Юридическому лицу</strong></li>
+    <li>Укажите сумму: {formatted_amount} руб.</li>
+    <li>Наименование услуги: <em>Услуги агента по сделке с недвижимостью</em></li>
+    <li>ИНН заказчика: {settings.COMPANY_INN}</li>
+    <li>Сохраните номер чека</li>
+</ol>
+<a href="{settings.FRONTEND_URL}/agent/receipts/{receipt_id}" class="button">Загрузить данные чека</a>
+<p>После формирования чека загрузите его номер в личном кабинете.</p>
+"""
+    html = _get_html_wrapper(html_content)
+
+    return await provider.send(email, subject, html, html=True)

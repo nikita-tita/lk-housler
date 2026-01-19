@@ -6,6 +6,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi.responses import Response
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,7 +16,7 @@ from app.models.user import User
 from app.models.deal import Deal
 from app.models.dispute import Dispute
 from app.models.bank_split import DealSplitRecipient
-from app.services.analytics import AnalyticsService
+from app.services.analytics import AnalyticsService, ExportService, ExportFormat
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -365,3 +366,404 @@ async def mark_payout_paid(
         "payout_status": recipient.payout_status,
         "paid_at": recipient.paid_at.isoformat(),
     }
+
+
+# ============================================
+# Export endpoints
+# ============================================
+
+
+def _get_export_response(
+    data: bytes,
+    format: ExportFormat,
+    filename: str,
+) -> Response:
+    """Create response with appropriate content type for export"""
+    if format == ExportFormat.CSV:
+        media_type = "text/csv; charset=utf-8"
+        filename = f"{filename}.csv"
+    else:
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        filename = f"{filename}.xlsx"
+
+    return Response(
+        content=data,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
+@router.get("/analytics/export/deals")
+async def export_deals(
+    format: str = Query("csv", regex="^(csv|xlsx)$", description="Export format: csv or xlsx"),
+    start_date: Optional[datetime] = Query(None, description="Filter from date"),
+    end_date: Optional[datetime] = Query(None, description="Filter to date"),
+    status_filter: Optional[str] = Query(None, alias="status", description="Filter by status"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Export deals to CSV or Excel.
+
+    Returns a file download with deals data for the current user.
+    """
+    export_service = ExportService(db)
+    export_format = ExportFormat(format)
+
+    data = await export_service.export_deals(
+        format=export_format,
+        user_id=current_user.id,
+        start_date=start_date,
+        end_date=end_date,
+        status_filter=status_filter,
+    )
+
+    filename = f"deals_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+    return _get_export_response(data, export_format, filename)
+
+
+@router.get("/analytics/export/payouts")
+async def export_payouts(
+    format: str = Query("csv", regex="^(csv|xlsx)$", description="Export format: csv or xlsx"),
+    start_date: Optional[datetime] = Query(None, description="Filter from date"),
+    end_date: Optional[datetime] = Query(None, description="Filter to date"),
+    status_filter: Optional[str] = Query(None, alias="status", description="Filter by status"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Export payouts to CSV or Excel.
+
+    Returns a file download with payout data for the current user.
+    """
+    export_service = ExportService(db)
+    export_format = ExportFormat(format)
+
+    data = await export_service.export_payouts(
+        format=export_format,
+        user_id=current_user.id,
+        start_date=start_date,
+        end_date=end_date,
+        status_filter=status_filter,
+    )
+
+    filename = f"payouts_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+    return _get_export_response(data, export_format, filename)
+
+
+@router.get("/analytics/export/time-series")
+async def export_time_series(
+    format: str = Query("csv", regex="^(csv|xlsx)$", description="Export format: csv or xlsx"),
+    days: int = Query(30, ge=1, le=365, description="Number of days"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Export time series data to CSV or Excel.
+
+    Returns daily deal statistics for charting.
+    """
+    export_service = ExportService(db)
+    export_format = ExportFormat(format)
+
+    data = await export_service.export_time_series(
+        format=export_format,
+        days=days,
+        user_id=current_user.id,
+    )
+
+    filename = f"time_series_{days}d_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+    return _get_export_response(data, export_format, filename)
+
+
+@router.get("/analytics/export/summary")
+async def export_summary(
+    format: str = Query("csv", regex="^(csv|xlsx)$", description="Export format: csv or xlsx"),
+    start_date: Optional[datetime] = Query(None, description="Filter from date"),
+    end_date: Optional[datetime] = Query(None, description="Filter to date"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Export summary statistics to CSV or Excel.
+
+    Returns aggregated statistics for the current user.
+    """
+    export_service = ExportService(db)
+    export_format = ExportFormat(format)
+
+    data = await export_service.export_summary(
+        format=export_format,
+        user_id=current_user.id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+    filename = f"summary_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+    return _get_export_response(data, export_format, filename)
+
+
+# ============================================
+# Admin Export endpoints (all data)
+# ============================================
+
+
+@router.get("/admin/export/deals")
+async def admin_export_deals(
+    format: str = Query("csv", regex="^(csv|xlsx)$", description="Export format"),
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
+    status_filter: Optional[str] = Query(None, alias="status"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Export ALL deals (admin only)"""
+    require_admin(current_user)
+
+    export_service = ExportService(db)
+    export_format = ExportFormat(format)
+
+    data = await export_service.export_deals(
+        format=export_format,
+        user_id=None,  # All users
+        start_date=start_date,
+        end_date=end_date,
+        status_filter=status_filter,
+    )
+
+    filename = f"all_deals_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+    return _get_export_response(data, export_format, filename)
+
+
+@router.get("/admin/export/payouts")
+async def admin_export_payouts(
+    format: str = Query("csv", regex="^(csv|xlsx)$", description="Export format"),
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
+    status_filter: Optional[str] = Query(None, alias="status"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Export ALL payouts (admin only)"""
+    require_admin(current_user)
+
+    export_service = ExportService(db)
+    export_format = ExportFormat(format)
+
+    data = await export_service.export_payouts(
+        format=export_format,
+        user_id=None,  # All users
+        start_date=start_date,
+        end_date=end_date,
+        status_filter=status_filter,
+    )
+
+    filename = f"all_payouts_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+    return _get_export_response(data, export_format, filename)
+
+
+@router.get("/admin/export/disputes")
+async def admin_export_disputes(
+    format: str = Query("csv", regex="^(csv|xlsx)$", description="Export format"),
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
+    status_filter: Optional[str] = Query(None, alias="status"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Export ALL disputes (admin only)"""
+    require_admin(current_user)
+
+    export_service = ExportService(db)
+    export_format = ExportFormat(format)
+
+    data = await export_service.export_disputes(
+        format=export_format,
+        start_date=start_date,
+        end_date=end_date,
+        status_filter=status_filter,
+    )
+
+    filename = f"all_disputes_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+    return _get_export_response(data, export_format, filename)
+
+
+@router.get("/admin/export/summary")
+async def admin_export_summary(
+    format: str = Query("csv", regex="^(csv|xlsx)$", description="Export format"),
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Export global summary statistics (admin only)"""
+    require_admin(current_user)
+
+    export_service = ExportService(db)
+    export_format = ExportFormat(format)
+
+    data = await export_service.export_summary(
+        format=export_format,
+        user_id=None,  # Global stats
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+    filename = f"global_summary_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+    return _get_export_response(data, export_format, filename)
+
+
+# ============================================
+# Webhook DLQ endpoints (admin only)
+# ============================================
+
+
+@router.get("/admin/webhooks/dlq")
+async def list_dlq_entries(
+    resolved: bool = Query(False, description="Show resolved entries"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    List webhook Dead Letter Queue entries.
+
+    DLQ contains failed webhook events that need manual review or retry.
+    """
+    require_admin(current_user)
+
+    from app.services.bank_split.webhook_service import WebhookService
+
+    webhook_service = WebhookService(db)
+    entries, total = await webhook_service.get_dlq_entries(
+        resolved=resolved,
+        limit=limit,
+        offset=offset,
+    )
+
+    return {
+        "items": [
+            {
+                "id": str(e.id),
+                "event_type": e.event_type,
+                "error_message": e.error_message,
+                "retry_count": e.retry_count,
+                "last_retry_at": e.last_retry_at.isoformat() if e.last_retry_at else None,
+                "resolved_at": e.resolved_at.isoformat() if e.resolved_at else None,
+                "deal_id": str(e.deal_id) if e.deal_id else None,
+                "created_at": e.created_at.isoformat(),
+            }
+            for e in entries
+        ],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@router.get("/admin/webhooks/dlq/{dlq_id}")
+async def get_dlq_entry(
+    dlq_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get detailed DLQ entry including full payload.
+    """
+    require_admin(current_user)
+
+    from app.services.bank_split.webhook_service import WebhookService
+
+    webhook_service = WebhookService(db)
+    entry = await webhook_service.get_dlq_entry(dlq_id)
+
+    if not entry:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="DLQ entry not found"
+        )
+
+    return {
+        "id": str(entry.id),
+        "event_type": entry.event_type,
+        "payload": entry.payload,
+        "error_message": entry.error_message,
+        "retry_count": entry.retry_count,
+        "last_retry_at": entry.last_retry_at.isoformat() if entry.last_retry_at else None,
+        "resolved_at": entry.resolved_at.isoformat() if entry.resolved_at else None,
+        "deal_id": str(entry.deal_id) if entry.deal_id else None,
+        "created_at": entry.created_at.isoformat(),
+        "updated_at": entry.updated_at.isoformat(),
+    }
+
+
+@router.post("/admin/webhooks/dlq/{dlq_id}/retry")
+async def retry_dlq_entry(
+    dlq_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Mark DLQ entry for retry.
+
+    This increments the retry count and updates last_retry_at.
+    Actual retry logic should be handled by a background worker.
+    """
+    require_admin(current_user)
+
+    from app.services.bank_split.webhook_service import WebhookService
+
+    webhook_service = WebhookService(db)
+
+    try:
+        entry = await webhook_service.retry_dlq_entry(dlq_id)
+        await db.commit()
+
+        return {
+            "id": str(entry.id),
+            "retry_count": entry.retry_count,
+            "last_retry_at": entry.last_retry_at.isoformat(),
+            "message": "Entry marked for retry"
+        }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.post("/admin/webhooks/dlq/{dlq_id}/resolve")
+async def resolve_dlq_entry(
+    dlq_id: UUID,
+    notes: Optional[str] = Query(None, description="Resolution notes"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Mark DLQ entry as resolved.
+
+    Use this when the issue has been manually resolved or is no longer relevant.
+    """
+    require_admin(current_user)
+
+    from app.services.bank_split.webhook_service import WebhookService
+
+    webhook_service = WebhookService(db)
+
+    try:
+        entry = await webhook_service.resolve_dlq_entry(dlq_id, resolution_notes=notes)
+        await db.commit()
+
+        return {
+            "id": str(entry.id),
+            "resolved_at": entry.resolved_at.isoformat(),
+            "message": "Entry resolved"
+        }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )

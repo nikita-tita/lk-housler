@@ -1,19 +1,18 @@
-"""Dispute API endpoints"""
+"""Dispute API endpoints (TASK-2.3 - Updated with DisputeService)"""
 
 import logging
-from datetime import datetime
 from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
-from app.models.dispute import Dispute, DisputeEvidence, DisputeStatus, RefundStatus
+from app.models.dispute import Dispute, DisputeEvidence, DisputeStatus
 from app.schemas.dispute import (
     DisputeCreate,
     DisputeResponse,
@@ -22,9 +21,8 @@ from app.schemas.dispute import (
     DisputeEvidenceResponse,
     DisputeResolve,
 )
+from app.services.dispute import DisputeService
 from app.services.bank_split import BankSplitDealService
-from app.models.deal import DealStatus
-from app.integrations.tbank import get_tbank_deals_client, TBankError
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -46,61 +44,35 @@ async def create_dispute(
     Open a dispute for a deal.
 
     Only deal participants can open disputes.
+    This will:
+    - Lock the deal (dispute_locked=True)
+    - Change deal status to DISPUTE
+    - Set escalation timers (agency 24h, max 7d)
     """
-    service = BankSplitDealService(db)
-    deal = await service.get_deal(deal_id)
-
-    if not deal:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
-
-    # Check if user is participant
-    is_participant = (
-        deal.created_by_user_id == current_user.id or
-        deal.agent_user_id == current_user.id
-    )
-    if not is_participant:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only deal participants can open disputes")
-
-    # Check if there's already an open dispute
-    existing = await db.execute(
-        select(Dispute).where(
-            Dispute.deal_id == deal_id,
-            Dispute.status.in_(["open", "under_review"])
-        )
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="There is already an open dispute for this deal"
-        )
-
     # Validate reason
-    valid_reasons = ["service_not_provided", "service_quality", "incorrect_amount", "duplicate_payment", "unauthorized_payment", "other"]
+    valid_reasons = [
+        "service_not_provided",
+        "service_quality",
+        "incorrect_amount",
+        "duplicate_payment",
+        "unauthorized_payment",
+        "other",
+    ]
     if dispute_in.reason not in valid_reasons:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid reason. Must be one of: {valid_reasons}"
         )
 
-    # Create dispute
-    dispute = Dispute(
+    service = DisputeService(db)
+    dispute = await service.create_dispute(
         deal_id=deal_id,
-        initiator_user_id=current_user.id,
+        user_id=current_user.id,
         reason=dispute_in.reason,
         description=dispute_in.description,
         refund_requested=dispute_in.refund_requested,
-        refund_amount=dispute_in.refund_amount if dispute_in.refund_requested else None,
-        refund_status=RefundStatus.REQUESTED.value if dispute_in.refund_requested else RefundStatus.NOT_REQUESTED.value,
+        refund_amount=dispute_in.refund_amount,
     )
-
-    db.add(dispute)
-
-    # Update deal status to DISPUTE
-    deal.status = DealStatus.DISPUTE.value
-    logger.info(f"Deal {deal_id} status changed to DISPUTE due to dispute creation")
-
-    await db.commit()
-    await db.refresh(dispute)
 
     return DisputeResponse.model_validate(dispute)
 
@@ -112,22 +84,24 @@ async def get_dispute(
     db: AsyncSession = Depends(get_db),
 ):
     """Get dispute by ID"""
-    result = await db.execute(
-        select(Dispute)
-        .options(selectinload(Dispute.evidence))
-        .where(Dispute.id == dispute_id)
-    )
-    dispute = result.scalar_one_or_none()
+    service = DisputeService(db)
+    dispute = await service.get_dispute(dispute_id)
 
     if not dispute:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dispute not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Dispute not found"
+        )
 
     # Get deal to check access
-    service = BankSplitDealService(db)
-    deal = await service.get_deal(dispute.deal_id)
+    deal_service = BankSplitDealService(db)
+    deal = await deal_service.get_deal(dispute.deal_id)
 
     if not deal:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Deal not found"
+        )
 
     # Check access (participant or admin)
     is_participant = (
@@ -138,7 +112,10 @@ async def get_dispute(
     is_admin = current_user.role == "admin"
 
     if not is_participant and not is_admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
 
     return DisputeResponse.model_validate(dispute)
 
@@ -150,11 +127,14 @@ async def get_deal_disputes(
     db: AsyncSession = Depends(get_db),
 ):
     """Get all disputes for a deal"""
-    service = BankSplitDealService(db)
-    deal = await service.get_deal(deal_id)
+    deal_service = BankSplitDealService(db)
+    deal = await deal_service.get_deal(deal_id)
 
     if not deal:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Deal not found"
+        )
 
     # Check access
     is_participant = (
@@ -164,15 +144,13 @@ async def get_deal_disputes(
     is_admin = current_user.role == "admin"
 
     if not is_participant and not is_admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
 
-    result = await db.execute(
-        select(Dispute)
-        .options(selectinload(Dispute.evidence))
-        .where(Dispute.deal_id == deal_id)
-        .order_by(Dispute.created_at.desc())
-    )
-    disputes = result.scalars().all()
+    service = DisputeService(db)
+    disputes = await service.get_deal_disputes(deal_id)
 
     return [DisputeResponse.model_validate(d) for d in disputes]
 
@@ -185,21 +163,33 @@ async def add_evidence(
     db: AsyncSession = Depends(get_db),
 ):
     """Add evidence to a dispute"""
-    dispute = await db.get(Dispute, dispute_id)
+    service = DisputeService(db)
+    dispute = await service.get_dispute(dispute_id)
 
     if not dispute:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dispute not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Dispute not found"
+        )
 
     # Check if dispute is still open
-    if dispute.status not in ["open", "under_review"]:
+    open_statuses = [
+        DisputeStatus.OPEN.value,
+        DisputeStatus.AGENCY_REVIEW.value,
+        DisputeStatus.PLATFORM_REVIEW.value,
+        "open",
+        "agency_review",
+        "platform_review",
+    ]
+    if dispute.status not in open_statuses:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot add evidence to closed dispute"
         )
 
     # Get deal to check access
-    service = BankSplitDealService(db)
-    deal = await service.get_deal(dispute.deal_id)
+    deal_service = BankSplitDealService(db)
+    deal = await deal_service.get_deal(dispute.deal_id)
 
     is_participant = (
         deal.created_by_user_id == current_user.id or
@@ -209,7 +199,10 @@ async def add_evidence(
     is_admin = current_user.role == "admin"
 
     if not is_participant and not is_admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
 
     # Validate file type
     valid_types = ["image", "pdf", "document"]
@@ -243,24 +236,43 @@ async def cancel_dispute(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Cancel a dispute (by initiator)"""
-    dispute = await db.get(Dispute, dispute_id)
+    """
+    Cancel a dispute (by initiator only).
 
-    if not dispute:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dispute not found")
+    This will:
+    - Unlock the deal (dispute_locked=False)
+    - Return deal to HOLD_PERIOD status
+    """
+    service = DisputeService(db)
+    dispute = await service.cancel_dispute(
+        dispute_id=dispute_id,
+        user_id=current_user.id,
+    )
 
-    if dispute.initiator_user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only initiator can cancel")
+    return DisputeResponse.model_validate(dispute)
 
-    if dispute.status not in ["open", "under_review"]:
+
+@router.post("/disputes/{dispute_id}/escalate", response_model=DisputeResponse)
+async def escalate_dispute(
+    dispute_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Escalate dispute to platform level (admin only).
+
+    This will:
+    - Change escalation_level from 'agency' to 'platform'
+    - Set platform_deadline (72h from now)
+    """
+    if current_user.role != "admin":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot cancel dispute in this status"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
         )
 
-    dispute.status = DisputeStatus.CANCELLED.value
-    await db.commit()
-    await db.refresh(dispute)
+    service = DisputeService(db)
+    dispute = await service.escalate_to_platform(dispute_id)
 
     return DisputeResponse.model_validate(dispute)
 
@@ -280,122 +292,69 @@ async def resolve_dispute(
     """
     Resolve a dispute (admin only).
 
-    This sets the resolution and may trigger a refund.
+    This will:
+    - Set resolution and mark as resolved
+    - Unlock the deal (dispute_locked=False)
+    - Process refund/release based on resolution:
+      - full_refund: Cancel deal in T-Bank, refund to payer
+      - partial_refund: Process partial refund
+      - no_refund: Release funds to recipients
+      - split_adjustment: Release with adjusted splits
     """
-    # Check admin role
     if current_user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
 
-    result = await db.execute(
-        select(Dispute)
-        .options(selectinload(Dispute.evidence))
-        .where(Dispute.id == dispute_id)
+    service = DisputeService(db)
+    dispute = await service.resolve_dispute(
+        dispute_id=dispute_id,
+        resolution=resolve_in.resolution,
+        admin_user_id=current_user.id,
+        resolution_notes=resolve_in.resolution_notes,
+        refund_amount=resolve_in.refund_amount,
     )
-    dispute = result.scalar_one_or_none()
-
-    if not dispute:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dispute not found")
-
-    if dispute.status not in ["open", "under_review"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Dispute is already resolved or cancelled"
-        )
-
-    # Validate resolution
-    valid_resolutions = ["full_refund", "partial_refund", "no_refund", "split_adjustment"]
-    if resolve_in.resolution not in valid_resolutions:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid resolution. Must be one of: {valid_resolutions}"
-        )
-
-    # Update dispute
-    dispute.status = DisputeStatus.RESOLVED.value
-    dispute.resolution = resolve_in.resolution
-    dispute.resolution_notes = resolve_in.resolution_notes
-    dispute.resolved_by_user_id = current_user.id
-    dispute.resolved_at = datetime.utcnow()
-
-    # Get the deal to update status
-    service = BankSplitDealService(db)
-    deal = await service.get_deal(dispute.deal_id)
-
-    # Handle refund
-    if resolve_in.resolution in ["full_refund", "partial_refund"]:
-        if resolve_in.resolution == "partial_refund" and not resolve_in.refund_amount:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Refund amount required for partial refund"
-            )
-
-        dispute.refund_status = RefundStatus.APPROVED.value
-        if resolve_in.refund_amount:
-            dispute.refund_amount = resolve_in.refund_amount
-
-        # Process refund via T-Bank if deal has external_deal_id
-        if deal and deal.external_deal_id and deal.payment_model == "bank_hold_split":
-            try:
-                dispute.refund_status = RefundStatus.PROCESSING.value
-                tbank = get_tbank_deals_client()
-                result = await tbank.cancel_deal(
-                    deal.external_deal_id,
-                    reason=f"Dispute resolved: {resolve_in.resolution}"
-                )
-                dispute.refund_status = RefundStatus.COMPLETED.value
-                dispute.refund_external_id = deal.external_deal_id
-                dispute.refund_processed_at = datetime.utcnow()
-                deal.status = DealStatus.REFUNDED.value
-                logger.info(f"Deal {deal.id} refunded via T-Bank")
-            except TBankError as e:
-                dispute.refund_status = RefundStatus.FAILED.value
-                logger.error(f"T-Bank refund failed for deal {deal.id}: {e}")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Refund processing failed: {str(e)}"
-                )
-        else:
-            # For legacy MoR deals, just mark as approved (manual refund)
-            deal.status = DealStatus.REFUNDED.value
-    else:
-        # No refund - return to previous state or close
-        if resolve_in.resolution == "no_refund":
-            # Dispute resolved in favor of service provider - return to hold or close
-            if deal:
-                deal.status = DealStatus.HOLD_PERIOD.value
-        elif resolve_in.resolution == "split_adjustment":
-            # Split was adjusted - can proceed
-            if deal:
-                deal.status = DealStatus.HOLD_PERIOD.value
-
-    await db.commit()
-    await db.refresh(dispute)
 
     return DisputeResponse.model_validate(dispute)
 
 
 @router.get("/admin/disputes", response_model=DisputeListResponse)
 async def list_disputes_admin(
-    status: str = None,
+    dispute_status: str = None,
+    escalation_level: str = None,
     page: int = 1,
     size: int = 20,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all disputes (admin only)"""
+    """
+    List all disputes (admin only).
+
+    Filters:
+    - dispute_status: Filter by status (open, agency_review, platform_review, resolved, etc.)
+    - escalation_level: Filter by escalation level (agency, platform)
+    """
     if current_user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
 
     query = select(Dispute).options(selectinload(Dispute.evidence))
 
-    if status:
-        query = query.where(Dispute.status == status)
+    if dispute_status:
+        query = query.where(Dispute.status == dispute_status)
+
+    if escalation_level:
+        query = query.where(Dispute.escalation_level == escalation_level)
 
     # Count total
-    from sqlalchemy import func
     count_query = select(func.count(Dispute.id))
-    if status:
-        count_query = count_query.where(Dispute.status == status)
+    if dispute_status:
+        count_query = count_query.where(Dispute.status == dispute_status)
+    if escalation_level:
+        count_query = count_query.where(Dispute.escalation_level == escalation_level)
     total_result = await db.execute(count_query)
     total = total_result.scalar()
 

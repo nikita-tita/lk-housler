@@ -9,74 +9,118 @@ from sqlalchemy.orm import relationship
 from app.db.base import BaseModel
 
 
-class TemplateType(str, PyEnum):
-    """Contract template type"""
+class ContractLayer(str, PyEnum):
+    """Уровень договора в двухслойной архитектуре
 
-    SECONDARY_BUY = "secondary_buy"
-    SECONDARY_SELL = "secondary_sell"
-    NEWBUILD_BOOKING = "newbuild_booking"
-    ACT = "act"
-    ADDITIONAL_AGREEMENT = "additional_agreement"
-    TERMINATION = "termination"
-    PD_CONSENT = "pd_consent"
-    # Bank-split contract types
+    PLATFORM: Договоры между пользователем и платформой Housler
+              (Terms of Service, User Agreement)
+    TRANSACTION: Договоры между участниками сделки
+                 (агент-клиент, агентство-агент и т.д.)
+    """
+
+    PLATFORM = "platform"  # Housler - User (ToS)
+    TRANSACTION = "transaction"  # Agent - Client, Agency - Agent
+
+
+class TemplateType(str, PyEnum):
+    """Тип шаблона договора"""
+
+    # Platform layer - соглашения с платформой
+    USER_AGREEMENT = "user_agreement"  # Пользовательское соглашение (Terms of Service)
+
+    # Основные шаблоны по сценариям
+    TPL_001_BUY = "tpl_001_buy"  # Договор оказания услуг (покупка)
+    TPL_002_SELL = "tpl_002_sell"  # Договор оказания услуг (продажа)
+    TPL_003_RENT = "tpl_003_rent"  # Договор оказания услуг (аренда)
+    TPL_004_EXCLUSIVE = "tpl_004_exclusive"  # Эксклюзивный договор
+    TPL_005_COAGENT = "tpl_005_coagent"  # Соглашение о разделе комиссии
+    TPL_006_AGENCY_AGENT = "tpl_006_agency_agent"  # Агентский договор (агентство-агент)
+
+    # Вспомогательные документы
+    ACT = "act"  # Акт выполненных работ
+    ADDITIONAL_AGREEMENT = "additional_agreement"  # Дополнительное соглашение
+    TERMINATION = "termination"  # Соглашение о расторжении
+    PD_CONSENT = "pd_consent"  # Согласие на обработку ПД
+
+    # Bank-split специфичные
     BANK_SPLIT_AGENT_AGREEMENT = "bank_split_agent_agreement"
     BANK_SPLIT_CLIENT_AGREEMENT = "bank_split_client_agreement"
     BANK_SPLIT_AGENCY_AGREEMENT = "bank_split_agency_agreement"
 
+    # Legacy (обратная совместимость)
+    SECONDARY_BUY = "secondary_buy"
+    SECONDARY_SELL = "secondary_sell"
+    NEWBUILD_BOOKING = "newbuild_booking"
+
 
 class TemplateStatus(str, PyEnum):
-    """Template workflow status"""
+    """Статус шаблона в workflow"""
 
-    DRAFT = "draft"
-    PENDING_REVIEW = "pending_review"
-    APPROVED = "approved"
-    PUBLISHED = "published"
-    ARCHIVED = "archived"
+    DRAFT = "draft"  # Черновик
+    PENDING_REVIEW = "pending_review"  # На проверке
+    APPROVED = "approved"  # Одобрен
+    PUBLISHED = "published"  # Опубликован
+    ARCHIVED = "archived"  # В архиве
 
 
 class DocumentStatus(str, PyEnum):
-    """Document status"""
+    """Статус документа"""
 
-    GENERATED = "generated"
-    SENT = "sent"
-    SIGNED = "signed"
-    VOIDED = "voided"
+    GENERATED = "generated"  # Сгенерирован
+    SENT = "sent"  # Отправлен
+    SIGNED = "signed"  # Подписан
+    VOIDED = "voided"  # Аннулирован
 
 
 class SignatureMethod(str, PyEnum):
-    """Signature method"""
+    """Метод подписания"""
 
     PEP_SMS = "pep_sms"  # Простая электронная подпись (OTP по SMS)
     UKEP = "ukep"  # Усиленная квалифицированная (Phase 2)
 
 
+class PartyTypeCode(str, PyEnum):
+    """Тип участников сделки для шаблона"""
+
+    AGENT_CLIENT = "agent_client"  # Агент - Клиент
+    AGENCY_CLIENT = "agency_client"  # Агентство - Клиент
+    AGENT_AGENT = "agent_agent"  # Агент - Со-агент
+    AGENCY_AGENT = "agency_agent"  # Агентство - Агент
+
+
 class ContractTemplate(BaseModel):
-    """Contract template with versioning and workflow"""
+    """Шаблон договора с версионированием и workflow"""
 
     __tablename__ = "contract_templates"
 
-    # Identification
-    code = Column(String(50), nullable=False, index=True)  # secondary_buy, act, etc.
-    type = Column(Enum(TemplateType), nullable=False)
+    # Идентификация
+    code = Column(String(50), nullable=False, index=True)  # TPL-001, TPL-002 и т.д.
+    type = Column(String(50), nullable=False)  # String в БД, значения из TemplateType
     version = Column(String(20), nullable=False)  # "1.0", "1.1", "2.0"
-    name = Column(String(255), nullable=False)  # Display name
-    description = Column(Text, nullable=True)  # Description for admins
+    name = Column(String(255), nullable=False)  # Название для отображения
+    description = Column(Text, nullable=True)  # Описание для админов
 
-    # Content
-    template_body = Column(Text, nullable=False)  # HTML template
-    placeholders_schema = Column(JSONB, nullable=False)  # JSON Schema of placeholders
+    # Contract Layer (two-layer architecture)
+    layer = Column(String(20), nullable=False, default="transaction", index=True)  # platform / transaction
 
-    # Metadata
-    legal_basis = Column(Text, nullable=True)  # Legal references (ГК РФ, 63-ФЗ, etc.)
-    effective_from = Column(Date, nullable=True)  # Effective date
+    # Применимость шаблона
+    deal_types = Column(JSONB, nullable=True)  # ["sale_buy", "sale_sell"] - к каким типам сделок применим
+    party_types = Column(JSONB, nullable=True)  # ["agent_client", "agency_client"] - какие стороны
 
-    # Workflow status
-    status = Column(Enum(TemplateStatus), default=TemplateStatus.DRAFT, nullable=False, index=True)
-    active = Column(Boolean, default=False, nullable=False)  # Is used for new deals
+    # Контент
+    template_body = Column(Text, nullable=False)  # HTML/Jinja шаблон
+    placeholders_schema = Column(JSONB, nullable=False)  # JSON Schema плейсхолдеров
+
+    # Метаданные
+    legal_basis = Column(Text, nullable=True)  # Правовые ссылки (ГК РФ, 63-ФЗ и т.д.)
+    effective_from = Column(Date, nullable=True)  # Дата вступления в силу
+
+    # Статус workflow
+    status = Column(String(20), default="draft", nullable=False, index=True)  # String в БД
+    active = Column(Boolean, default=False, nullable=False)  # Используется для новых сделок
     published_at = Column(DateTime, nullable=True)
 
-    # Audit
+    # Аудит
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     approved_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     approved_at = Column(DateTime, nullable=True)

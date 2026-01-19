@@ -9,8 +9,6 @@
 
 import Link from 'next/link';
 
-const DOCS_BASE_URL = 'https://agent.housler.ru';
-
 export function Footer() {
   const currentYear = new Date().getFullYear();
 
@@ -87,25 +85,28 @@ export function Footer() {
           </p>
           <div className="flex flex-wrap justify-center gap-4 text-[13px] text-[var(--color-text-light)]">
             <Link
-              href={`${DOCS_BASE_URL}/doc/clients/politiki/privacy`}
-              target="_blank"
+              href="/legal/privacy"
               className="hover:text-[var(--color-accent)] transition-colors"
             >
-              Политика конфиденциальности
+              Политика ПД
             </Link>
             <Link
-              href={`${DOCS_BASE_URL}/doc/clients/soglasiya/terms`}
-              target="_blank"
+              href="/legal/terms"
               className="hover:text-[var(--color-accent)] transition-colors"
             >
               Пользовательское соглашение
             </Link>
             <Link
-              href={`${DOCS_BASE_URL}/doc`}
-              target="_blank"
+              href="/legal/support"
               className="hover:text-[var(--color-accent)] transition-colors"
             >
-              Документы
+              Поддержка
+            </Link>
+            <Link
+              href="/legal/requisites"
+              className="hover:text-[var(--color-accent)] transition-colors"
+            >
+              Контакты
             </Link>
           </div>
         </div>

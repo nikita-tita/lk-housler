@@ -56,14 +56,31 @@ class DisputeResponse(BaseModel):
     reason: str
     description: str
     status: str
+
+    # Escalation info (TASK-2.3)
+    escalation_level: str = "agency"
+    escalated_at: Optional[datetime] = None
+    agency_deadline: Optional[datetime] = None
+    platform_deadline: Optional[datetime] = None
+    max_deadline: Optional[datetime] = None
+
+    # Agency decision (first level)
+    agency_decision: Optional[str] = None
+    agency_decision_notes: Optional[str] = None
+    agency_decision_at: Optional[datetime] = None
+
+    # Final resolution
     resolution: Optional[str] = None
     resolution_notes: Optional[str] = None
     resolved_by_user_id: Optional[int] = None
     resolved_at: Optional[datetime] = None
+
+    # Refund tracking
     refund_requested: bool
     refund_amount: Optional[Decimal] = None
     refund_status: str
     refund_processed_at: Optional[datetime] = None
+
     evidence: List[DisputeEvidenceResponse] = []
     created_at: datetime
     updated_at: datetime

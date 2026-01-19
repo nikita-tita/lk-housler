@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.models.deal import DealType, DealStatus, ExecutorType, PartyRole
+from app.models.deal import DealType, DealStatus, ExecutorType, PartyRole, PropertyType, PaymentType, AdvanceType
 
 
 # ============================================
@@ -43,6 +43,7 @@ class DealCreateSimple(BaseModel):
     """Simplified deal creation for MVP"""
 
     type: DealType
+    property_type: Optional[PropertyType] = None
 
     # Address
     address: AddressCreate
@@ -50,6 +51,20 @@ class DealCreateSimple(BaseModel):
     # Financials
     price: int = Field(..., gt=0, description="Property price in rubles")
     commission: int = Field(..., gt=0, description="Agent commission in rubles")
+
+    # Payment configuration
+    payment_type: Optional[PaymentType] = PaymentType.PERCENT
+    commission_percent: Optional[Decimal] = Field(None, ge=0, le=100)
+    commission_fixed: Optional[Decimal] = Field(None, ge=0)
+
+    # Advance
+    advance_type: Optional[AdvanceType] = AdvanceType.NONE
+    advance_amount: Optional[Decimal] = Field(None, ge=0)
+    advance_percent: Optional[Decimal] = Field(None, ge=0, le=100)
+
+    # Exclusive
+    is_exclusive: bool = False
+    exclusive_until: Optional[datetime] = None
 
     # Client
     client_name: str = Field(..., min_length=2, max_length=255)
@@ -177,6 +192,11 @@ class Deal(DealBase):
     status: DealStatus
     created_at: datetime
     updated_at: datetime
+
+    # Dispute lock (TASK-2.3)
+    dispute_locked: bool = False
+    dispute_locked_at: Optional[datetime] = None
+    dispute_lock_reason: Optional[str] = None
 
     # Relationships (optional, can be loaded separately)
     parties: Optional[List[DealParty]] = None

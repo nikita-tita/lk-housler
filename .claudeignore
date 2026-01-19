@@ -1,0 +1,122 @@
+# ===========================================
+# .aignore - Исключения для AI-ассистентов
+# Сокращает расход токенов, убирая "мусор"
+# ===========================================
+
+# ===== ЗАВИСИМОСТИ (высокий приоритет) =====
+node_modules/
+venv/
+env/
+.venv/
+ENV/
+__pycache__/
+*.egg-info/
+.Python
+pip-log.txt
+
+# ===== ФАЙЛЫ БЛОКИРОВОК =====
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+poetry.lock
+Pipfile.lock
+requirements.lock
+
+# ===== СБОРКА И КОМПИЛЯЦИЯ =====
+dist/
+build/
+out/
+.next/
+*.tsbuildinfo
+*.py[cod]
+*$py.class
+*.so
+
+# ===== БОЛЬШИЕ ДАННЫЕ =====
+*.csv
+*.xlsx
+*.xls
+*.json.backup
+*.sql.backup
+*.dump
+*.bak
+
+# ===== МЕДИА И ДОКУМЕНТЫ =====
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.webp
+*.mp4
+*.mp3
+*.pdf
+*.docx
+*.doc
+*.pptx
+
+# ===== ЛОГИ =====
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===== ТЕСТЫ (опционально) =====
+# Раскомментируй, если не работаешь с тестами:
+# **/__tests__/
+# **/*.test.ts
+# **/*.test.tsx
+# **/*.spec.ts
+# coverage/
+# htmlcov/
+# .pytest_cache/
+# .coverage
+
+# ===== IDE И СИСТЕМА =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ===== DOCKER =====
+docker-compose.override.yml
+Dockerfile*
+.dockerignore
+
+# ===== КОНФИГУРАЦИЯ CI/CD =====
+.github/
+.gitlab-ci.yml
+.circleci/
+Jenkinsfile
+
+# ===== МИГРАЦИИ (большие файлы) =====
+# backend/alembic/versions/
+
+# ===== ДОКУМЕНТАЦИЯ (если не работаешь с ней) =====
+# docs/
+# *.md
+# !README.md
+# !CLAUDE.md
+
+# ===== СПЕЦИФИЧНЫЕ ДЛЯ ПРОЕКТА =====
+tz-agent-deals-platform*.docx
+celerybeat-schedule
+*.db
+*.sqlite
+*.sqlite3
+
+# ===== ВРЕМЕННЫЕ ФАЙЛЫ =====
+*.tmp
+*.temp
+.cache/
+.turbo/
+
+# ===== ENV (безопасность + экономия) =====
+.env
+.env.*
+!.env.example

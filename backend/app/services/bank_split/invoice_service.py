@@ -264,20 +264,32 @@ class InvoiceService:
         """
         Release deal from hold (early release).
 
+        TASK-3.2: Creates fiscal receipt when releasing if fiscalization_method == tbank_checks
+
         Args:
             deal: Deal to release
 
         Returns:
             Updated Deal
+
+        Raises:
+            ValueError: If deal has no external_deal_id or is locked by dispute
         """
         if not deal.external_deal_id:
             raise ValueError("Deal has no external_deal_id")
+
+        # TASK-2.3: Check dispute lock
+        if deal.dispute_locked:
+            raise ValueError(
+                f"Cannot release: dispute in progress. Reason: {deal.dispute_lock_reason}"
+            )
 
         try:
             await self.tbank_client.release_deal(deal.external_deal_id)
 
             deal.status = "closed"
             deal.hold_expires_at = None
+            deal.bank_released_at = datetime.utcnow()  # TASK-3.2: Track release time
 
             # Mark recipients as released
             recipients = await self._get_deal_recipients(deal.id)
@@ -294,11 +306,41 @@ class InvoiceService:
             await self.db.flush()
             logger.info(f"Released deal {deal.id}")
 
+            # TASK-3.2: Create fiscal receipt after release
+            await self._create_fiscal_receipt(deal)
+
             return deal
 
         except TBankError as e:
             logger.error(f"Failed to release T-Bank deal: {e}")
             raise
+
+    async def _create_fiscal_receipt(self, deal: Deal) -> None:
+        """Create fiscal receipt for released deal.
+
+        TASK-3.2: T-Bank Checks Integration
+
+        Args:
+            deal: The released deal
+        """
+        try:
+            from app.services.fiscalization import FiscalReceiptService
+
+            receipt_service = FiscalReceiptService(self.db)
+            receipt = await receipt_service.create_receipt_for_deal(deal)
+
+            if receipt:
+                logger.info(
+                    f"Created fiscal receipt {receipt.id} for deal {deal.id}, "
+                    f"status: {receipt.status}"
+                )
+            else:
+                logger.debug(f"No fiscal receipt needed for deal {deal.id}")
+
+        except Exception as e:
+            # Log error but don't fail the release
+            # Receipt can be retried later
+            logger.error(f"Failed to create fiscal receipt for deal {deal.id}: {e}")
 
     async def _get_deal_recipients(self, deal_id: UUID) -> List[DealSplitRecipient]:
         """Get split recipients for deal"""

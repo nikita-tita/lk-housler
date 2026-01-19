@@ -365,9 +365,15 @@ export default function SigningPage() {
           background: white;
           border: 1px solid #e5e5e5;
           border-radius: 12px;
-          padding: 32px;
+          padding: 20px;
           max-width: 480px;
           width: 100%;
+        }
+
+        @media (min-width: 640px) {
+          .signing-card {
+            padding: 32px;
+          }
         }
 
         .signing-header {
@@ -376,9 +382,15 @@ export default function SigningPage() {
         }
 
         .signing-title {
-          font-size: 24px;
+          font-size: 20px;
           font-weight: 600;
           margin: 0 0 8px;
+        }
+
+        @media (min-width: 640px) {
+          .signing-title {
+            font-size: 24px;
+          }
         }
 
         .signing-subtitle {
@@ -404,19 +416,34 @@ export default function SigningPage() {
 
         .signing-info-item {
           display: flex;
-          justify-content: space-between;
+          flex-direction: column;
+          gap: 4px;
           padding: 12px;
           background: #f5f5f5;
           border-radius: 8px;
         }
 
+        @media (min-width: 640px) {
+          .signing-info-item {
+            flex-direction: row;
+            justify-content: space-between;
+            gap: 0;
+          }
+        }
+
         .signing-info-label {
           color: #666;
+          font-size: 14px;
         }
 
         .signing-info-value {
           font-weight: 500;
-          text-align: right;
+        }
+
+        @media (min-width: 640px) {
+          .signing-info-value {
+            text-align: right;
+          }
         }
 
         .signing-hint {
@@ -488,10 +515,18 @@ export default function SigningPage() {
         }
 
         .input-code {
-          font-size: 32px;
+          font-size: 24px;
           text-align: center;
-          letter-spacing: 8px;
-          padding: 16px;
+          letter-spacing: 6px;
+          padding: 14px;
+        }
+
+        @media (min-width: 640px) {
+          .input-code {
+            font-size: 32px;
+            letter-spacing: 8px;
+            padding: 16px;
+          }
         }
 
         .btn {
