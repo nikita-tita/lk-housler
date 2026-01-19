@@ -353,13 +353,22 @@ export default function CreateDealPage() {
       let errorMessage = 'Ошибка создания сделки';
 
       if (err && typeof err === 'object' && 'response' in err) {
-        const response = (err as { response?: { data?: { detail?: unknown } } }).response;
+        const response = (err as { response?: { data?: { detail?: unknown; errors?: unknown } } }).response;
         const detail = response?.data?.detail;
+        const errors = response?.data?.errors;
 
-        if (typeof detail === 'string') {
+        // Check errors field first (FastAPI validation errors format)
+        if (Array.isArray(errors) && errors.length > 0) {
+          errorMessage = errors
+            .map((e: { loc?: string[]; msg?: string; type?: string }) => {
+              const field = e.loc?.slice(-1)[0] || 'поле';
+              return `${field}: ${e.msg || 'ошибка'}`;
+            })
+            .join('; ');
+        } else if (typeof detail === 'string' && detail !== 'Validation error') {
           errorMessage = detail;
         } else if (Array.isArray(detail)) {
-          // Pydantic validation errors
+          // Alternative format
           errorMessage = detail
             .map((e: { loc?: string[]; msg?: string }) => {
               const field = e.loc?.slice(-1)[0] || 'поле';
