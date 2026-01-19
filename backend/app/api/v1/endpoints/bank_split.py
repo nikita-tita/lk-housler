@@ -2141,3 +2141,171 @@ async def get_milestone_configs(
         "configs": configs,
         "available": list(DEFAULT_MILESTONE_CONFIGS.keys()),
     }
+
+
+# ============================================
+# Client Passport endpoints (152-FZ compliant)
+# ============================================
+
+
+@router.put("/{deal_id}/client-passport", status_code=status.HTTP_200_OK)
+async def update_client_passport(
+    deal_id: UUID,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Update client passport data for a deal.
+
+    152-FZ Compliance:
+    - All passport data is encrypted before storage
+    - A hash is stored for duplicate detection
+    - Only masked data is returned in responses
+
+    Required for contract generation.
+    """
+    from app.schemas.bank_split import ClientPassportUpdate, ClientPassportResponse
+    from app.core.encryption import (
+        encrypt_passport,
+        encrypt_passport_issued_by,
+        encrypt_name,
+    )
+
+    # Parse request
+    body = await request.json()
+    passport_data = ClientPassportUpdate(**body)
+
+    # Get deal
+    service = BankSplitDealService(db)
+    deal = await service.get_deal(deal_id)
+
+    if not deal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
+
+    # Check access - only deal creator can update passport
+    if deal.created_by_user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only deal creator can update client passport"
+        )
+
+    # Check deal status - can't update passport after payment
+    if deal.status in ("hold_period", "closed", "payout_ready", "payout_in_progress"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot update passport data after payment"
+        )
+
+    # Encrypt passport data
+    series_enc, number_enc, passport_hash = encrypt_passport(
+        passport_data.passport_series,
+        passport_data.passport_number
+    )
+    issued_by_enc = encrypt_passport_issued_by(passport_data.passport_issued_by)
+    birth_place_enc = encrypt_name(passport_data.birth_place)
+    registration_enc = encrypt_name(passport_data.registration_address)
+
+    # Update deal
+    deal.client_passport_series_encrypted = series_enc
+    deal.client_passport_number_encrypted = number_enc
+    deal.client_passport_hash = passport_hash
+    deal.client_passport_issued_by_encrypted = issued_by_enc
+    deal.client_passport_issued_date = passport_data.passport_issued_date
+    deal.client_passport_issued_code = passport_data.passport_issued_code
+    deal.client_birth_date = passport_data.birth_date
+    deal.client_birth_place_encrypted = birth_place_enc
+    deal.client_registration_address_encrypted = registration_enc
+
+    await db.commit()
+
+    # Return masked response
+    series = passport_data.passport_series
+    number = passport_data.passport_number
+
+    return ClientPassportResponse(
+        has_passport_data=True,
+        passport_series_masked=f"{series[:2]} {series[2:]}",
+        passport_number_masked=f"{number[:3]} {number[3:]}",
+        passport_issued_date=passport_data.passport_issued_date,
+        passport_issued_code=passport_data.passport_issued_code,
+        birth_date=passport_data.birth_date,
+    )
+
+
+@router.get("/{deal_id}/client-passport", response_model=dict)
+async def get_client_passport_status(
+    deal_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Check if client passport data is filled.
+
+    Returns masked passport info (NOT decrypted data).
+    Full decrypted data is only used internally for contract generation.
+    """
+    from app.schemas.bank_split import ClientPassportCheckResponse
+    from app.core.encryption import decrypt_passport_series, decrypt_passport_number
+
+    # Get deal
+    service = BankSplitDealService(db)
+    deal = await service.get_deal(deal_id)
+
+    if not deal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
+
+    # Check access
+    is_participant = (
+        deal.created_by_user_id == current_user.id or
+        deal.agent_user_id == current_user.id
+    )
+    if not is_participant:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    # Check what fields are missing
+    missing_fields = []
+    if not deal.client_passport_series_encrypted:
+        missing_fields.append("passport_series")
+    if not deal.client_passport_number_encrypted:
+        missing_fields.append("passport_number")
+    if not deal.client_passport_issued_by_encrypted:
+        missing_fields.append("passport_issued_by")
+    if not deal.client_passport_issued_date:
+        missing_fields.append("passport_issued_date")
+    if not deal.client_passport_issued_code:
+        missing_fields.append("passport_issued_code")
+    if not deal.client_birth_date:
+        missing_fields.append("birth_date")
+    if not deal.client_birth_place_encrypted:
+        missing_fields.append("birth_place")
+    if not deal.client_registration_address_encrypted:
+        missing_fields.append("registration_address")
+
+    has_passport = len(missing_fields) == 0
+
+    response = {
+        "deal_id": str(deal_id),
+        "has_passport_data": has_passport,
+        "missing_fields": missing_fields,
+    }
+
+    # Add masked data if available
+    if deal.client_passport_series_encrypted and deal.client_passport_number_encrypted:
+        # Decrypt for masking only
+        series = decrypt_passport_series(deal.client_passport_series_encrypted)
+        number = decrypt_passport_number(deal.client_passport_number_encrypted)
+        if series and number:
+            response["passport_series_masked"] = f"{series[:2]} {series[2:]}"
+            response["passport_number_masked"] = f"{number[:3]} {number[3:]}"
+
+    if deal.client_passport_issued_date:
+        response["passport_issued_date"] = deal.client_passport_issued_date.isoformat()
+
+    if deal.client_passport_issued_code:
+        response["passport_issued_code"] = deal.client_passport_issued_code
+
+    if deal.client_birth_date:
+        response["birth_date"] = deal.client_birth_date.isoformat()
+
+    return response

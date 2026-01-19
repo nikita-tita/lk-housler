@@ -131,6 +131,17 @@ class Deal(BaseModel, SoftDeleteMixin):
     client_name = Column(String(255), nullable=True)
     client_phone = Column(String(20), nullable=True)
 
+    # Паспортные данные клиента (encrypted для 152-ФЗ)
+    client_passport_series_encrypted = Column(String(500), nullable=True)
+    client_passport_number_encrypted = Column(String(500), nullable=True)
+    client_passport_hash = Column(String(64), nullable=True, index=True)  # SHA-256 для дедупликации
+    client_passport_issued_by_encrypted = Column(String(500), nullable=True)
+    client_passport_issued_date = Column(DateTime, nullable=True)
+    client_passport_issued_code = Column(String(10), nullable=True)  # Код подразделения
+    client_birth_date = Column(DateTime, nullable=True)
+    client_birth_place_encrypted = Column(String(500), nullable=True)
+    client_registration_address_encrypted = Column(Text, nullable=True)
+
     status = Column(String(50), default="draft", nullable=False, index=True)
 
     # Адрес объекта недвижимости

@@ -481,3 +481,60 @@ export const ADJUSTMENT_STATUS_STYLES: Record<AdjustmentStatus, string> = {
   rejected: 'bg-gray-300 text-gray-700',
   expired: 'bg-gray-100 text-gray-500',
 };
+
+// ============================================
+// Client Passport types
+// ============================================
+
+export interface ClientPassportUpdate {
+  passport_series: string; // 4 digits
+  passport_number: string; // 6 digits
+  passport_issued_by: string;
+  passport_issued_date: string; // ISO date
+  passport_issued_code: string; // XXX-XXX
+  birth_date: string; // ISO date
+  birth_place: string;
+  registration_address: string;
+}
+
+export interface ClientPassportResponse {
+  has_passport_data: boolean;
+  passport_series_masked?: string;
+  passport_number_masked?: string;
+  passport_issued_date?: string;
+  passport_issued_code?: string;
+  birth_date?: string;
+}
+
+export interface ClientPassportStatus {
+  deal_id: string;
+  has_passport_data: boolean;
+  missing_fields: string[];
+  passport_series_masked?: string;
+  passport_number_masked?: string;
+  passport_issued_date?: string;
+  passport_issued_code?: string;
+  birth_date?: string;
+}
+
+// Passport API functions
+
+export async function updateClientPassport(
+  dealId: string,
+  passport: ClientPassportUpdate
+): Promise<ClientPassportResponse> {
+  const { data } = await apiClient.put<ClientPassportResponse>(
+    `/bank-split/${dealId}/client-passport`,
+    passport
+  );
+  return data;
+}
+
+export async function getClientPassportStatus(
+  dealId: string
+): Promise<ClientPassportStatus> {
+  const { data } = await apiClient.get<ClientPassportStatus>(
+    `/bank-split/${dealId}/client-passport`
+  );
+  return data;
+}

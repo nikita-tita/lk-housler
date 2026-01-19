@@ -427,3 +427,53 @@ class ConsentCheckResponse(BaseModel):
     given_consents: List[str]
     missing_consents: List[str]
     all_consents_given: bool
+
+
+# ============================================
+# Client Passport schemas (152-FZ)
+# ============================================
+
+
+class ClientPassportUpdate(BaseModel):
+    """Update client passport data for deal (152-FZ compliant)"""
+    passport_series: str = Field(..., min_length=4, max_length=4, pattern=r"^\d{4}$")
+    passport_number: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$")
+    passport_issued_by: str = Field(..., min_length=5, max_length=500)
+    passport_issued_date: datetime
+    passport_issued_code: str = Field(..., min_length=6, max_length=7, pattern=r"^\d{3}-?\d{3}$")
+    birth_date: datetime
+    birth_place: str = Field(..., min_length=2, max_length=255)
+    registration_address: str = Field(..., min_length=10, max_length=500)
+
+    @field_validator('passport_series', 'passport_number')
+    @classmethod
+    def validate_digits_only(cls, v: str) -> str:
+        """Ensure only digits"""
+        return ''.join(filter(str.isdigit, v))
+
+    @field_validator('passport_issued_code')
+    @classmethod
+    def normalize_code(cls, v: str) -> str:
+        """Normalize issued code to XXX-XXX format"""
+        digits = ''.join(filter(str.isdigit, v))
+        if len(digits) == 6:
+            return f"{digits[:3]}-{digits[3:]}"
+        return v
+
+
+class ClientPassportResponse(BaseModel):
+    """Response with masked client passport data"""
+    has_passport_data: bool
+    passport_series_masked: Optional[str] = None  # "XX XX"
+    passport_number_masked: Optional[str] = None  # "XXX XXX"
+    passport_issued_date: Optional[datetime] = None
+    passport_issued_code: Optional[str] = None
+    birth_date: Optional[datetime] = None
+    # Note: Full decrypted data is NOT returned for security
+
+
+class ClientPassportCheckResponse(BaseModel):
+    """Check if passport data is complete"""
+    deal_id: UUID
+    has_passport_data: bool
+    missing_fields: List[str]
