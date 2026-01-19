@@ -74,7 +74,11 @@ class DealCreateSimple(BaseModel):
     agent_split_percent: Optional[int] = Field(None, ge=0, le=100)
     coagent_split_percent: Optional[int] = Field(None, ge=0, le=100)
     coagent_user_id: Optional[int] = None  # If co-agent is already registered
+    coagent_phone: Optional[str] = None  # Co-agent phone (for invitation if not registered)
     agency_split_percent: Optional[int] = Field(None, ge=0, le=100)
+
+    class Config:
+        extra = "ignore"  # Ignore extra fields to avoid validation errors
 
     @field_validator("client_phone")
     @classmethod
