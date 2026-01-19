@@ -50,6 +50,7 @@ async def get_current_user_info(
     db: AsyncSession = Depends(get_db),
 ):
     """Get current user info with organization details"""
+    from sqlalchemy import text
     from app.models.organization import Organization, OrganizationMember
     from app.schemas.user import UserResponse, AgencyInfo
 
@@ -68,7 +69,9 @@ async def get_current_user_info(
         "updated_at": current_user.updated_at,
     }
 
-    # Try to find organization membership
+    agency_info = None
+
+    # First, try to find organization membership (lk.housler.ru pattern)
     stmt = (
         select(Organization)
         .join(OrganizationMember, OrganizationMember.org_id == Organization.id)
@@ -78,11 +81,29 @@ async def get_current_user_info(
     org = result.scalar_one_or_none()
 
     if org:
-        response_data["agency"] = AgencyInfo(
+        agency_info = AgencyInfo(
             id=str(org.id),
             legal_name=org.legal_name,
             short_name=org.legal_name[:30] if len(org.legal_name) > 30 else None,
         )
+    elif current_user.agency_id:
+        # Fallback: check agencies table (agent.housler.ru pattern)
+        try:
+            stmt = text("SELECT id, name FROM agencies WHERE id = :agency_id")
+            result = await db.execute(stmt, {"agency_id": current_user.agency_id})
+            agency_row = result.fetchone()
+            if agency_row:
+                agency_info = AgencyInfo(
+                    id=str(agency_row[0]),
+                    legal_name=agency_row[1] or "Агентство",
+                    short_name=None,
+                )
+        except Exception:
+            # agencies table might not exist - ignore
+            pass
+
+    if agency_info:
+        response_data["agency"] = agency_info
 
     return UserResponse(**response_data)
 

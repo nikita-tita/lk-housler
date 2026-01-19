@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { getDeals, Deal } from '@/lib/api/deals';
+import { getOrganizations, getAgents } from '@/lib/api/organizations';
 import { formatPrice } from '@/lib/utils/format';
 
 export default function AgencyDashboard() {
@@ -26,6 +27,7 @@ export default function AgencyDashboard() {
       setError(null);
       setLoading(true);
 
+      // Load deals
       const response = await getDeals();
       setDeals(response.items);
 
@@ -39,8 +41,20 @@ export default function AgencyDashboard() {
         .filter((d) => d.status === 'closed')
         .reduce((sum, d) => sum + d.commission_agent, 0);
 
+      // Load agents count
+      let totalAgents = 0;
+      try {
+        const orgs = await getOrganizations();
+        if (orgs.length > 0) {
+          const agentsResponse = await getAgents(orgs[0].id);
+          totalAgents = agentsResponse.total;
+        }
+      } catch {
+        // Ignore error - just show 0 agents
+      }
+
       setStats({
-        totalAgents: 0,
+        totalAgents,
         activeDeals,
         completedDeals,
         totalRevenue,
