@@ -25,6 +25,7 @@ import {
   ADVANCE_TYPE_LABELS,
 } from '@/lib/api/deals';
 import { createInvitation } from '@/lib/api/invitations';
+import { searchUserByPhone, UserSearchResult } from '@/lib/api/users';
 
 // Опции для типов сделок (основные)
 const DEAL_TYPE_OPTIONS = [
@@ -118,6 +119,11 @@ export default function CreateDealPage() {
   const [calculation, setCalculation] = useState<CommissionCalculateResponse | null>(null);
   const [hasSplit, setHasSplit] = useState(false);
 
+  // Co-agent search state
+  const [coagentSearching, setCoagentSearching] = useState(false);
+  const [coagentFound, setCoagentFound] = useState<UserSearchResult | null>(null);
+  const [coagentSearchDone, setCoagentSearchDone] = useState(false);
+
   const [formData, setFormData] = useState<FormData>({
     deal_type: 'sale_buy',
     property_type: 'apartment',
@@ -177,6 +183,36 @@ export default function CreateDealPage() {
       doCalculation();
     }
   }, [step, doCalculation, formData.price]);
+
+  // Search for co-agent when phone changes
+  useEffect(() => {
+    const phone = formData.coagent_phone;
+    const digits = phone.replace(/\D/g, '');
+
+    // Only search if we have a complete phone
+    if (digits.length !== 11) {
+      setCoagentFound(null);
+      setCoagentSearchDone(false);
+      return;
+    }
+
+    // Debounce search
+    const timeoutId = setTimeout(async () => {
+      setCoagentSearching(true);
+      try {
+        const result = await searchUserByPhone(digits);
+        setCoagentFound(result.found ? result.user : null);
+        setCoagentSearchDone(true);
+      } catch {
+        setCoagentFound(null);
+        setCoagentSearchDone(true);
+      } finally {
+        setCoagentSearching(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.coagent_phone]);
 
   const validateStep1 = (): boolean => !!formData.deal_type;
   const validateStep2 = (): boolean => !!formData.property_type;
@@ -289,14 +325,16 @@ export default function CreateDealPage() {
         ...(hasSplit && {
           agent_split_percent: formData.agent_split_percent,
           coagent_split_percent: formData.coagent_split_percent > 0 ? formData.coagent_split_percent : undefined,
+          // If co-agent is found in system, pass their user_id
+          coagent_user_id: coagentFound ? coagentFound.id : undefined,
           agency_split_percent: formData.agency_split_percent > 0 ? formData.agency_split_percent : undefined,
         }),
       };
 
       const deal = await createDeal(dealData);
 
-      // Send invitation to co-agent if phone provided
-      if (hasSplit && formData.coagent_split_percent > 0 && formData.coagent_phone) {
+      // Send invitation to co-agent if phone provided AND user not found in system
+      if (hasSplit && formData.coagent_split_percent > 0 && formData.coagent_phone && !coagentFound) {
         const phone = formData.coagent_phone.replace(/\D/g, '');
         try {
           await createInvitation(deal.id, {
@@ -700,7 +738,7 @@ export default function CreateDealPage() {
                           placeholder="+7 (999) 123-45-67"
                           value={formatCoagentPhone(formData.coagent_phone)}
                           onChange={handleCoagentPhoneChange}
-                          helperText="На этот номер будет отправлено приглашение"
+                          helperText={coagentSearching ? "Поиск..." : undefined}
                           error={
                             formData.coagent_phone.length > 0 &&
                             !isValidCoagentPhone(formData.coagent_phone)
@@ -708,9 +746,31 @@ export default function CreateDealPage() {
                               : undefined
                           }
                         />
-                        <p className="text-xs text-gray-500">
-                          После создания сделки со-агент получит SMS с приглашением
-                        </p>
+
+                        {/* Search result */}
+                        {coagentSearchDone && isValidCoagentPhone(formData.coagent_phone) && (
+                          coagentFound ? (
+                            <div className="p-3 bg-white border border-gray-200 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center text-sm font-medium">
+                                  {coagentFound.name?.charAt(0).toUpperCase() || 'A'}
+                                </div>
+                                <div>
+                                  <div className="font-medium text-gray-900">
+                                    {coagentFound.name || 'Агент'}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {coagentFound.phone_masked} — зарегистрирован в системе
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-3 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-600">
+                              Пользователь не найден. После создания сделки ему будет отправлено SMS-приглашение.
+                            </div>
+                          )
+                        )}
                       </div>
                     )}
                   </div>

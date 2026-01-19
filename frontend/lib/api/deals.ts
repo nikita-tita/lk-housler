@@ -82,6 +82,7 @@ export interface DealCreateSimple {
   agent_split_percent?: number;
   coagent_split_percent?: number;
   coagent_phone?: string;
+  coagent_user_id?: number;  // If co-agent is already registered
   agency_split_percent?: number;
 }
 

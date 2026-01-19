@@ -70,6 +70,12 @@ class DealCreateSimple(BaseModel):
     client_name: str = Field(..., min_length=2, max_length=255)
     client_phone: str = Field(..., min_length=10, max_length=20)
 
+    # Split (optional)
+    agent_split_percent: Optional[int] = Field(None, ge=0, le=100)
+    coagent_split_percent: Optional[int] = Field(None, ge=0, le=100)
+    coagent_user_id: Optional[int] = None  # If co-agent is already registered
+    agency_split_percent: Optional[int] = Field(None, ge=0, le=100)
+
     @field_validator("client_phone")
     @classmethod
     def validate_phone(cls, v: str) -> str:
