@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
-import { getDeals, Deal } from '@/lib/api/deals';
+import { getAgencyDeals, Deal } from '@/lib/api/deals';
 import { formatPrice, formatDate } from '@/lib/utils/format';
 
 export default function AgencyDealsPage() {
@@ -16,10 +16,10 @@ export default function AgencyDealsPage() {
 
   async function loadDeals() {
     try {
-      const response = await getDeals();
+      const response = await getAgencyDeals();
       setDeals(response.items);
     } catch (error) {
-      console.error('Failed to load deals:', error);
+      console.error('Failed to load agency deals:', error);
     } finally {
       setLoading(false);
     }

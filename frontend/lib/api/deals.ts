@@ -154,6 +154,13 @@ export async function getDeals(page = 1, size = 20): Promise<DealsListResponse> 
   return data;
 }
 
+export async function getAgencyDeals(page = 1, size = 20): Promise<DealsListResponse> {
+  const { data } = await apiClient.get<DealsListResponse>('/agency/deals', {
+    params: { page, size },
+  });
+  return data;
+}
+
 export async function getDeal(id: string): Promise<Deal> {
   const { data } = await apiClient.get<Deal>(`/deals/${id}`);
   return data;

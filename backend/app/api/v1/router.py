@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, users, organizations, deals, documents, payments, sign, templates, bank_split, invitations, disputes, admin, onboarding, inn, receipts
+from app.api.v1.endpoints import auth, users, organizations, deals, documents, payments, sign, templates, bank_split, invitations, disputes, admin, onboarding, inn, receipts, agency
 
 api_router = APIRouter()
 
@@ -36,3 +36,6 @@ api_router.include_router(inn.router, prefix="/inn", tags=["inn"])
 
 # NPD Receipts (self-employed receipt tracking)
 api_router.include_router(receipts.router, tags=["receipts"])
+
+# Agency (agency admin endpoints)
+api_router.include_router(agency.router, prefix="/agency", tags=["agency"])

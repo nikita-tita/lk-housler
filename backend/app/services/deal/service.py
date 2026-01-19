@@ -73,6 +73,50 @@ class DealService:
 
         return deals, total
 
+    async def list_organization_deals(
+        self,
+        org_id: UUID,
+        status: Optional[DealStatus] = None,
+        page: int = 1,
+        page_size: int = 20,
+        include_deleted: bool = False,
+    ) -> Tuple[List[Deal], int]:
+        """List deals for all agents in organization"""
+        from app.models.organization import OrganizationMember
+
+        # Get all user IDs in organization
+        members_stmt = select(OrganizationMember.user_id).where(
+            OrganizationMember.org_id == org_id,
+            OrganizationMember.is_active == True
+        )
+        members_result = await self.db.execute(members_stmt)
+        member_user_ids = [row[0] for row in members_result.fetchall()]
+
+        if not member_user_ids:
+            return [], 0
+
+        # Query deals where agent is in organization
+        stmt = select(Deal).where(Deal.agent_user_id.in_(member_user_ids))
+
+        if not include_deleted:
+            stmt = stmt.where(Deal.deleted_at.is_(None))
+
+        if status:
+            stmt = stmt.where(Deal.status == status)
+
+        # Count total
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total_result = await self.db.execute(count_stmt)
+        total = total_result.scalar()
+
+        # Paginate
+        stmt = stmt.order_by(Deal.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+
+        result = await self.db.execute(stmt)
+        deals = list(result.scalars().all())
+
+        return deals, total
+
     async def create(self, deal_in: DealCreate, creator: User) -> Deal:
         """Create new deal"""
         # Validate split rule percentages add up to 100
