@@ -1,17 +1,5 @@
-import { authClient } from './client';
-
-// User type matching agent.housler.ru
-export interface User {
-  id: number;
-  email: string;
-  phone: string | null;
-  name: string | null;
-  role: 'client' | 'agent' | 'agency_admin' | 'operator' | 'admin';
-  agency_id: number | null;
-  is_active: boolean;
-  last_login_at: string | null;
-  created_at: string;
-}
+import { authClient, apiClient } from './client';
+import { User } from '@/types/user';
 
 // API response wrapper from agent.housler.ru
 // All responses have structure: { success: boolean, data?: T, error?: string }
@@ -184,17 +172,13 @@ export async function loginAgency(email: string, password: string): Promise<Auth
 }
 
 // ==========================================
-// Current User - uses agent.housler.ru
+// Current User - uses lk.housler.ru for full user info with agency
 // ==========================================
 
 export async function getCurrentUser(): Promise<User> {
-  const { data } = await authClient.get<ApiResponse<User>>('/auth/me');
-
-  if (!data.success || !data.data) {
-    throw new Error(data.error || 'Не удалось получить данные пользователя');
-  }
-
-  return data.data;
+  // Use lk.housler.ru API to get user with organization info
+  const { data } = await apiClient.get<User>('/users/me');
+  return data;
 }
 
 // ==========================================

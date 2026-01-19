@@ -75,9 +75,16 @@ export function Sidebar({ items }: SidebarProps) {
           <div>
             <div className="header-logo">LK Housler</div>
             {user && (
-              <p style={{ fontSize: '14px', color: 'var(--color-text-light)', marginTop: '4px' }}>
-                {user.email || user.phone}
-              </p>
+              <>
+                <p style={{ fontSize: '14px', color: 'var(--color-text-light)', marginTop: '4px' }}>
+                  {user.name || user.email || user.phone}
+                </p>
+                {user.agency && (
+                  <p style={{ fontSize: '12px', color: 'var(--color-text-light)', marginTop: '2px', opacity: 0.7 }}>
+                    {user.agency.short_name || user.agency.legal_name}
+                  </p>
+                )}
+              </>
             )}
           </div>
           {/* Close button for mobile */}

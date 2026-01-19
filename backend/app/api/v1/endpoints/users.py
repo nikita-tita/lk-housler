@@ -44,12 +44,47 @@ def mask_phone(phone: Optional[str]) -> Optional[str]:
     return f"+7 ({digits[1:4]}) ***-**-{digits[-2:]}"
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me")
 async def get_current_user_info(
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Get current user info"""
-    return current_user
+    """Get current user info with organization details"""
+    from app.models.organization import Organization, OrganizationMember
+    from app.schemas.user import UserResponse, AgencyInfo
+
+    # Build response with user data
+    response_data = {
+        "id": current_user.id,
+        "email": current_user.email,
+        "phone": current_user.phone,
+        "name": current_user.name,
+        "role": current_user.role,
+        "is_active": current_user.is_active,
+        "agency_id": current_user.agency_id,
+        "city": current_user.city,
+        "is_self_employed": current_user.is_self_employed,
+        "created_at": current_user.created_at,
+        "updated_at": current_user.updated_at,
+    }
+
+    # Try to find organization membership
+    stmt = (
+        select(Organization)
+        .join(OrganizationMember, OrganizationMember.org_id == Organization.id)
+        .where(OrganizationMember.user_id == current_user.id)
+    )
+    result = await db.execute(stmt)
+    org = result.scalar_one_or_none()
+
+    if org:
+        response_data["agency"] = AgencyInfo(
+            id=str(org.id),
+            legal_name=org.legal_name,
+            short_name=org.legal_name[:30] if len(org.legal_name) > 30 else None,
+        )
+
+    return UserResponse(**response_data)
 
 
 @router.get("/search", response_model=UserSearchResponse)

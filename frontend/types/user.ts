@@ -5,6 +5,12 @@ export type UserRole =
   | 'operator'
   | 'admin';
 
+export interface AgencyInfo {
+  id: string;
+  legal_name: string;
+  short_name: string | null;
+}
+
 export interface User {
   id: number;
   email: string;
@@ -12,6 +18,7 @@ export interface User {
   name: string | null;
   role: UserRole;
   agency_id: number | null;
+  agency: AgencyInfo | null;  // Populated if user is member of an organization
   is_active: boolean;
   last_login_at: string | null;
   created_at: string;

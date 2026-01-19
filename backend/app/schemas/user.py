@@ -14,6 +14,13 @@ class UserBase(BaseModel):
     name: Optional[str] = Field(None, description="Display name")
 
 
+class AgencyInfo(BaseModel):
+    """Basic agency info for user response"""
+    id: str
+    legal_name: str
+    short_name: Optional[str] = None
+
+
 class UserResponse(BaseModel):
     """User response schema - matches agent.housler.ru users table"""
 
@@ -24,6 +31,7 @@ class UserResponse(BaseModel):
     role: str
     is_active: bool = True
     agency_id: Optional[int] = None
+    agency: Optional[AgencyInfo] = None  # Populated if agency_id exists
     city: Optional[str] = None
     is_self_employed: Optional[bool] = False
     created_at: Optional[datetime] = None
