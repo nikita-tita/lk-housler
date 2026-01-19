@@ -289,14 +289,14 @@ export default function CreateDealPage() {
     setLoading(true);
 
     try {
-      // Рассчитываем комиссию для передачи на бэкенд
+      // Рассчитываем комиссию для передачи на бэкенд (округляем до целого)
       let commission = 0;
       if (formData.payment_type === 'percent') {
-        commission = formData.price * (formData.commission_percent / 100);
+        commission = Math.round(formData.price * (formData.commission_percent / 100));
       } else if (formData.payment_type === 'fixed') {
-        commission = formData.commission_fixed;
+        commission = Math.round(formData.commission_fixed);
       } else {
-        commission = formData.commission_fixed + formData.price * (formData.commission_percent / 100);
+        commission = Math.round(formData.commission_fixed + formData.price * (formData.commission_percent / 100));
       }
 
       const dealData: DealCreateSimple = {
@@ -309,7 +309,7 @@ export default function CreateDealPage() {
           ...(formData.address.building && { building: formData.address.building }),
           ...(formData.address.apartment && { apartment: formData.address.apartment }),
         },
-        price: formData.price,
+        price: Math.round(formData.price),
         commission: commission,
         payment_type: formData.payment_type,
         commission_percent: formData.payment_type !== 'fixed' ? formData.commission_percent : undefined,
@@ -350,11 +350,27 @@ export default function CreateDealPage() {
 
       router.push(`/agent/deals/${deal.id}`);
     } catch (err: unknown) {
-      const errorMessage =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
-          : null;
-      setError(errorMessage || 'Ошибка создания сделки');
+      let errorMessage = 'Ошибка создания сделки';
+
+      if (err && typeof err === 'object' && 'response' in err) {
+        const response = (err as { response?: { data?: { detail?: unknown } } }).response;
+        const detail = response?.data?.detail;
+
+        if (typeof detail === 'string') {
+          errorMessage = detail;
+        } else if (Array.isArray(detail)) {
+          // Pydantic validation errors
+          errorMessage = detail
+            .map((e: { loc?: string[]; msg?: string }) => {
+              const field = e.loc?.slice(-1)[0] || 'поле';
+              return `${field}: ${e.msg || 'ошибка'}`;
+            })
+            .join('; ');
+        }
+      }
+
+      setError(errorMessage);
+      console.error('Deal creation error:', err);
     } finally {
       setLoading(false);
     }
