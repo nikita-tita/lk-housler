@@ -66,6 +66,23 @@ class DealCreateSimple(BaseModel):
     is_exclusive: bool = False
     exclusive_until: Optional[datetime] = None
 
+    @field_validator("exclusive_until", mode="before")
+    @classmethod
+    def parse_exclusive_until(cls, v):
+        """Accept both date and datetime formats"""
+        if v is None:
+            return None
+        if isinstance(v, datetime):
+            return v
+        if isinstance(v, str):
+            # Try datetime first
+            for fmt in ["%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"]:
+                try:
+                    return datetime.strptime(v, fmt)
+                except ValueError:
+                    continue
+        return v  # Let Pydantic handle the error
+
     # Client
     client_name: str = Field(..., min_length=2, max_length=255)
     client_phone: str = Field(..., min_length=10, max_length=20)
