@@ -138,6 +138,14 @@ class DealCreateSimple(BaseModel):
             raise ValueError('Серия и номер паспорта должны быть указаны вместе')
         return self
 
+    @model_validator(mode='after')
+    def validate_exclusive_until(self) -> 'DealCreateSimple':
+        """Validate that exclusive_until is in the future if is_exclusive is True"""
+        if self.is_exclusive and self.exclusive_until:
+            if self.exclusive_until <= datetime.now():
+                raise ValueError('Дата окончания эксклюзива должна быть в будущем')
+        return self
+
 
 class DealSimpleResponse(BaseModel):
     """Simplified deal response for frontend"""

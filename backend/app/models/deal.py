@@ -128,7 +128,8 @@ class Deal(BaseModel, SoftDeleteMixin):
 
     # Клиент (для MVP - просто текстовые поля)
     client_id = Column(Integer, nullable=True)  # Может быть external party
-    client_name = Column(String(255), nullable=True)
+    client_name = Column(String(255), nullable=True)  # Legacy plaintext (deprecated)
+    client_name_encrypted = Column(String(500), nullable=True)  # 152-FZ compliant
     client_phone = Column(String(20), nullable=True)  # Legacy plaintext (deprecated)
     client_phone_encrypted = Column(String(500), nullable=True)  # 152-FZ compliant
     client_phone_hash = Column(String(64), nullable=True, index=True)  # For search

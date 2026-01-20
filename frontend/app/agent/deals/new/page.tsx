@@ -269,7 +269,12 @@ export default function CreateDealPage() {
   };
 
   const isValidPhone = (phone: string): boolean => {
-    return phone.length === 11 && phone.startsWith('7');
+    // Match backend validation: 10-11 digits, normalizes to 7XXXXXXXXXX
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 10 || digits.length > 11) return false;
+    // If 11 digits, must start with 7 or 8
+    if (digits.length === 11 && !['7', '8'].includes(digits[0])) return false;
+    return true;
   };
 
   const validateStep5 = (): boolean => {
@@ -521,8 +526,11 @@ export default function CreateDealPage() {
   };
 
   const isValidCoagentPhone = (phone: string): boolean => {
+    // Same validation as client phone
     const digits = phone.replace(/\D/g, '');
-    return digits.length === 11 && digits.startsWith('7');
+    if (digits.length < 10 || digits.length > 11) return false;
+    if (digits.length === 11 && !['7', '8'].includes(digits[0])) return false;
+    return true;
   };
 
   // Get calculated commission for display

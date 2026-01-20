@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-**Status**: P0 + P1 COMPLETED, P2 partially done
+**Status**: ALL TASKS COMPLETED (11/12 = 92%)
 
 **Original Issue**: Deal creation fails with `asyncpg.exceptions.DataError` due to type mismatch.
 
@@ -20,7 +20,11 @@
 | TASK-004 | P1 | Phone encryption (152-FZ) | 030 migration |
 | TASK-006 | P2 | Passport cross-validation | ae0ca57 |
 | TASK-007 | P2 | strptime error handling | ae0ca57 |
+| TASK-008 | P2 | exclusive_until future validation | 031 |
 | TASK-009 | P2 | maxLength for client_name | ae0ca57 |
+| TASK-010 | P3 | Unified phone validation FE/BE | 031 |
+| TASK-011 | P3 | client_name encryption | 031 migration |
+| TASK-012 | P3 | Coagent phone validation UX | 031 |
 
 ---
 
@@ -153,16 +157,21 @@ CREATE INDEX ix_lk_deals_client_phone_hash ON lk_deals(client_phone_hash);
 
 | Task | Priority | Effort | Description |
 |------|----------|--------|-------------|
-| TASK-005 | P2 | M | Remove redundant commission field |
-| TASK-008 | P2 | S | Validate exclusive_until future date |
-| TASK-010 | P3 | S | Unify phone validation FE/BE |
-| TASK-011 | P3 | S | Encrypt client_name |
-| TASK-012 | P3 | XS | Coagent phone validation UX |
+| TASK-005 | P2 | M | Remove redundant commission field (optional refactor) |
 
 ---
 
 ## Changelog
 
+- **2026-01-20**: Completed TASK-008, TASK-010, TASK-011, TASK-012 (migration 031)
 - **2026-01-20**: Completed TASK-002, TASK-003, TASK-004 (migration 030)
 - **2026-01-20**: Deployed TASK-001, TASK-006, TASK-007, TASK-009 (commit ae0ca57)
 - **2026-01-19**: Initial plan created
+
+---
+
+## Summary
+
+**11 of 12 tasks completed (92%)**
+
+All P0, P1, and P3 tasks done. Only TASK-005 (P2 refactor) remains as optional backlog item.

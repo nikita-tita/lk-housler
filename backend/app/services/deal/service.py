@@ -225,6 +225,10 @@ class DealService:
             deal.client_phone_encrypted = phone_encrypted
             deal.client_phone_hash = phone_hash
 
+        # TASK-011: Encrypt client name for 152-FZ compliance
+        if deal_in.client_name:
+            deal.client_name_encrypted = encrypt_name(deal_in.client_name)
+
         # Encrypt and save passport data if provided
         if deal_in.client_passport_series and deal_in.client_passport_number:
             series_enc, number_enc, passport_hash = encrypt_passport(
