@@ -1,5 +1,34 @@
 # Deployment Guide - lk.housler.ru
 
+## Автоматический деплой (GitHub Actions)
+
+**Push в `main` → автоматический деплой на сервер**
+
+### Настройка (один раз)
+
+1. Добавьте GitHub Secret:
+   - Settings → Secrets and variables → Actions
+   - New repository secret: `SSH_PRIVATE_KEY`
+   - Value: содержимое `~/.ssh/id_housler`
+
+2. Создайте environment:
+   - Settings → Environments → New: `production`
+
+### Что происходит при деплое
+
+```
+push main → CI → Deploy → Smoke test
+```
+
+1. SSH на 95.163.227.26
+2. `git pull origin main`
+3. `docker compose build --no-cache backend`
+4. `docker compose up -d`
+5. `alembic upgrade head`
+6. Health check
+
+---
+
 ## Оглавление
 1. [Подготовка к деплою](#подготовка-к-деплою)
 2. [Размещение на GitHub](#размещение-на-github)
