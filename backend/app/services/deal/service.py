@@ -192,7 +192,7 @@ class DealService:
             created_by_user_id=creator.id,
             agent_user_id=creator.id,
             executor_type=ExecutorType.USER,
-            executor_id=creator.id,
+            executor_id=str(creator.id),  # Column is String(36), convert int to str
             property_address=full_address,
             price=deal_in.price,
             commission_agent=deal_in.commission,
@@ -226,13 +226,19 @@ class DealService:
             deal.client_passport_issued_by_encrypted = encrypt_passport_issued_by(deal_in.client_passport_issued_by)
 
         if deal_in.client_passport_issued_date:
-            deal.client_passport_issued_date = datetime.strptime(deal_in.client_passport_issued_date, "%Y-%m-%d")
+            try:
+                deal.client_passport_issued_date = datetime.strptime(deal_in.client_passport_issued_date, "%Y-%m-%d")
+            except ValueError:
+                raise ValueError(f"Неверный формат даты выдачи паспорта: {deal_in.client_passport_issued_date}. Ожидается ГГГГ-ММ-ДД")
 
         if deal_in.client_passport_issued_code:
             deal.client_passport_issued_code = deal_in.client_passport_issued_code
 
         if deal_in.client_birth_date:
-            deal.client_birth_date = datetime.strptime(deal_in.client_birth_date, "%Y-%m-%d")
+            try:
+                deal.client_birth_date = datetime.strptime(deal_in.client_birth_date, "%Y-%m-%d")
+            except ValueError:
+                raise ValueError(f"Неверный формат даты рождения: {deal_in.client_birth_date}. Ожидается ГГГГ-ММ-ДД")
 
         if deal_in.client_birth_place:
             deal.client_birth_place_encrypted = encrypt_name(deal_in.client_birth_place)

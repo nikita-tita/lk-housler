@@ -894,11 +894,14 @@ export default function CreateDealPage() {
               <Input
                 label="ФИО клиента"
                 placeholder="Иванов Иван Иванович"
+                maxLength={255}
                 value={formData.client_name}
                 onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
                 error={
                   formData.client_name.length > 0 && formData.client_name.length < 2
                     ? 'Введите имя клиента'
+                    : formData.client_name.length > 250
+                    ? 'Имя слишком длинное'
                     : undefined
                 }
               />

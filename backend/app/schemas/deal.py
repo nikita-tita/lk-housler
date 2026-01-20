@@ -5,7 +5,7 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.models.deal import DealType, DealStatus, ExecutorType, PartyRole, PropertyType, PaymentType, AdvanceType
 
@@ -128,6 +128,15 @@ class DealCreateSimple(BaseModel):
         elif len(digits) == 10:
             digits = "7" + digits
         return digits
+
+    @model_validator(mode='after')
+    def validate_passport_fields(self) -> 'DealCreateSimple':
+        """Validate that passport series and number are provided together"""
+        series = self.client_passport_series
+        number = self.client_passport_number
+        if (series and not number) or (number and not series):
+            raise ValueError('Серия и номер паспорта должны быть указаны вместе')
+        return self
 
 
 class DealSimpleResponse(BaseModel):
