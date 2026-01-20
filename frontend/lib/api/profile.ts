@@ -1,4 +1,12 @@
-import { apiClient } from './client';
+import { apiClient, authClient } from './client';
+import { ExtendedProfile, UpdateProfileDto } from '@/types/user';
+
+// API response wrapper from agent.housler.ru
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
 
 // Legal entity types
 export type LegalType = 'se' | 'ip' | 'ooo';
@@ -193,5 +201,95 @@ export async function autofillCompanyByINN(inn: string): Promise<CompanyAutofill
     return data;
   } catch {
     return null;
+  }
+}
+
+// ==========================================
+// Settings Profile API (uses agent.housler.ru)
+// ==========================================
+
+export interface SettingsProfileResponse {
+  success: boolean;
+  data?: ExtendedProfile;
+  error?: string;
+}
+
+export interface AvatarUploadResponse {
+  success: boolean;
+  data?: { avatar_url: string };
+  error?: string;
+}
+
+export async function getSettingsProfile(): Promise<SettingsProfileResponse> {
+  try {
+    const { data } = await authClient.get<ApiResponse<ExtendedProfile>>('/settings/profile');
+    return {
+      success: data.success,
+      data: data.data,
+      error: data.error,
+    };
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { data?: { error?: string } }; message?: string };
+    return {
+      success: false,
+      error: axiosError.response?.data?.error || axiosError.message || 'Error loading profile',
+    };
+  }
+}
+
+export async function updateSettingsProfile(profileData: UpdateProfileDto): Promise<SettingsProfileResponse> {
+  try {
+    const { data } = await authClient.patch<ApiResponse<ExtendedProfile>>('/settings/profile', profileData);
+    return {
+      success: data.success,
+      data: data.data,
+      error: data.error,
+    };
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { data?: { error?: string } }; message?: string };
+    return {
+      success: false,
+      error: axiosError.response?.data?.error || axiosError.message || 'Error updating profile',
+    };
+  }
+}
+
+export async function uploadProfileAvatar(file: File): Promise<AvatarUploadResponse> {
+  try {
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const { data } = await authClient.post<ApiResponse<{ avatar_url: string }>>('/settings/profile/avatar', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return {
+      success: data.success,
+      data: data.data,
+      error: data.error,
+    };
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { data?: { error?: string } }; message?: string };
+    return {
+      success: false,
+      error: axiosError.response?.data?.error || axiosError.message || 'Error uploading avatar',
+    };
+  }
+}
+
+export async function deleteProfileAvatar(): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data } = await authClient.delete<ApiResponse<null>>('/settings/profile/avatar');
+    return {
+      success: data.success,
+      error: data.error,
+    };
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { data?: { error?: string } }; message?: string };
+    return {
+      success: false,
+      error: axiosError.response?.data?.error || axiosError.message || 'Error deleting avatar',
+    };
   }
 }

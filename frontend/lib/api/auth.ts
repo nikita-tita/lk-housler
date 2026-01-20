@@ -207,7 +207,10 @@ export interface AgencyRegisterData {
   inn: string;
   name: string;
   legalAddress: string;
+  phone?: string;        // Company phone
+  companyEmail?: string; // Company email
   contactName: string;
+  contactPosition?: string;
   contactPhone: string;
   contactEmail: string;
   password: string;

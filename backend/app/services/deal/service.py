@@ -180,7 +180,7 @@ class DealService:
     async def create_simple(self, deal_in: DealCreateSimple, creator: User) -> Deal:
         """Create deal with simplified schema (MVP)"""
         from datetime import datetime
-        from app.core.encryption import encrypt_passport, encrypt_passport_issued_by, encrypt_name
+        from app.core.encryption import encrypt_passport, encrypt_passport_issued_by, encrypt_name, encrypt_phone
 
         # Build full address from structured input
         full_address = deal_in.address.to_full_address()
@@ -209,9 +209,21 @@ class DealService:
             exclusive_until=deal_in.exclusive_until,
             # Client
             client_name=deal_in.client_name,
-            client_phone=deal_in.client_phone,
+            client_phone=deal_in.client_phone,  # Legacy plaintext (kept for backward compat)
+            # Commission split (TASK-002)
+            agent_split_percent=deal_in.agent_split_percent,
+            coagent_split_percent=deal_in.coagent_split_percent,
+            coagent_user_id=deal_in.coagent_user_id,
+            coagent_phone=deal_in.coagent_phone,
+            agency_split_percent=deal_in.agency_split_percent,
             status=DealStatus.DRAFT,
         )
+
+        # TASK-004: Encrypt client phone for 152-FZ compliance
+        if deal_in.client_phone:
+            phone_encrypted, phone_hash = encrypt_phone(deal_in.client_phone)
+            deal.client_phone_encrypted = phone_encrypted
+            deal.client_phone_hash = phone_hash
 
         # Encrypt and save passport data if provided
         if deal_in.client_passport_series and deal_in.client_passport_number:

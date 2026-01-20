@@ -32,3 +32,31 @@ export interface UserProfile {
   verified_level: number;
   kyc_checked_at?: string;
 }
+
+// Preferred contact method
+export type PreferredContact = 'phone' | 'telegram' | 'whatsapp' | 'email';
+
+// Extended profile (includes all user data + settings)
+export interface ExtendedProfile extends User {
+  preferred_contact: PreferredContact;
+  telegram_username: string | null;
+  whatsapp_phone: string | null;
+  avatar_url: string | null;
+  // Agent-specific fields
+  city: string | null;
+  specialization: string[] | null;
+  experience_years: number | null;
+  about: string | null;
+}
+
+// Update profile DTO
+export interface UpdateProfileDto {
+  name?: string;
+  preferred_contact?: PreferredContact;
+  telegram_username?: string | null;
+  whatsapp_phone?: string | null;
+  city?: string | null;
+  specialization?: string[] | null;
+  experience_years?: number | null;
+  about?: string | null;
+}

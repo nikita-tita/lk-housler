@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import Image from 'next/image';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -12,6 +13,10 @@ import {
   getOnboardingStatus,
   autofillBankByBIK,
   autofillCompanyByINN,
+  getSettingsProfile,
+  updateSettingsProfile,
+  uploadProfileAvatar,
+  deleteProfileAvatar,
   PaymentProfile,
   OnboardingStatusResponse,
   LegalType,
@@ -19,6 +24,7 @@ import {
   ONBOARDING_STATUS_LABELS,
   KYC_STATUS_LABELS,
 } from '@/lib/api/profile';
+import { ExtendedProfile, UpdateProfileDto, PreferredContact } from '@/types/user';
 
 const ROLE_LABELS: Record<string, string> = {
   agent: 'Агент',
@@ -33,7 +39,22 @@ const LEGAL_TYPE_OPTIONS = [
   { value: 'ooo', label: 'ООО' },
 ];
 
-function formatPhone(phone: string | undefined): string {
+const CONTACT_OPTIONS: { value: PreferredContact; label: string }[] = [
+  { value: 'phone', label: 'Телефон' },
+  { value: 'telegram', label: 'Telegram' },
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'email', label: 'Email' },
+];
+
+const SPECIALIZATION_OPTIONS = [
+  'Новостройки',
+  'Вторичное жильё',
+  'Коммерческая недвижимость',
+  'Загородная недвижимость',
+  'Элитная недвижимость',
+];
+
+function formatPhone(phone: string | undefined | null): string {
   if (!phone) return '';
   const cleaned = phone.replace(/\D/g, '');
   if (cleaned.length === 11 && cleaned.startsWith('7')) {
@@ -57,7 +78,28 @@ interface OnboardingFormData {
 }
 
 export default function ProfilePage() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, updateUser } = useAuth();
+
+  // Extended profile state
+  const [extendedProfile, setExtendedProfile] = useState<ExtendedProfile | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Personal data form state
+  const [name, setName] = useState('');
+  const [preferredContact, setPreferredContact] = useState<PreferredContact>('phone');
+  const [telegramUsername, setTelegramUsername] = useState('');
+  const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [city, setCity] = useState('');
+  const [specialization, setSpecialization] = useState<string[]>([]);
+  const [experienceYears, setExperienceYears] = useState<number | ''>('');
+  const [about, setAbout] = useState('');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileSuccess, setProfileSuccess] = useState('');
+  const [profileError, setProfileError] = useState('');
+
+  // Payment profile state
   const [profiles, setProfiles] = useState<PaymentProfile[]>([]);
   const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -80,8 +122,33 @@ export default function ProfilePage() {
     email: user?.email || '',
   });
 
+  const isAgent = user?.role === 'agent' || user?.role === 'agency_admin' || user?.role === 'operator';
+
+  // Load extended profile
+  const loadExtendedProfile = useCallback(async () => {
+    try {
+      const res = await getSettingsProfile();
+      if (res.success && res.data) {
+        setExtendedProfile(res.data);
+        setAvatarUrl(res.data.avatar_url || null);
+        // Populate form
+        setName(res.data.name || '');
+        setPreferredContact(res.data.preferred_contact || 'phone');
+        setTelegramUsername(res.data.telegram_username || '');
+        setWhatsappPhone(res.data.whatsapp_phone || '');
+        setCity(res.data.city || '');
+        setSpecialization(res.data.specialization || []);
+        setExperienceYears(res.data.experience_years ?? '');
+        setAbout(res.data.about || '');
+      }
+    } catch {
+      console.error('Error loading extended profile');
+    }
+  }, []);
+
   useEffect(() => {
     if (user) {
+      loadExtendedProfile();
       loadProfiles();
       setFormData((prev) => ({
         ...prev,
@@ -89,7 +156,7 @@ export default function ProfilePage() {
         email: user.email || '',
       }));
     }
-  }, [user]);
+  }, [user, loadExtendedProfile]);
 
   async function loadProfiles() {
     try {
@@ -112,6 +179,117 @@ export default function ProfilePage() {
       setLoading(false);
     }
   }
+
+  // Avatar handlers
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileError('Размер файла не должен превышать 5 МБ');
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setProfileError('Разрешены только изображения');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setProfileError('');
+
+    try {
+      const res = await uploadProfileAvatar(file);
+      if (res.success && res.data) {
+        setAvatarUrl(res.data.avatar_url);
+        setProfileSuccess('Аватар обновлён');
+      } else {
+        setProfileError(res.error || 'Ошибка загрузки аватара');
+      }
+    } catch {
+      setProfileError('Ошибка загрузки аватара');
+    } finally {
+      setIsUploadingAvatar(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleAvatarDelete = async () => {
+    if (!avatarUrl) return;
+
+    setIsUploadingAvatar(true);
+    setProfileError('');
+
+    try {
+      const res = await deleteProfileAvatar();
+      if (res.success) {
+        setAvatarUrl(null);
+        setProfileSuccess('Аватар удалён');
+      } else {
+        setProfileError(res.error || 'Ошибка удаления аватара');
+      }
+    } catch {
+      setProfileError('Ошибка удаления аватара');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  // Profile update handler
+  const handleProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileError('');
+    setProfileSuccess('');
+    setIsSavingProfile(true);
+
+    const data: UpdateProfileDto = {
+      name: name || undefined,
+      preferred_contact: preferredContact,
+      telegram_username: telegramUsername || null,
+      whatsapp_phone: whatsappPhone || null,
+    };
+
+    // Agent-only fields
+    if (isAgent) {
+      data.city = city || null;
+      data.specialization = specialization.length > 0 ? specialization : null;
+      data.experience_years = experienceYears !== '' ? Number(experienceYears) : null;
+      data.about = about || null;
+    }
+
+    try {
+      const res = await updateSettingsProfile(data);
+      if (res.success && res.data) {
+        setExtendedProfile(res.data);
+        setProfileSuccess('Профиль обновлён');
+        // Update user in auth context
+        if (updateUser && user) {
+          updateUser({
+            ...user,
+            name: res.data.name,
+          });
+        }
+      } else {
+        setProfileError(res.error || 'Ошибка сохранения');
+      }
+    } catch {
+      setProfileError('Ошибка сохранения');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const toggleSpecialization = (spec: string) => {
+    setSpecialization(prev =>
+      prev.includes(spec)
+        ? prev.filter(s => s !== spec)
+        : [...prev, spec]
+    );
+  };
 
   const handleSubmitOnboarding = async () => {
     setError('');
@@ -221,45 +399,280 @@ export default function ProfilePage() {
       </div>
 
       <div className="space-y-4 sm:space-y-6">
+        {/* Avatar Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Фото профиля</CardTitle>
+            <CardDescription>Ваш аватар для идентификации</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-6">
+              {/* Avatar Preview */}
+              <div className="relative w-24 h-24 rounded-full overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0">
+                {avatarUrl ? (
+                  <Image
+                    src={avatarUrl}
+                    alt="Аватар"
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+
+              {/* Upload Controls */}
+              <div className="flex-1">
+                <div className="flex flex-wrap gap-3">
+                  <label className="btn btn-secondary cursor-pointer">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarUpload}
+                      disabled={isUploadingAvatar}
+                      className="hidden"
+                    />
+                    {isUploadingAvatar ? 'Загрузка...' : 'Загрузить фото'}
+                  </label>
+
+                  {avatarUrl && (
+                    <button
+                      type="button"
+                      onClick={handleAvatarDelete}
+                      disabled={isUploadingAvatar}
+                      className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg transition-colors"
+                    >
+                      Удалить
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  JPG, PNG или GIF. Максимум 5 МБ.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Personal info */}
         <Card>
           <CardHeader>
-            <CardTitle>Личная информация</CardTitle>
-            <CardDescription>Ваши основные данные</CardDescription>
+            <CardTitle>Личные данные</CardTitle>
+            <CardDescription>Ваши контактные данные и способы связи</CardDescription>
           </CardHeader>
           <CardContent>
-            <dl className="space-y-3 sm:space-y-4">
+            <form onSubmit={handleProfileSubmit} className="space-y-5">
+              {/* Email (read-only) */}
               <div>
-                <dt className="text-xs sm:text-sm text-gray-600">ID пользователя</dt>
-                <dd className="text-sm sm:text-base text-gray-900 mt-1 font-mono truncate">
-                  {user?.id}
-                </dd>
+                <label className="block text-sm font-medium mb-2 text-gray-500">
+                  Email
+                </label>
+                <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-500">
+                  {extendedProfile?.email || user?.email}
+                </div>
               </div>
-              {user?.email && (
+
+              {/* Phone (read-only) */}
+              {(extendedProfile?.phone || user?.phone) && (
                 <div>
-                  <dt className="text-xs sm:text-sm text-gray-600">Email</dt>
-                  <dd className="text-sm sm:text-base text-gray-900 mt-1">{user.email}</dd>
+                  <label className="block text-sm font-medium mb-2 text-gray-500">
+                    Телефон
+                  </label>
+                  <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-500">
+                    {formatPhone(extendedProfile?.phone || user?.phone)}
+                  </div>
                 </div>
               )}
-              {user?.phone && (
-                <div>
-                  <dt className="text-xs sm:text-sm text-gray-600">Телефон</dt>
-                  <dd className="text-sm sm:text-base text-gray-900 mt-1">{formatPhone(user.phone)}</dd>
-                </div>
-              )}
+
+              {/* Name */}
               <div>
-                <dt className="text-xs sm:text-sm text-gray-600">Роль</dt>
-                <dd className="text-sm sm:text-base text-gray-900 mt-1">
+                <label htmlFor="name" className="block text-sm font-medium mb-2">
+                  Имя
+                </label>
+                <input
+                  type="text"
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Иван Иванов"
+                  className="input"
+                />
+              </div>
+
+              {/* Role (read-only) */}
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-500">
+                  Роль
+                </label>
+                <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-500">
                   {ROLE_LABELS[user?.role || ''] || user?.role}
-                </dd>
+                </div>
               </div>
+
+              {/* Preferred Contact */}
               <div>
-                <dt className="text-xs sm:text-sm text-gray-600">Статус</dt>
-                <dd className="text-sm sm:text-base text-gray-900 mt-1 capitalize">
-                  {user?.is_active ? 'Активен' : 'Неактивен'}
-                </dd>
+                <label className="block text-sm font-medium mb-2">
+                  Предпочтительный способ связи
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {CONTACT_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setPreferredContact(opt.value)}
+                      className={`px-4 py-2 rounded-lg border transition-colors ${
+                        preferredContact === opt.value
+                          ? 'border-black bg-black text-white'
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </dl>
+
+              {/* Telegram */}
+              <div>
+                <label htmlFor="telegram" className="block text-sm font-medium mb-2">
+                  Telegram username
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">@</span>
+                  <input
+                    type="text"
+                    id="telegram"
+                    value={telegramUsername}
+                    onChange={(e) => setTelegramUsername(e.target.value.replace('@', ''))}
+                    placeholder="username"
+                    className="input pl-8"
+                  />
+                </div>
+              </div>
+
+              {/* WhatsApp */}
+              <div>
+                <label htmlFor="whatsapp" className="block text-sm font-medium mb-2">
+                  WhatsApp телефон
+                </label>
+                <input
+                  type="text"
+                  id="whatsapp"
+                  value={whatsappPhone}
+                  onChange={(e) => setWhatsappPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                  placeholder="79991234567"
+                  className="input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Если отличается от основного телефона
+                </p>
+              </div>
+
+              {/* Agent-only fields */}
+              {isAgent && (
+                <>
+                  <hr className="my-6" />
+                  <h3 className="text-md font-semibold mb-4">Профессиональные данные</h3>
+
+                  {/* City */}
+                  <div>
+                    <label htmlFor="city" className="block text-sm font-medium mb-2">
+                      Город
+                    </label>
+                    <input
+                      type="text"
+                      id="city"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="Москва"
+                      className="input"
+                    />
+                  </div>
+
+                  {/* Specialization */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Специализация
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {SPECIALIZATION_OPTIONS.map((spec) => (
+                        <button
+                          key={spec}
+                          type="button"
+                          onClick={() => toggleSpecialization(spec)}
+                          className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
+                            specialization.includes(spec)
+                              ? 'border-black bg-black text-white'
+                              : 'border-gray-300 hover:border-gray-400'
+                          }`}
+                        >
+                          {spec}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Experience */}
+                  <div>
+                    <label htmlFor="experience" className="block text-sm font-medium mb-2">
+                      Опыт работы (лет)
+                    </label>
+                    <input
+                      type="number"
+                      id="experience"
+                      value={experienceYears}
+                      onChange={(e) => setExperienceYears(e.target.value ? parseInt(e.target.value) : '')}
+                      min={0}
+                      max={70}
+                      placeholder="5"
+                      className="input"
+                    />
+                  </div>
+
+                  {/* About */}
+                  <div>
+                    <label htmlFor="about" className="block text-sm font-medium mb-2">
+                      О себе
+                    </label>
+                    <textarea
+                      id="about"
+                      value={about}
+                      onChange={(e) => setAbout(e.target.value)}
+                      rows={4}
+                      maxLength={2000}
+                      placeholder="Расскажите о своём опыте и подходе к работе..."
+                      className="input resize-none"
+                    />
+                    <p className="text-xs text-gray-500 mt-1 text-right">
+                      {about.length}/2000
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {/* Messages */}
+              {profileError && (
+                <div className="p-3 bg-gray-100 border border-gray-300 rounded-lg">
+                  <p className="text-sm text-gray-900">{profileError}</p>
+                </div>
+              )}
+              {profileSuccess && (
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <p className="text-sm text-gray-900">{profileSuccess}</p>
+                </div>
+              )}
+
+              {/* Submit */}
+              <Button type="submit" loading={isSavingProfile}>
+                Сохранить изменения
+              </Button>
+            </form>
           </CardContent>
         </Card>
 

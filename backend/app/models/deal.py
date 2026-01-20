@@ -129,7 +129,16 @@ class Deal(BaseModel, SoftDeleteMixin):
     # Клиент (для MVP - просто текстовые поля)
     client_id = Column(Integer, nullable=True)  # Может быть external party
     client_name = Column(String(255), nullable=True)
-    client_phone = Column(String(20), nullable=True)
+    client_phone = Column(String(20), nullable=True)  # Legacy plaintext (deprecated)
+    client_phone_encrypted = Column(String(500), nullable=True)  # 152-FZ compliant
+    client_phone_hash = Column(String(64), nullable=True, index=True)  # For search
+
+    # Commission split (TASK-002)
+    agent_split_percent = Column(Integer, nullable=True)  # Agent's share %
+    coagent_split_percent = Column(Integer, nullable=True)  # Co-agent's share %
+    coagent_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    coagent_phone = Column(String(20), nullable=True)  # For invitation if not registered
+    agency_split_percent = Column(Integer, nullable=True)  # Agency's share %
 
     # Паспортные данные клиента (encrypted для 152-ФЗ)
     client_passport_series_encrypted = Column(String(500), nullable=True)
@@ -177,6 +186,7 @@ class Deal(BaseModel, SoftDeleteMixin):
     # Relationships
     creator = relationship("User", foreign_keys=[created_by_user_id], back_populates="deals_created")
     agent = relationship("User", foreign_keys=[agent_user_id], back_populates="deals_as_agent")
+    coagent = relationship("User", foreign_keys=[coagent_user_id])
     parties = relationship("DealParty", back_populates="deal", cascade="all, delete-orphan")
     terms = relationship("DealTerms", back_populates="deal", uselist=False, cascade="all, delete-orphan")
     documents = relationship("Document", back_populates="deal", cascade="all, delete-orphan")

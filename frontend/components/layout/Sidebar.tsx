@@ -116,6 +116,40 @@ export function Sidebar({ items }: SidebarProps) {
           })}
         </nav>
 
+        {/* Cross-service navigation */}
+        <div style={{ padding: '16px', borderTop: '1px solid var(--color-border)' }}>
+          <p style={{ fontSize: '12px', color: 'var(--color-text-light)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Другие сервисы
+          </p>
+          <a
+            href="https://agent.housler.ru"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="sidebar-item"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
+              borderRadius: '8px',
+              padding: '12px',
+              marginBottom: '0',
+              textDecoration: 'none',
+            }}
+          >
+            <div>
+              <span style={{ fontWeight: 500 }}>Сервис новостроек</span>
+              <span style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-light)', marginTop: '2px' }}>
+                agent.housler.ru
+              </span>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
+        </div>
+
         <div style={{ padding: '16px', borderTop: '1px solid var(--color-border)' }}>
           <button onClick={logout} className="btn btn-ghost btn-block" style={{ justifyContent: 'flex-start' }}>
             Выйти
