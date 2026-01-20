@@ -2,9 +2,11 @@
 
 from enum import Enum as PyEnum
 
+from decimal import Decimal
 from sqlalchemy import Column, String, Enum, Integer, ForeignKey, Text, Numeric, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
+from sqlalchemy.ext.hybrid import hybrid_property
 
 from app.db.base import BaseModel, SoftDeleteMixin
 
@@ -159,6 +161,9 @@ class Deal(BaseModel, SoftDeleteMixin):
 
     # Финансы (для MVP - простые поля)
     price = Column(Numeric(15, 2), nullable=True)
+    # TASK-005: commission_agent is the denormalized/cached commission amount.
+    # It can be calculated from payment_type + commission_percent/commission_fixed using calculated_commission property.
+    # Kept for backward compatibility - many services depend on this field directly.
     commission_agent = Column(Numeric(15, 2), nullable=True)
 
     # Bank Split fields (T-Bank integration)
@@ -200,6 +205,38 @@ class Deal(BaseModel, SoftDeleteMixin):
     payment_type = Column(String(20), default="percent", nullable=False)  # percent/fixed/mixed
     commission_percent = Column(Numeric(5, 2), nullable=True)  # Процент от суммы сделки
     commission_fixed = Column(Numeric(15, 2), nullable=True)  # Фиксированная сумма комиссии
+
+    @hybrid_property
+    def calculated_commission(self) -> Decimal:
+        """Calculate commission from typed fields (TASK-005).
+
+        Returns commission_agent if set, otherwise calculates from:
+        - percent: price * commission_percent / 100
+        - fixed: commission_fixed
+        - mixed: commission_fixed + (price * commission_percent / 100)
+        """
+        # If commission_agent is already set, use it
+        if self.commission_agent is not None:
+            return Decimal(self.commission_agent)
+
+        # Calculate from typed fields
+        if self.payment_type == "percent" and self.price and self.commission_percent:
+            return (Decimal(self.price) * Decimal(self.commission_percent) / Decimal("100")).quantize(Decimal("0.01"))
+        elif self.payment_type == "fixed" and self.commission_fixed:
+            return Decimal(self.commission_fixed)
+        elif self.payment_type == "mixed":
+            total = Decimal("0")
+            if self.commission_fixed:
+                total += Decimal(self.commission_fixed)
+            if self.price and self.commission_percent:
+                total += (Decimal(self.price) * Decimal(self.commission_percent) / Decimal("100")).quantize(Decimal("0.01"))
+            return total
+
+        return Decimal("0")
+
+    def sync_commission_agent(self) -> None:
+        """Sync commission_agent from typed fields for backward compatibility."""
+        self.commission_agent = self.calculated_commission
 
     # Аванс
     advance_type = Column(String(20), default="none", nullable=False)  # none/advance_fixed/advance_percent

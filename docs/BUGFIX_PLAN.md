@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-**Status**: ALL TASKS COMPLETED (11/12 = 92%)
+**Status**: ALL 12 TASKS COMPLETED (100%)
 
 **Original Issue**: Deal creation fails with `asyncpg.exceptions.DataError` due to type mismatch.
 
@@ -25,6 +25,7 @@
 | TASK-010 | P3 | Unified phone validation FE/BE | 031 |
 | TASK-011 | P3 | client_name encryption | 031 migration |
 | TASK-012 | P3 | Coagent phone validation UX | 031 |
+| TASK-005 | P2 | Commission field refactor | hybrid property |
 
 ---
 
@@ -155,14 +156,13 @@ CREATE INDEX ix_lk_deals_client_phone_hash ON lk_deals(client_phone_hash);
 
 ## Remaining Work (Backlog)
 
-| Task | Priority | Effort | Description |
-|------|----------|--------|-------------|
-| TASK-005 | P2 | M | Remove redundant commission field (optional refactor) |
+None - all tasks completed!
 
 ---
 
 ## Changelog
 
+- **2026-01-20**: Completed TASK-005 (hybrid property for commission calculation)
 - **2026-01-20**: Completed TASK-008, TASK-010, TASK-011, TASK-012 (migration 031)
 - **2026-01-20**: Completed TASK-002, TASK-003, TASK-004 (migration 030)
 - **2026-01-20**: Deployed TASK-001, TASK-006, TASK-007, TASK-009 (commit ae0ca57)
@@ -172,6 +172,11 @@ CREATE INDEX ix_lk_deals_client_phone_hash ON lk_deals(client_phone_hash);
 
 ## Summary
 
-**11 of 12 tasks completed (92%)**
+**12 of 12 tasks completed (100%)**
 
-All P0, P1, and P3 tasks done. Only TASK-005 (P2 refactor) remains as optional backlog item.
+All tasks from the bugfix plan have been completed. Deal creation is fully functional with:
+- Proper type handling (executor_id)
+- Commission split support (agent/coagent/agency)
+- 152-FZ compliant encryption (phone, name, passport)
+- Comprehensive validation (dates, phone, passport fields)
+- Unified frontend/backend validation
