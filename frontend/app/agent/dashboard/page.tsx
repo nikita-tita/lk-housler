@@ -142,9 +142,6 @@ export default function AgentDashboard() {
             label="Экспорт"
             onExport={(format: ExportFormat) => exportAgentSummary(format)}
           />
-          <Link href="/agent/deals/bank-split/new" className="hidden sm:block">
-            <Button variant="secondary" size="sm">Bank-Split</Button>
-          </Link>
           <Link href="/agent/deals/new">
             <Button size="sm">Создать сделку</Button>
           </Link>
