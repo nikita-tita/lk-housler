@@ -12,13 +12,14 @@ import { getDashboardPath } from '@/lib/utils/redirect';
  * где layout уже вызвал useRequireAuth().
  */
 export function useAuth() {
-  const { user, isAuthenticated, isLoading, logout } = useAuthStore();
+  const { user, isAuthenticated, isLoading, logout, updateUser } = useAuthStore();
 
   return {
     user,
     isAuthenticated,
     isLoading,
     logout,
+    updateUser,
   };
 }
 
