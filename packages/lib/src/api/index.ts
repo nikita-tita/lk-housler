@@ -238,6 +238,10 @@ export {
 } from './signing';
 
 // Exports from users.ts
+export type {
+  UserSearchResult,
+} from './users';
+
 export {
   searchUserByPhone,
 } from './users';
