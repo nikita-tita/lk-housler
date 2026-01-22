@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@housler/lib';
+import { useAuth } from '@/hooks/useAuth';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@housler/ui';
 
 export default function SettingsPage() {
