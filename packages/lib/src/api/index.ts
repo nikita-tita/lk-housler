@@ -1,46 +1,6 @@
-// Exports from admin.ts
-export {
-  AdminDeal,
-  AdminDealsResponse,
-  AdminDispute,
-  AdminDisputesResponse,
-  PendingPayout,
-  PendingPayoutsResponse,
-  GlobalAnalytics,
-  LeaderboardEntry,
-  getGlobalAnalytics,
-  getLeaderboard,
-  getAdminDeals,
-  getAdminDisputes,
-  resolveDispute,
-  getPendingPayouts,
-  markPayoutPaid,
-  DEAL_STATUS_LABELS,
-  DISPUTE_STATUS_LABELS,
-  DISPUTE_REASON_LABELS,
-  ROLE_LABELS,
-  ExportFormat,
-  exportDeals,
-  exportPayouts,
-  exportDisputes,
-  exportSummary,
-} from './admin';
+// Note: admin.ts exports removed - file exists but has no exports
 
-// Exports from analytics.ts (excluding conflicting ones)
-export {
-  DealStatistics,
-  PayoutStatistics,
-  TimeSeriesPoint,
-  RecentDeal,
-  DashboardSummary,
-  getDashboardSummary,
-  getDealAnalytics,
-  getPayoutAnalytics,
-  getTimeSeries,
-  exportAgentDeals,
-  exportAgentPayouts,
-  exportAgentSummary,
-} from './analytics';
+// Note: analytics.ts exports removed - file exists but has no exports
 
 // Exports from auth.ts
 export {
@@ -71,9 +31,7 @@ export {
   BankSplitDealCreate,
   BankSplitDeal,
   InvoiceResponse,
-  StatusTransitionResponse,
   BankSplitDealsListResponse,
-  TimelineEvent,
   SendPaymentLinkResponse,
   RegeneratePaymentLinkResponse,
   DisputeCreateRequest,
@@ -81,7 +39,6 @@ export {
   ServiceCompletionRequest,
   ServiceCompletionResponse,
   ServiceCompletionStatus,
-  AdjustmentStatus,
   SplitAdjustmentApproval,
   SplitAdjustment,
   SplitAdjustmentCreateRequest,
@@ -154,9 +111,7 @@ export {
   DealType,
   PropertyType,
   PaymentType,
-  AdvanceType,
   DealStatus,
-  AddressInput,
   DealCreateSimple,
   CommissionCalculateRequest,
   PaymentStep,
@@ -245,7 +200,6 @@ export {
 export {
   SigningInfo,
   RequestOTPResponse,
-  VerifySignatureResponse,
   getSigningInfo,
   requestSigningOTP,
   verifyAndSign,
@@ -255,7 +209,5 @@ export {
 
 // Exports from users.ts
 export {
-  UserSearchResult,
-  UserSearchResponse,
   searchUserByPhone,
 } from './users';

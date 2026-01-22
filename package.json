@@ -1,0 +1,13 @@
+{
+  "name": "housler-monorepo",
+  "private": true,
+  "scripts": {
+    "build": "pnpm --filter \"@housler/*\" build",
+    "build:lk": "pnpm --filter \"@housler/lk\" build",
+    "build:agent": "pnpm --filter \"@housler/agent\" build"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "pnpm": "^9.1.0"
+  }
+}

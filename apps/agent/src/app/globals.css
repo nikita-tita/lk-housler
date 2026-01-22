@@ -1,0 +1,483 @@
+@import "tailwindcss";
+
+/* ============================================
+   HOUSLER PERVICHKA - Design System
+   Based on housler.ru patterns
+   Theme: Black & White Minimal
+   ============================================ */
+
+:root {
+  /* === COLORS === */
+  --black: #000000;
+  --white: #FFFFFF;
+
+  /* Grays */
+  --gray-900: #181A20;
+  --gray-800: #333333;
+  --gray-700: #4A4A4A;
+  --gray-600: #6B7280;
+  --gray-500: #9CA3AF;
+  --gray-400: #D1D5DB;
+  --gray-300: #E5E7EB;
+  --gray-200: #F3F4F6;
+  --gray-100: #F9FAFB;
+
+  /* Semantic */
+  --color-text: #181A20;
+  --color-text-light: #6B7280;
+  --color-border: #E5E7EB;
+  --color-bg: #FFFFFF;
+  --color-bg-gray: #F9FAFB;
+  --color-bg-secondary: #F3F4F6;
+  --color-accent: #000000;
+
+  /* Functional */
+  --success: #4ADE80;
+  --error: #EF4444;
+  --warning: #F59E0B;
+  --info: #3B82F6;
+
+  /* === TYPOGRAPHY === */
+  --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* === SPACING === */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+  --spacing-3xl: 64px;
+
+  /* === EFFECTS === */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* === BORDERS === */
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+}
+
+/* === BASE STYLES === */
+body {
+  font-family: var(--font-primary);
+  color: var(--color-text);
+  background: var(--color-bg);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* === BUTTONS ===
+   ВАЖНО: Всегда используй эти классы для кнопок!
+   Не используй inline стили типа bg-[var(--color-text)] text-white
+
+   Основные классы:
+   - .btn-primary - чёрная кнопка с белым текстом
+   - .btn-secondary - белая кнопка с рамкой
+   - .btn-accent - акцентная кнопка (чёрная)
+   - .btn-danger - красная кнопка для опасных действий
+
+   Модификаторы размера: .btn-sm, .btn-lg
+   Модификаторы состояния: disabled:opacity-50 disabled:cursor-not-allowed
+*/
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: var(--border-radius-md);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: center;
+  border: none;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Primary - чёрный фон, белый текст */
+.btn-primary {
+  background: var(--gray-900);
+  color: var(--white);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--black);
+}
+
+/* Secondary - прозрачный фон, рамка */
+.btn-secondary {
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--color-text);
+  background: var(--gray-100);
+}
+
+/* Accent - аналог primary для акцентных действий */
+.btn-accent {
+  background: var(--color-accent);
+  color: var(--white);
+}
+
+.btn-accent:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+/* Danger - для опасных действий */
+.btn-danger {
+  background: var(--error);
+  color: var(--white);
+}
+
+.btn-danger:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+/* Ghost - минимальная кнопка */
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--gray-100);
+}
+
+/* Размеры */
+.btn-xs {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.btn-sm {
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.btn-lg {
+  padding: 16px 32px;
+  font-size: 16px;
+}
+
+/* Full width */
+.btn-block {
+  width: 100%;
+}
+
+/* === CARDS ===
+   Варианты padding:
+   - .card (по умолчанию) - без padding, для карточек с картинками
+   - .card-body - стандартный padding 20px
+   - .card-sm - маленький padding 12px
+   - .card-lg - большой padding 24px
+
+   Модификаторы:
+   - .card-interactive - с hover эффектами (по умолчанию)
+   - .card-static - без hover эффектов
+*/
+.card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+  transition: all var(--transition-fast);
+}
+
+.card:hover {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-md);
+}
+
+.card-static:hover {
+  border-color: var(--color-border);
+  box-shadow: none;
+}
+
+.card-body {
+  padding: 20px;
+}
+
+.card-sm {
+  padding: 12px;
+}
+
+.card-lg {
+  padding: 24px;
+}
+
+/* === INPUTS === */
+.input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+  font-size: 16px;
+  font-family: inherit;
+  transition: border-color var(--transition-base);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-text);
+}
+
+.input::placeholder {
+  color: var(--color-text-light);
+}
+
+/* === SELECT === */
+.select {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+  font-size: 16px;
+  font-family: inherit;
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 20px;
+  padding-right: 44px;
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--color-text);
+}
+
+/* === SECTION === */
+.section {
+  padding: 80px 0;
+}
+
+.section-gray {
+  background: var(--color-bg-gray);
+}
+
+.section-title {
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: 48px;
+  text-align: center;
+}
+
+/* === CONTAINER === */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+@media (min-width: 640px) {
+  .container {
+    padding: 0 32px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    padding: 0 40px;
+  }
+}
+
+/* === RESPONSIVE SECTION === */
+@media (max-width: 640px) {
+  .section {
+    padding: 48px 0;
+  }
+
+  .section-title {
+    font-size: 24px;
+    margin-bottom: 24px;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1023px) {
+  .section {
+    padding: 60px 0;
+  }
+
+  .section-title {
+    font-size: 32px;
+    margin-bottom: 32px;
+  }
+}
+
+/* === TYPOGRAPHY === */
+.text-xs { font-size: 12px; }
+.text-sm { font-size: 14px; }
+.text-base { font-size: 16px; }
+.text-lg { font-size: 18px; }
+.text-xl { font-size: 20px; }
+.text-2xl { font-size: 24px; }
+.text-3xl { font-size: 32px; }
+.text-4xl { font-size: 40px; }
+
+/* === PRICE FORMAT === */
+.price {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.price-per-sqm {
+  font-size: 14px;
+  color: var(--color-text-light);
+}
+
+/* === ANIMATIONS === */
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
+/* === TAB/TOGGLE BUTTONS ===
+   Для табов, фильтров и переключателей состояния
+   Использовать вместо inline bg-[var(--color-text)] text-white
+*/
+.tab-btn {
+  padding: 8px 16px;
+  border-radius: var(--border-radius-md);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  border: none;
+  background: var(--gray-100);
+  color: var(--gray-900);
+}
+
+.tab-btn:hover {
+  background: var(--gray-200);
+}
+
+.tab-btn.active,
+.tab-btn-active {
+  background: var(--gray-900) !important;
+  color: var(--white) !important;
+}
+
+/* === BADGES ===
+   Для статусов, меток и тегов
+
+   Варианты:
+   - .badge - светлый фон (серый), тёмный текст
+   - .badge-filled - тёмный фон (чёрный), светлый текст
+
+   Размеры: по умолчанию sm, можно добавить .badge-md
+*/
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--border-radius-sm);
+  background: var(--gray-100);
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.badge-filled {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--border-radius-sm);
+  background: var(--gray-900);
+  color: var(--white);
+  white-space: nowrap;
+}
+
+.badge-md {
+  padding: 4px 12px;
+  font-size: 14px;
+}
+
+/* === ICON BUTTONS ===
+   Квадратные кнопки с иконками
+*/
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.icon-btn:hover {
+  border-color: var(--color-text);
+  background: var(--gray-100);
+}
+
+.icon-btn-sm {
+  width: 32px;
+  height: 32px;
+}
+
+.icon-btn-lg {
+  width: 48px;
+  height: 48px;
+}
+
+/* === SKELETON ===
+   Плейсхолдеры для загрузки
+*/
+.skeleton {
+  background: linear-gradient(90deg, var(--gray-200) 25%, var(--gray-100) 50%, var(--gray-200) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: var(--border-radius-sm);
+}
+
+@keyframes skeleton-loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
