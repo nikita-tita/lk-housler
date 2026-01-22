@@ -57,11 +57,10 @@ export interface PendingPayoutsResponse {
 // GlobalAnalytics moved to analytics.ts
 
 export interface LeaderboardEntry {
-  user_id: number;
+  agent_user_id: number;
   user_name?: string;
   deals_count: number;
   total_commission: number;
-  avg_commission: number;
 }
 
 // Admin API functions

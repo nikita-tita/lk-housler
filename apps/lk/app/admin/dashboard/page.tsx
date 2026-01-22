@@ -205,7 +205,7 @@ export default function AdminDashboard() {
               <div className="space-y-3">
                 {leaderboard.map((agent, i) => (
                   <div
-                    key={agent.user_id}
+                    key={agent.agent_user_id}
                     className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
                   >
                     <div className="flex items-center gap-3">
@@ -213,7 +213,7 @@ export default function AdminDashboard() {
                         {i + 1}
                       </span>
                       <div>
-                        <p className="font-medium">{agent.user_name || `ID: ${agent.user_id}`}</p>
+                        <p className="font-medium">{agent.user_name || `ID: ${agent.agent_user_id}`}</p>
                         <p className="text-sm text-gray-500">{agent.deals_count} сделок</p>
                       </div>
                     </div>

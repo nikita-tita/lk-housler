@@ -3,7 +3,7 @@
  */
 
 import { apiClient } from './client';
-import { ExportFormat } from './admin';
+import { ExportFormat, LeaderboardEntry } from './admin';
 
 export interface DealStatistics {
   total_deals: number;
@@ -112,13 +112,7 @@ export async function getGlobalAnalytics(params?: {
 export async function getLeaderboard(
   limit = 10,
   params?: { start_date?: string; end_date?: string }
-): Promise<
-  {
-    agent_user_id: number;
-    deals_count: number;
-    total_commission: number;
-  }[]
-> {
+): Promise<LeaderboardEntry[]> {
   const response = await apiClient.get('/admin/analytics/leaderboard', {
     params: { limit, ...params },
   });
