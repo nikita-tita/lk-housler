@@ -1,56 +1,55 @@
-# Frontend Dockerfile для lk.housler.ru
-# Multi-stage build для оптимизации размера образа
+# Frontend Dockerfile for lk.housler.ru (Monorepo support)
+FROM node:20-alpine AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 
-# Stage 1: Dependencies
-FROM node:20-alpine AS deps
+FROM base AS deps
 WORKDIR /app
+# Copy root workspace files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Copy shared packages
+COPY packages ./packages
+# Copy app package
+COPY apps/lk/package.json ./apps/lk/package.json
 
-# Копируем package files
-COPY package.json package-lock.json ./
+# Install dependencies
+RUN pnpm install --frozen-lockfile
 
-# Устанавливаем ВСЕ зависимости (включая devDependencies для build)
-RUN npm ci
-
-# Stage 2: Builder
-FROM node:20-alpine AS builder
+FROM base AS builder
 WORKDIR /app
-
-# Копируем зависимости из deps
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages ./packages
 COPY . .
 
-# Переменные окружения для build
-ARG NEXT_PUBLIC_API_URL
+# Build specific app
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NODE_ENV=production
 
-# Build Next.js приложения
-RUN npm run build
+# Re-install strictly for build context if needed or just build
+# pnpm run build --filter lk
+WORKDIR /app/apps/lk
+RUN pnpm run build
 
-# Stage 3: Runner
-FROM node:20-alpine AS runner
+FROM base AS runner
 WORKDIR /app
 
-# Создаем non-root пользователя
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Копируем необходимые файлы
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Copy standalone build
+COPY --from=builder --chown=nextjs:nodejs /app/apps/lk/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/lk/.next/static ./apps/lk/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/apps/lk/public ./apps/lk/public
 
-# Переключаемся на non-root пользователя
 USER nextjs
 
-# Открываем порт
 EXPOSE 3000
-
-# Переменные окружения
-ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Запускаем приложение
-CMD ["node", "server.js"]
+CMD ["node", "apps/lk/server.js"]
 
