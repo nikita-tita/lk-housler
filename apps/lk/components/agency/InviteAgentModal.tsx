@@ -7,7 +7,8 @@ import { z } from 'zod';
 const inviteSchema = z.object({
     contact: z.string().min(5, 'Введите email или телефон'),
     role: z.enum(['agent', 'admin'], {
-        errorMap: () => ({ message: 'Выберите роль' }),
+        required_error: 'Выберите роль',
+        invalid_type_error: 'Неверная роль',
     }),
 });
 
