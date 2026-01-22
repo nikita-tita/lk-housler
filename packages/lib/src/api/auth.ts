@@ -1,8 +1,7 @@
 import { authClient, apiClient } from './client';
 import { User } from '@/types/user';
 
-// API response wrapper from agent.housler.ru
-// All responses have structure: { success: boolean, data?: T, error?: string }
+// API response wrapper
 interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -14,6 +13,20 @@ export interface AuthResponse {
   access_token: string;
   user: User;
 }
+
+const IS_MOCK = process.env.NEXT_PUBLIC_MOCK_AUTH === 'true';
+
+const MOCK_USER: User = {
+  id: 1,
+  email: 'demo@housler.ru',
+  phone: '+79990000000',
+  name: 'Демо Пользователь',
+  role: 'client',
+  is_active: true,
+  created_at: new Date().toISOString(),
+  agency_id: null,
+  last_login_at: new Date().toISOString(),
+};
 
 // ==========================================
 // 1. SMS Auth (Agent) - uses agent.housler.ru
@@ -35,6 +48,16 @@ export interface SendSmsResult {
 }
 
 export async function sendSMS(phone: string): Promise<SendSmsResult> {
+  if (IS_MOCK) {
+    console.log('[MOCK] sendSMS', phone);
+    return {
+      success: true,
+      message: 'Код (MOCK): 111111',
+      codeSentAt: new Date().toISOString(),
+      canResendAt: new Date(Date.now() + 60000).toISOString(),
+    };
+  }
+
   const { data } = await authClient.post<ApiResponse<RequestSmsData>>('/auth/request-sms', { phone });
   return {
     success: data.success,
@@ -53,6 +76,15 @@ interface VerifySmsData {
 }
 
 export async function verifySMS(phone: string, code: string): Promise<AuthResponse> {
+  if (IS_MOCK) {
+    console.log('[MOCK] verifySMS', phone, code);
+    if (code !== '111111') throw new Error('Неверный код (MOCK: используйте 111111)');
+    return {
+      access_token: 'mock_agent_token',
+      user: { ...MOCK_USER, role: 'agent' },
+    };
+  }
+
   try {
     const { data } = await authClient.post<ApiResponse<VerifySmsData>>('/auth/verify-sms', { phone, code });
 
@@ -76,7 +108,6 @@ export async function verifySMS(phone: string, code: string): Promise<AuthRespon
       user: user,
     };
   } catch (err: unknown) {
-    // Re-throw with proper error message from API response
     const axiosError = err as { response?: { data?: { error?: string } } };
     if (axiosError.response?.data?.error) {
       throw new Error(axiosError.response.data.error);
@@ -105,6 +136,16 @@ export interface SendEmailResult {
 }
 
 export async function sendEmail(email: string): Promise<SendEmailResult> {
+  if (IS_MOCK) {
+    console.log('[MOCK] sendEmail', email);
+    return {
+      success: true,
+      message: 'Код (MOCK): 111111',
+      codeSentAt: new Date().toISOString(),
+      canResendAt: new Date(Date.now() + 60000).toISOString(),
+    };
+  }
+
   const { data } = await authClient.post<ApiResponse<RequestCodeData>>('/auth/request-code', { email });
   return {
     success: data.success,
@@ -121,6 +162,15 @@ interface VerifyCodeData {
 }
 
 export async function verifyEmail(email: string, code: string): Promise<AuthResponse> {
+  if (IS_MOCK) {
+    console.log('[MOCK] verifyEmail', email, code);
+    if (code !== '111111') throw new Error('Неверный код (MOCK: используйте 111111)');
+    return {
+      access_token: 'mock_client_token',
+      user: { ...MOCK_USER, email, role: 'client' },
+    };
+  }
+
   try {
     const { data } = await authClient.post<ApiResponse<VerifyCodeData>>('/auth/verify-code', { email, code });
 
@@ -151,6 +201,15 @@ interface LoginAgencyData {
 }
 
 export async function loginAgency(email: string, password: string): Promise<AuthResponse> {
+  if (IS_MOCK) {
+    console.log('[MOCK] loginAgency', email);
+    if (password !== '123456') throw new Error('Неверный пароль (MOCK: 123456)');
+    return {
+      access_token: 'mock_agency_token',
+      user: { ...MOCK_USER, email, role: 'agency_admin', id: 99 },
+    };
+  }
+
   try {
     const { data } = await authClient.post<ApiResponse<LoginAgencyData>>('/auth/login-agency', { email, password });
 
@@ -176,6 +235,12 @@ export async function loginAgency(email: string, password: string): Promise<Auth
 // ==========================================
 
 export async function getCurrentUser(): Promise<User> {
+  if (IS_MOCK) {
+    // В мок-режиме, если есть токен, возвращаем мок-юзера
+    // Токен мы не проверяем на валидность, просто его наличие (обычно делается в axios interceptor)
+    return MOCK_USER;
+  }
+
   // Use lk.housler.ru API to get user with organization info
   const { data } = await apiClient.get<User>('/users/me');
   return data;
@@ -224,6 +289,13 @@ interface RegisterData {
 }
 
 export async function registerAgent(data: AgentRegisterData): Promise<AuthResponse> {
+  if (IS_MOCK) {
+    return {
+      access_token: 'mock_agent_token',
+      user: { ...MOCK_USER, ...data, role: 'agent' } as User,
+    };
+  }
+
   try {
     const { data: response } = await authClient.post<ApiResponse<RegisterData>>('/auth/register-realtor', data);
 
@@ -245,6 +317,13 @@ export async function registerAgent(data: AgentRegisterData): Promise<AuthRespon
 }
 
 export async function registerAgency(data: AgencyRegisterData): Promise<AuthResponse> {
+  if (IS_MOCK) {
+    return {
+      access_token: 'mock_agency_token',
+      user: { ...MOCK_USER, name: data.contactName, email: data.contactEmail, role: 'agency_admin' } as User,
+    };
+  }
+
   try {
     const { data: response } = await authClient.post<ApiResponse<RegisterData>>('/auth/register-agency', data);
 

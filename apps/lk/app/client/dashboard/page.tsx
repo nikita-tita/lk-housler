@@ -85,7 +85,7 @@ export default function ClientDashboard() {
       ) : (
         <div className="grid gap-6">
           {deals.map((deal) => (
-            <Link key={deal.id} href={`/client/deals/${deal.id}`}>
+            <Link key={deal.id} href={`/client/dashboard/${deal.id}`}>
               <Card className="hover:bg-gray-50 transition-colors cursor-pointer">
                 <CardHeader>
                   <div className="flex items-start justify-between">
@@ -96,17 +96,16 @@ export default function ClientDashboard() {
                       </CardDescription>
                     </div>
                     <span
-                      className={`px-3 py-1 text-sm rounded-full whitespace-nowrap ${
-                        deal.status === 'draft'
+                      className={`px-3 py-1 text-sm rounded-full whitespace-nowrap ${deal.status === 'draft'
                           ? 'bg-gray-200 text-gray-900'
                           : deal.status === 'closed'
-                          ? 'bg-black text-white'
-                          : deal.status === 'cancelled'
-                          ? 'bg-gray-100 text-gray-500'
-                          : deal.status === 'dispute'
-                          ? 'bg-gray-900 text-white'
-                          : 'bg-gray-100 text-gray-900'
-                      }`}
+                            ? 'bg-black text-white'
+                            : deal.status === 'cancelled'
+                              ? 'bg-gray-100 text-gray-500'
+                              : deal.status === 'dispute'
+                                ? 'bg-gray-900 text-white'
+                                : 'bg-gray-100 text-gray-900'
+                        }`}
                     >
                       {STATUS_LABELS[deal.status] || deal.status}
                     </span>

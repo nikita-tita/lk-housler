@@ -33,7 +33,7 @@ const roles = [
     id: 'agency',
     title: 'Сотрудник агентства',
     description: 'Для агентств недвижимости, застройщиков или банков',
-    href: '/agency',
+    href: '/login/agency',
     icon: (
       <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
@@ -75,7 +75,7 @@ export default function LoginPage() {
         {roles.map((role) => (
           <Link
             key={role.id}
-            href={role.href}
+            href={role.id === 'client' ? '/login/client' : role.href}
             className="flex items-center gap-4 p-5 border border-[var(--color-border)] rounded-xl hover:border-[var(--gray-400)] hover:bg-[var(--color-bg-secondary)] transition-all"
           >
             <div className="text-[var(--color-accent)]">
@@ -94,7 +94,7 @@ export default function LoginPage() {
 
       <p className="text-center text-sm text-[var(--color-text-light)] mt-8">
         Уже зарегистрированы?{' '}
-        <Link href="/client" className="text-[var(--color-accent)] hover:underline">
+        <Link href="/login/client" className="text-[var(--color-accent)] hover:underline">
           Войти
         </Link>
       </p>

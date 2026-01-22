@@ -65,13 +65,12 @@ export default function ClientDealDetailPage() {
           </p>
         </div>
         <span
-          className={`px-4 py-2 rounded-lg ${
-            deal.status === 'draft'
+          className={`px-4 py-2 rounded-lg ${deal.status === 'draft'
               ? 'bg-gray-200 text-gray-900'
               : deal.status === 'closed'
-              ? 'bg-black text-white'
-              : 'bg-gray-100 text-gray-900'
-          }`}
+                ? 'bg-black text-white'
+                : 'bg-gray-100 text-gray-900'
+            }`}
         >
           {deal.status}
         </span>

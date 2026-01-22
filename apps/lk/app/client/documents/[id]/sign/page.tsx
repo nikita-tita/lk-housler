@@ -69,7 +69,7 @@ export default function DocumentSignPage() {
 
                 // Redirect to deals list after success
                 setTimeout(() => {
-                    router.push('/client/deals');
+                    router.push('/client/dashboard');
                 }, 2000);
             } else {
                 setState({ step: 'error', error: 'Неверный код. Попробуйте ещё раз.' });

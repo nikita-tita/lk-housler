@@ -1,15 +1,20 @@
-// Note: admin.ts exports removed - file exists but has no exports
+// Exports from admin.ts
+export * from './admin';
 
-// Note: analytics.ts exports removed - file exists but has no exports
+// Exports from analytics.ts
+export * from './analytics';
 
 // Exports from auth.ts
-export {
+export type {
   AuthResponse,
   SendSmsResult,
   SendEmailResult,
   AgentRegisterData,
   AgencyRegisterData,
   ConsentInput,
+} from './auth';
+
+export {
   sendSMS,
   verifySMS,
   sendEmail,
@@ -21,11 +26,11 @@ export {
 } from './auth';
 
 // Exports from bank-split.ts
-export {
-  BankSplitDealType,
-  BankSplitStatus,
+export type {
+  BankSplitDealType, // Enum or Type? Assuming Enum creates value. If Enum, do not use type.
+  BankSplitStatus, // Enum likely
   PaymentModel,
-  RecipientRole,
+  RecipientRole, // Type
   RecipientInput,
   Recipient,
   BankSplitDealCreate,
@@ -38,7 +43,7 @@ export {
   DisputeResponse,
   ServiceCompletionRequest,
   ServiceCompletionResponse,
-  ServiceCompletionStatus,
+  ServiceCompletionStatus, // Enum?
   SplitAdjustmentApproval,
   SplitAdjustment,
   SplitAdjustmentCreateRequest,
@@ -46,7 +51,10 @@ export {
   SplitAdjustmentsListResponse,
   ClientPassportUpdate,
   ClientPassportResponse,
-  ClientPassportStatus,
+  ClientPassportStatus, // Enum?
+} from './bank-split';
+
+export {
   createBankSplitDeal,
   getBankSplitDeal,
   getBankSplitDeals,
@@ -68,6 +76,7 @@ export {
   rejectSplitAdjustment,
   updateClientPassport,
   getClientPassportStatus,
+  // Enums/Constants
   BANK_SPLIT_STATUS_LABELS,
   BANK_SPLIT_STATUS_STYLES,
   RECIPIENT_ROLE_LABELS,
@@ -79,8 +88,7 @@ export {
 export { apiClient, authClient } from './client';
 
 // Exports from contracts.ts
-export {
-  ContractStatus,
+export type {
   ContractType,
   SignatureMethod,
   RequiredSigner,
@@ -89,6 +97,10 @@ export {
   ContractsListResponse,
   GenerateContractResponse,
   SignContractResponse,
+  ContractStatus,
+} from './contracts';
+
+export {
   CONTRACT_STATUS_LABELS,
   CONTRACT_TYPE_LABELS,
   SIGNATURE_METHOD_LABELS,
@@ -107,11 +119,11 @@ export {
 } from './contracts';
 
 // Exports from deals.ts
-export {
-  DealType,
-  PropertyType,
-  PaymentType,
-  DealStatus,
+export type {
+  DealType, // Enum?
+  PropertyType, // Enum?
+  PaymentType, // Enum?
+  DealStatus, // Enum?
   DealCreateSimple,
   CommissionCalculateRequest,
   PaymentStep,
@@ -119,6 +131,9 @@ export {
   Deal,
   DealsListResponse,
   SendForSigningResponse,
+} from './deals';
+
+export {
   getDeals,
   getAgencyDeals,
   getDeal,
@@ -135,13 +150,16 @@ export {
 } from './deals';
 
 // Exports from invitations.ts
-export {
+export type {
   InvitationRole,
   InvitationStatus,
   InvitationCreate,
   InvitationResponse,
   InvitationPublicInfo,
   InvitationActionResponse,
+} from './invitations';
+
+export {
   createInvitation,
   getDealInvitations,
   cancelInvitation,
@@ -154,10 +172,13 @@ export {
 } from './invitations';
 
 // Exports from organizations.ts
-export {
+export type {
   AgentInfo,
   AgentListResponse,
   Organization,
+} from './organizations';
+
+export {
   getOrganizations,
   getOrganization,
   getAgents,
@@ -166,7 +187,7 @@ export {
 } from './organizations';
 
 // Exports from profile.ts
-export {
+export type {
   LegalType,
   OnboardingStatus,
   KYCStatus,
@@ -180,6 +201,9 @@ export {
   CompanyAutofillResponse,
   SettingsProfileResponse,
   AvatarUploadResponse,
+} from './profile';
+
+export {
   LEGAL_TYPE_LABELS,
   ONBOARDING_STATUS_LABELS,
   KYC_STATUS_LABELS,
@@ -197,9 +221,12 @@ export {
 } from './profile';
 
 // Exports from signing.ts
-export {
+export type {
   SigningInfo,
   RequestOTPResponse,
+} from './signing';
+
+export {
   getSigningInfo,
   requestSigningOTP,
   verifyAndSign,

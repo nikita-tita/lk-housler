@@ -12,18 +12,18 @@ export default function ClientOnboardingPage() {
         // Check if user has seen onboarding
         const hasSeenOnboarding = localStorage.getItem('client_onboarding_seen');
         if (hasSeenOnboarding) {
-            router.replace('/client/deals');
+            router.replace('/client/dashboard');
         }
     }, [router]);
 
     const handleComplete = () => {
         localStorage.setItem('client_onboarding_seen', 'true');
-        router.push('/client/deals');
+        router.push('/client/dashboard');
     };
 
     const handleSkip = () => {
         localStorage.setItem('client_onboarding_seen', 'true');
-        router.push('/client/deals');
+        router.push('/client/dashboard');
     };
 
     return (

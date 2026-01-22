@@ -84,34 +84,7 @@ export interface LeaderboardEntry {
 
 // Admin API functions
 
-export async function getGlobalAnalytics(
-  startDate?: string,
-  endDate?: string
-): Promise<GlobalAnalytics> {
-  const params: Record<string, string> = {};
-  if (startDate) params.start_date = startDate;
-  if (endDate) params.end_date = endDate;
-
-  const { data } = await apiClient.get<GlobalAnalytics>('/admin/admin/analytics/global', {
-    params,
-  });
-  return data;
-}
-
-export async function getLeaderboard(
-  limit = 10,
-  startDate?: string,
-  endDate?: string
-): Promise<LeaderboardEntry[]> {
-  const params: Record<string, unknown> = { limit };
-  if (startDate) params.start_date = startDate;
-  if (endDate) params.end_date = endDate;
-
-  const { data } = await apiClient.get<LeaderboardEntry[]>('/admin/admin/analytics/leaderboard', {
-    params,
-  });
-  return data;
-}
+// getGlobalAnalytics and getLeaderboard moved to analytics.ts
 
 export async function getAdminDeals(
   status?: string,
