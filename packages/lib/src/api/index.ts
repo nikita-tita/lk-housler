@@ -133,6 +133,7 @@ export type {
   DealsListResponse,
   SendForSigningResponse,
   AdvanceType,
+  AddressInput,
 } from './deals';
 
 export {
