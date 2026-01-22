@@ -52,6 +52,7 @@ export type {
   ClientPassportUpdate,
   ClientPassportResponse,
   ClientPassportStatus, // Enum?
+  TimelineEvent,
 } from './bank-split';
 
 export {
