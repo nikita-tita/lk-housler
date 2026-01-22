@@ -1,15 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Modal, Button, Input, Select } from '@housler/ui';
+import { Modal, Button, Input } from '@housler/ui';
 import { z } from 'zod';
 
 const inviteSchema = z.object({
     contact: z.string().min(5, 'Введите email или телефон'),
-    role: z.enum(['agent', 'admin'], {
-        required_error: 'Выберите роль',
-        invalid_type_error: 'Неверная роль',
-    }),
+    role: z.enum(['agent', 'admin']),
 });
 
 type InviteData = z.infer<typeof inviteSchema>;
@@ -47,7 +44,7 @@ export function InviteAgentModal({ isOpen, onClose, onSuccess }: InviteAgentModa
         } catch (error) {
             if (error instanceof z.ZodError) {
                 const newErrors: Record<string, string> = {};
-                error.errors.forEach((err) => {
+                error.issues.forEach((err: z.ZodIssue) => {
                     if (err.path[0]) {
                         newErrors[err.path[0] as string] = err.message;
                     }
@@ -82,7 +79,8 @@ export function InviteAgentModal({ isOpen, onClose, onSuccess }: InviteAgentModa
                     <label className="block text-sm font-medium text-gray-900 mb-2">
                         Роль
                     </label>
-                    <Select
+                    <select
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
                         value={formData.role || 'agent'}
                         onChange={(e) =>
                             setFormData({ ...formData, role: e.target.value as InviteData['role'] })
@@ -90,7 +88,7 @@ export function InviteAgentModal({ isOpen, onClose, onSuccess }: InviteAgentModa
                     >
                         <option value="agent">Агент</option>
                         <option value="admin">Администратор</option>
-                    </Select>
+                    </select>
                     {errors.role && (
                         <p className="text-sm text-gray-900 mt-1">{errors.role}</p>
                     )}
