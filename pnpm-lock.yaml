@@ -157,22 +157,29 @@ importers:
         version: 5.9.3
 
   packages/ui:
+    dependencies:
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      tailwind-merge:
+        specifier: ^2.3.0
+        version: 2.6.0
     devDependencies:
       '@types/react':
         specifier: ^19
         version: 19.2.9
-      clsx:
-        specifier: ^2.1.1
-        version: 2.1.1
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.2.3(@types/react@19.2.9)
       eslint:
         specifier: ^9
         version: 9.39.2(jiti@2.6.1)
       react:
-        specifier: ^19
+        specifier: 19.2.3
         version: 19.2.3
-      tailwind-merge:
-        specifier: ^3.4.0
-        version: 3.4.0
+      react-dom:
+        specifier: 19.2.3
+        version: 19.2.3(react@19.2.3)
       typescript:
         specifier: ^5
         version: 5.9.3
