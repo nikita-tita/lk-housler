@@ -25,6 +25,7 @@ const MOCK_USER: User = {
   is_active: true,
   created_at: new Date().toISOString(),
   agency_id: null,
+  agency: null,
   last_login_at: new Date().toISOString(),
 };
 
