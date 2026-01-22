@@ -83,13 +83,7 @@ export async function getTimeSeries(days = 30): Promise<TimeSeriesPoint[]> {
   return response.data;
 }
 
-/**
- * Admin: Get global analytics
- */
-export async function getGlobalAnalytics(params?: {
-  start_date?: string;
-  end_date?: string;
-}): Promise<{
+export interface GlobalAnalytics {
   deals: DealStatistics;
   payouts: PayoutStatistics;
   disputes: {
@@ -99,7 +93,15 @@ export async function getGlobalAnalytics(params?: {
     total_refund_amount: number;
     open_disputes: number;
   };
-}> {
+}
+
+/**
+ * Admin: Get global analytics
+ */
+export async function getGlobalAnalytics(params?: {
+  start_date?: string;
+  end_date?: string;
+}): Promise<GlobalAnalytics> {
   const response = await apiClient.get('/admin/analytics/global', { params });
   return response.data;
 }

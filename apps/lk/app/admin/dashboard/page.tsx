@@ -101,23 +101,27 @@ export default function AdminDashboard() {
   }
 
   const dealStats = analytics?.deals || {
-    total: 0,
-    by_status: {},
+    total_deals: 0,
+    deals_by_status: {},
+    total_volume: 0,
     total_commission: 0,
+    avg_deal_size: 0,
     avg_commission: 0,
   };
 
   const payoutStats = analytics?.payouts || {
     total_paid: 0,
-    pending_count: 0,
-    pending_amount: 0,
+    recipients_count: 0,
+    total_pending: 0,
+    payout_by_status: {},
   };
 
   const disputeStats = analytics?.disputes || {
-    total: 0,
-    open: 0,
-    resolved: 0,
-    refund_total: 0,
+    total_disputes: 0,
+    open_disputes: 0,
+    disputes_by_status: {},
+    disputes_by_reason: {},
+    total_refund_amount: 0,
   };
 
   return (
@@ -138,7 +142,7 @@ export default function AdminDashboard() {
         <Card>
           <CardHeader className="p-4 sm:p-6">
             <CardDescription className="text-xs sm:text-sm">Всего сделок</CardDescription>
-            <CardTitle className="text-2xl sm:text-4xl">{dealStats.total}</CardTitle>
+            <CardTitle className="text-2xl sm:text-4xl">{dealStats.total_deals}</CardTitle>
           </CardHeader>
         </Card>
 
@@ -152,30 +156,30 @@ export default function AdminDashboard() {
         <Card>
           <CardHeader className="p-4 sm:p-6">
             <CardDescription className="text-xs sm:text-sm">К выплате</CardDescription>
-            <CardTitle className="text-xl sm:text-4xl">{formatPrice(payoutStats.pending_amount)}</CardTitle>
-            <p className="text-xs sm:text-sm text-gray-500">{payoutStats.pending_count} получателей</p>
+            <CardTitle className="text-xl sm:text-4xl">{formatPrice(payoutStats.total_pending)}</CardTitle>
+            <p className="text-xs sm:text-sm text-gray-500">{payoutStats.recipients_count} получателей</p>
           </CardHeader>
         </Card>
 
         <Card>
           <CardHeader className="p-4 sm:p-6">
             <CardDescription className="text-xs sm:text-sm">Открытых споров</CardDescription>
-            <CardTitle className="text-2xl sm:text-4xl">{disputeStats.open}</CardTitle>
-            <p className="text-xs sm:text-sm text-gray-500">из {disputeStats.total} всего</p>
+            <CardTitle className="text-2xl sm:text-4xl">{disputeStats.open_disputes}</CardTitle>
+            <p className="text-xs sm:text-sm text-gray-500">из {disputeStats.total_disputes} всего</p>
           </CardHeader>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8 mb-6 sm:mb-8">
         {/* Status breakdown */}
-        {Object.keys(dealStats.by_status || {}).length > 0 && (
+        {Object.keys(dealStats.deals_by_status || {}).length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle>Сделки по статусам</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                {Object.entries(dealStats.by_status).map(([status, count]) => (
+                {Object.entries(dealStats.deals_by_status).map(([status, count]) => (
                   <div
                     key={status}
                     className={`px-3 py-1.5 rounded-lg text-sm ${STATUS_COLORS[status] || 'bg-gray-100'}`}
@@ -254,9 +258,8 @@ export default function AdminDashboard() {
                         </p>
                       </div>
                       <span
-                        className={`self-start sm:self-center px-2 py-1 text-xs rounded-full whitespace-nowrap ${
-                          STATUS_COLORS[deal.status] || 'bg-gray-100 text-gray-900'
-                        }`}
+                        className={`self-start sm:self-center px-2 py-1 text-xs rounded-full whitespace-nowrap ${STATUS_COLORS[deal.status] || 'bg-gray-100 text-gray-900'
+                          }`}
                       >
                         {DEAL_STATUS_LABELS[deal.status] || deal.status}
                       </span>
@@ -302,9 +305,8 @@ export default function AdminDashboard() {
                         </p>
                       </div>
                       <span
-                        className={`self-start sm:self-center px-2 py-1 text-xs rounded-full whitespace-nowrap ${
-                          DISPUTE_STATUS_COLORS[dispute.status] || 'bg-gray-100'
-                        }`}
+                        className={`self-start sm:self-center px-2 py-1 text-xs rounded-full whitespace-nowrap ${DISPUTE_STATUS_COLORS[dispute.status] || 'bg-gray-100'
+                          }`}
                       >
                         {DISPUTE_STATUS_LABELS[dispute.status] || dispute.status}
                       </span>

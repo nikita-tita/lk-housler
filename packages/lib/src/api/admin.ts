@@ -54,25 +54,7 @@ export interface PendingPayoutsResponse {
   offset: number;
 }
 
-export interface GlobalAnalytics {
-  deals: {
-    total: number;
-    by_status: Record<string, number>;
-    total_commission: number;
-    avg_commission: number;
-  };
-  payouts: {
-    total_paid: number;
-    pending_count: number;
-    pending_amount: number;
-  };
-  disputes: {
-    total: number;
-    open: number;
-    resolved: number;
-    refund_total: number;
-  };
-}
+// GlobalAnalytics moved to analytics.ts
 
 export interface LeaderboardEntry {
   user_id: number;
