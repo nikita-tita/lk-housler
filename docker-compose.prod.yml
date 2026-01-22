@@ -154,7 +154,7 @@ services:
   # Frontend (Next.js)
   frontend:
     build:
-      context: ./frontend
+      context: ./apps/lk
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: https://lk.housler.ru/api/v1
