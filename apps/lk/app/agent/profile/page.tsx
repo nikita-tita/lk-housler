@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
-import { useAuth } from '@housler/lib';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@housler/ui';
 import { Input } from '@housler/ui';
 import { Select } from '@housler/ui';
@@ -526,11 +526,10 @@ export default function ProfilePage() {
                       key={opt.value}
                       type="button"
                       onClick={() => setPreferredContact(opt.value)}
-                      className={`px-4 py-2 rounded-lg border transition-colors ${
-                        preferredContact === opt.value
+                      className={`px-4 py-2 rounded-lg border transition-colors ${preferredContact === opt.value
                           ? 'border-black bg-black text-white'
                           : 'border-gray-300 hover:border-gray-400'
-                      }`}
+                        }`}
                     >
                       {opt.label}
                     </button>
@@ -606,11 +605,10 @@ export default function ProfilePage() {
                           key={spec}
                           type="button"
                           onClick={() => toggleSpecialization(spec)}
-                          className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
-                            specialization.includes(spec)
+                          className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${specialization.includes(spec)
                               ? 'border-black bg-black text-white'
                               : 'border-gray-300 hover:border-gray-400'
-                          }`}
+                            }`}
                         >
                           {spec}
                         </button>
@@ -735,21 +733,20 @@ export default function ProfilePage() {
                       </p>
                     </div>
                     <span
-                      className={`px-3 py-1 text-xs rounded-full ${
-                        activeProfile.bank_onboarding_status === 'approved'
+                      className={`px-3 py-1 text-xs rounded-full ${activeProfile.bank_onboarding_status === 'approved'
                           ? 'bg-black text-white'
                           : activeProfile.bank_onboarding_status === 'rejected'
-                          ? 'bg-gray-200 text-gray-700'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}
+                            ? 'bg-gray-200 text-gray-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
                     >
                       {activeProfile.bank_onboarding_status === 'approved'
                         ? 'Активен'
                         : activeProfile.bank_onboarding_status === 'pending_review'
-                        ? 'На проверке'
-                        : activeProfile.bank_onboarding_status === 'rejected'
-                        ? 'Отклонено'
-                        : 'Ожидает'}
+                          ? 'На проверке'
+                          : activeProfile.bank_onboarding_status === 'rejected'
+                            ? 'Отклонено'
+                            : 'Ожидает'}
                     </span>
                   </div>
 
@@ -779,8 +776,8 @@ export default function ProfilePage() {
                     formData.legal_type === 'se'
                       ? 'Иванов Иван Иванович'
                       : formData.legal_type === 'ip'
-                      ? 'ИП Иванов И.И.'
-                      : 'ООО "Компания"'
+                        ? 'ИП Иванов И.И.'
+                        : 'ООО "Компания"'
                   }
                   value={formData.legal_name}
                   onChange={(e) => setFormData({ ...formData, legal_name: e.target.value })}
@@ -795,8 +792,8 @@ export default function ProfilePage() {
                     formData.legal_type === 'ooo'
                       ? '10 цифр для юрлица (данные заполнятся автоматически)'
                       : formData.legal_type === 'ip'
-                      ? '12 цифр (данные заполнятся автоматически)'
-                      : '12 цифр для физлица'
+                        ? '12 цифр (данные заполнятся автоматически)'
+                        : '12 цифр для физлица'
                   }
                 />
 
@@ -938,21 +935,20 @@ export default function ProfilePage() {
                   </p>
                 </div>
                 <span
-                  className={`px-3 py-1 text-xs rounded-full ${
-                    activeProfile.kyc_status === 'approved'
+                  className={`px-3 py-1 text-xs rounded-full ${activeProfile.kyc_status === 'approved'
                       ? 'bg-black text-white'
                       : activeProfile.kyc_status === 'rejected'
-                      ? 'bg-gray-200 text-gray-700'
-                      : 'bg-gray-100 text-gray-600'
-                  }`}
+                        ? 'bg-gray-200 text-gray-700'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}
                 >
                   {activeProfile.kyc_status === 'approved'
                     ? 'Верифицирован'
                     : activeProfile.kyc_status === 'in_review'
-                    ? 'На проверке'
-                    : activeProfile.kyc_status === 'rejected'
-                    ? 'Отклонено'
-                    : 'Ожидает'}
+                      ? 'На проверке'
+                      : activeProfile.kyc_status === 'rejected'
+                        ? 'Отклонено'
+                        : 'Ожидает'}
                 </span>
               </div>
             ) : (

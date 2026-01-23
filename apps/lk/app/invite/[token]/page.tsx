@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useAuth } from '@housler/lib';
+import { useAuth } from '@/hooks/useAuth';
 import {
   getInvitationByToken,
   acceptInvitation,

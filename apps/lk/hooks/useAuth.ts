@@ -2,9 +2,9 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore } from '@housler/lib';
 import { UserRole } from '@/types/user';
-import { getDashboardPath } from '../utils/redirect';
+import { getDashboardPath } from '@housler/lib';
 
 /**
  * Хук для доступа к данным авторизации.

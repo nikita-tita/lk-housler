@@ -20,6 +20,17 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  // Redirects - FIX BUG-002: /agent should redirect to /realtor
+  async redirects() {
+    return [
+      {
+        source: '/agent',
+        destination: '/realtor',
+        permanent: true,
+      },
+    ];
+  },
+
   // Security headers
   async headers() {
     return [

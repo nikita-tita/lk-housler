@@ -12,7 +12,7 @@ import {
 import { SplitRecipients } from '@/components/deals/SplitRecipients';
 import { DealTimeline } from '@/components/deals/DealTimeline';
 import { ContractSection } from '@/components/deals/ContractSection';
-import { useAuth } from '@housler/lib';
+import { useAuth } from '@/hooks/useAuth';
 import {
   getBankSplitDeal,
   submitForSigning,
@@ -671,14 +671,14 @@ export default function BankSplitDealDetailPage() {
                       )}
                       {(paymentData?.expiresAt ||
                         deal.payment_link_expires_at) && (
-                        <p className="text-xs text-gray-500 text-center">
-                          Действует до:{' '}
-                          {formatDateTime(
-                            paymentData?.expiresAt ||
+                          <p className="text-xs text-gray-500 text-center">
+                            Действует до:{' '}
+                            {formatDateTime(
+                              paymentData?.expiresAt ||
                               deal.payment_link_expires_at!
-                          )}
-                        </p>
-                      )}
+                            )}
+                          </p>
+                        )}
 
                       {/* SMS Send Section */}
                       <div className="pt-4 border-t border-gray-200">
@@ -702,11 +702,10 @@ export default function BankSplitDealDetailPage() {
                         )}
                         {smsResult && (
                           <div
-                            className={`mt-3 p-3 rounded-lg text-sm text-center ${
-                              smsResult.success
+                            className={`mt-3 p-3 rounded-lg text-sm text-center ${smsResult.success
                                 ? 'bg-gray-50 text-gray-900'
                                 : 'bg-gray-100 text-gray-700'
-                            }`}
+                              }`}
                           >
                             {smsResult.message}
                           </div>
