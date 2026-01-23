@@ -140,7 +140,8 @@ class Document(BaseModel):
 
     version_no = Column(Integer, default=1, nullable=False)
 
-    status = Column(Enum(DocumentStatus), default=DocumentStatus.GENERATED, nullable=False, index=True)
+    # Using String instead of native Enum to avoid PostgreSQL enum type issues
+    status = Column(String(20), default="generated", nullable=False, index=True)
 
     # URL файла в S3
     file_url = Column(String(500), nullable=True)
@@ -161,7 +162,8 @@ class Signature(BaseModel):
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False)
     signer_party_id = Column(UUID(as_uuid=True), ForeignKey("deal_parties.id"), nullable=False)
 
-    method = Column(Enum(SignatureMethod), nullable=False)
+    # Using String instead of native Enum to avoid PostgreSQL enum type issues
+    method = Column(String(20), nullable=False)
 
     # Для ПЭП
     phone = Column(String(20), nullable=True)

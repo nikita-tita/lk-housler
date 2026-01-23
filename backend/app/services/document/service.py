@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.document import Document, DocumentStatus
+from app.models.document import Document
 from app.models.deal import Deal
 from app.services.document.generator import DocumentGenerator, ContractTemplates
 from app.services.storage.service import StorageService
@@ -169,7 +169,7 @@ class DocumentService:
             document = Document(
                 deal_id=deal.id,
                 version_no=1,
-                status=DocumentStatus.GENERATED,
+                status="generated",  # DocumentStatus.GENERATED as string
                 file_url=file_url,
                 document_hash=doc_hash,
             )

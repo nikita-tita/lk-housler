@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.document import Signature, Document, DocumentStatus, SignatureMethod
+from app.models.document import Signature, Document, SignatureMethod
 from app.models.deal import Deal
 from app.services.auth.otp import OTPService
 from app.services.sms.provider import get_sms_provider
@@ -122,7 +122,7 @@ class SignatureService:
         signed_party_ids = {s.signer_party_id for s in signatures}
 
         if required_party_ids.issubset(signed_party_ids):
-            document.status = DocumentStatus.SIGNED
+            document.status = "signed"  # DocumentStatus.SIGNED as string
 
             # Transition deal to SIGNED status
             from app.services.deal.service import DealService
