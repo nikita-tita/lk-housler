@@ -60,44 +60,45 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
             className={selectStyles}
             disabled={disabled}
             value={value}
-            appearance: 'none',
-          MozAppearance: 'none',
-          WebkitAppearance: 'none',
-          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
-          backgroundPosition: 'right 12px center',
-          backgroundSize: '20px',
-          paddingRight: '44px',
+            style={{
+              appearance: 'none',
+              MozAppearance: 'none',
+              WebkitAppearance: 'none',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+              backgroundPosition: 'right 12px center',
+              backgroundSize: '20px',
+              paddingRight: '44px',
             }}
-          {...props}
+            {...props}
           >
-          {placeholder && (
-            <option value="" disabled>
-              {placeholder}
-            </option>
-          )}
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
+            {placeholder && (
+              <option value="" disabled>
+                {placeholder}
+              </option>
+            )}
+            {options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {
-      error && (
-        <p className="text-sm text-gray-900 font-medium">
-          {error}
-        </p>
-      )
-    }
+          error && (
+            <p className="text-sm text-gray-900 font-medium">
+              {error}
+            </p>
+          )
+        }
 
-    {
-      helperText && !error && (
-        <p className="text-sm text-gray-600">
-          {helperText}
-        </p>
-      )
-    }
+        {
+          helperText && !error && (
+            <p className="text-sm text-gray-600">
+              {helperText}
+            </p>
+          )
+        }
       </div >
     );
   }
