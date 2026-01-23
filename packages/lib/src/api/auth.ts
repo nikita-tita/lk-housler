@@ -80,6 +80,7 @@ export async function verifySMS(phone: string, code: string): Promise<AuthRespon
   if (IS_MOCK) {
     console.log('[MOCK] verifySMS', phone, code);
     if (code !== '111111') throw new Error('Неверный код (MOCK: используйте 111111)');
+    if (typeof window !== 'undefined') localStorage.setItem('housler_mock_role', 'agent');
     return {
       access_token: 'mock_agent_token',
       user: { ...MOCK_USER, role: 'agent' },
@@ -166,6 +167,7 @@ export async function verifyEmail(email: string, code: string): Promise<AuthResp
   if (IS_MOCK) {
     console.log('[MOCK] verifyEmail', email, code);
     if (code !== '111111') throw new Error('Неверный код (MOCK: используйте 111111)');
+    if (typeof window !== 'undefined') localStorage.setItem('housler_mock_role', 'client');
     return {
       access_token: 'mock_client_token',
       user: { ...MOCK_USER, email, role: 'client' },
@@ -205,6 +207,7 @@ export async function loginAgency(email: string, password: string): Promise<Auth
   if (IS_MOCK) {
     console.log('[MOCK] loginAgency', email);
     if (password !== '123456') throw new Error('Неверный пароль (MOCK: 123456)');
+    if (typeof window !== 'undefined') localStorage.setItem('housler_mock_role', 'agency_admin');
     return {
       access_token: 'mock_agency_token',
       user: { ...MOCK_USER, email, role: 'agency_admin', id: 99 },
@@ -236,11 +239,15 @@ export async function loginAgency(email: string, password: string): Promise<Auth
 // ==========================================
 
 export async function getCurrentUser(): Promise<User> {
-  if (IS_MOCK) {
-    // В мок-режиме, если есть токен, возвращаем мок-юзера
-    // Токен мы не проверяем на валидность, просто его наличие (обычно делается в axios interceptor)
-    return MOCK_USER;
+  // В мок-режиме, если есть токен, возвращаем мок-юзера
+  // Токен мы не проверяем на валидность, просто его наличие (обычно делается в axios interceptor)
+  if (typeof window !== 'undefined') {
+    const mockRole = localStorage.getItem('housler_mock_role');
+    if (mockRole) {
+      return { ...MOCK_USER, role: mockRole as any };
+    }
   }
+  return MOCK_USER;
 
   // Use lk.housler.ru API to get user with organization info
   const { data } = await apiClient.get<User>('/users/me');
@@ -291,6 +298,7 @@ interface RegisterData {
 
 export async function registerAgent(data: AgentRegisterData): Promise<AuthResponse> {
   if (IS_MOCK) {
+    if (typeof window !== 'undefined') localStorage.setItem('housler_mock_role', 'agent');
     return {
       access_token: 'mock_agent_token',
       user: { ...MOCK_USER, ...data, role: 'agent' } as User,
@@ -319,6 +327,7 @@ export async function registerAgent(data: AgentRegisterData): Promise<AuthRespon
 
 export async function registerAgency(data: AgencyRegisterData): Promise<AuthResponse> {
   if (IS_MOCK) {
+    if (typeof window !== 'undefined') localStorage.setItem('housler_mock_role', 'agency_admin');
     return {
       access_token: 'mock_agency_token',
       user: { ...MOCK_USER, name: data.contactName, email: data.contactEmail, role: 'agency_admin' } as User,

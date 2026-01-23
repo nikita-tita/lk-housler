@@ -71,17 +71,49 @@ a {
 }
 
 /* === FIX TAILWIND V4 WIDTH UTILITIES === */
-.max-w-xs { max-width: 20rem !important; }
-.max-w-sm { max-width: 24rem !important; }
-.max-w-md { max-width: 28rem !important; }
-.max-w-lg { max-width: 32rem !important; }
-.max-w-xl { max-width: 36rem !important; }
-.max-w-2xl { max-width: 42rem !important; }
-.max-w-3xl { max-width: 48rem !important; }
-.max-w-4xl { max-width: 56rem !important; }
-.max-w-5xl { max-width: 64rem !important; }
-.max-w-6xl { max-width: 72rem !important; }
-.max-w-7xl { max-width: 80rem !important; }
+.max-w-xs {
+  max-width: 20rem !important;
+}
+
+.max-w-sm {
+  max-width: 24rem !important;
+}
+
+.max-w-md {
+  max-width: 28rem !important;
+}
+
+.max-w-lg {
+  max-width: 32rem !important;
+}
+
+.max-w-xl {
+  max-width: 36rem !important;
+}
+
+.max-w-2xl {
+  max-width: 42rem !important;
+}
+
+.max-w-3xl {
+  max-width: 48rem !important;
+}
+
+.max-w-4xl {
+  max-width: 56rem !important;
+}
+
+.max-w-5xl {
+  max-width: 64rem !important;
+}
+
+.max-w-6xl {
+  max-width: 72rem !important;
+}
+
+.max-w-7xl {
+  max-width: 80rem !important;
+}
 
 /* === BUTTONS === */
 .btn {
@@ -476,14 +508,16 @@ a {
 
 @media (min-width: 1024px) {
   .dashboard {
-    padding-left: 256px;
+    /* Padding removed as Sidebar is relative on desktop */
+    /* padding-left: 256px; */
   }
 }
 
 .dashboard-main {
   flex: 1;
   padding: 16px;
-  min-width: 0; /* Fix for flex child overflow */
+  min-width: 0;
+  /* Fix for flex child overflow */
 }
 
 @media (min-width: 640px) {
@@ -593,6 +627,7 @@ a {
     transform: translateX(100%);
     opacity: 0;
   }
+
   to {
     transform: translateX(0);
     opacity: 1;
@@ -623,18 +658,21 @@ a {
 
 /* Responsive text utilities */
 .text-responsive-title {
-  font-size: 1.25rem; /* 20px */
+  font-size: 1.25rem;
+  /* 20px */
 }
 
 @media (min-width: 640px) {
   .text-responsive-title {
-    font-size: 1.5rem; /* 24px */
+    font-size: 1.5rem;
+    /* 24px */
   }
 }
 
 @media (min-width: 1024px) {
   .text-responsive-title {
-    font-size: 1.875rem; /* 30px */
+    font-size: 1.875rem;
+    /* 30px */
   }
 }
 
@@ -698,5 +736,12 @@ a {
 
   .legal-content h2 {
     font-size: 1.5rem;
+  }
+}
+
+/* === MANUAL TAILWIND FIXES === */
+@media (min-width: 1024px) {
+  .lg\:hidden {
+    display: none !important;
   }
 }
