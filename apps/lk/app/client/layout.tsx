@@ -1,6 +1,6 @@
 'use client';
 
-import { useRequireAuth } from '@housler/lib';
+import { useRequireAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@housler/lib';

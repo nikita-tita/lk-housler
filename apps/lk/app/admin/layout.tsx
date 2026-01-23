@@ -1,6 +1,6 @@
 'use client';
 
-import { useRequireAuth } from '@housler/lib';
+import { useRequireAuth } from '@/hooks/useAuth';
 import { Sidebar } from '@/components/layout/Sidebar';
 
 const adminMenuItems = [
