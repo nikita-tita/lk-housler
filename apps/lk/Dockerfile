@@ -19,7 +19,8 @@ RUN pnpm install --frozen-lockfile
 # Copy full source
 COPY . .
 
-# Build
+# Build args (must be declared with ARG to receive from docker-compose)
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NODE_ENV=production
 
