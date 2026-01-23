@@ -47,7 +47,9 @@ class StorageService:
         try:
             self.client.put_object(bucket, key, BytesIO(data), length=len(data), content_type=content_type)
 
-            # Return URL
+            # Return public URL if configured, otherwise internal URL
+            if settings.S3_PUBLIC_URL:
+                return f"{settings.S3_PUBLIC_URL}/{bucket}/{key}"
             return f"{settings.S3_ENDPOINT}/{bucket}/{key}"
         except S3Error as e:
             raise Exception(f"Failed to upload file: {e}")

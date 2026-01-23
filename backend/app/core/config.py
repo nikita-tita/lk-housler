@@ -85,6 +85,7 @@ class Settings(BaseSettings):
     S3_SECRET_KEY: str
     S3_BUCKET_DOCUMENTS: str = "lk-documents"
     S3_BUCKET_RECEIPTS: str = "lk-receipts"
+    S3_PUBLIC_URL: str = ""  # Public URL for accessing files (e.g., https://lk.housler.ru/storage)
 
     # JWT
     JWT_SECRET_KEY: str
