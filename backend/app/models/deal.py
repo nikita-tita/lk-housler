@@ -274,8 +274,9 @@ class DealParty(BaseModel):
 
     deal_id = Column(UUID(as_uuid=True), ForeignKey("lk_deals.id"), nullable=False)
 
-    party_role = Column(Enum(PartyRole), nullable=False)
-    party_type = Column(Enum(PartyType), nullable=False)
+    # Using String instead of native Enum to avoid PostgreSQL enum type issues
+    party_role = Column(String(50), nullable=False)
+    party_type = Column(String(50), nullable=False)
     party_id = Column(Integer, nullable=True)  # user_id или org_id
 
     # Snapshot данных участника на момент создания сделки

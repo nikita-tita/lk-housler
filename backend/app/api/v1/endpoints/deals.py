@@ -273,7 +273,7 @@ async def send_deal_for_signing(
     from app.services.document.service import DocumentService
     from app.services.notification.service import NotificationService
     from app.api.v1.endpoints.sign import create_signing_token
-    from app.models.deal import DealParty, PartyRole
+    from app.models.deal import DealParty
     from sqlalchemy import select
 
     deal_service = DealService(db)
@@ -299,7 +299,7 @@ async def send_deal_for_signing(
         )
 
     # Find client party
-    stmt = select(DealParty).where(DealParty.deal_id == deal.id, DealParty.party_role == PartyRole.CLIENT)
+    stmt = select(DealParty).where(DealParty.deal_id == deal.id, DealParty.party_role == "client")
     result = await db.execute(stmt)
     client_party = result.scalar_one_or_none()
 
@@ -307,7 +307,7 @@ async def send_deal_for_signing(
     if not client_party and deal.client_phone:
         client_party = DealParty(
             deal_id=deal.id,
-            party_role=PartyRole.CLIENT,
+            party_role="client",
             party_type="external",
             display_name_snapshot=deal.client_name or "Клиент",
             phone_snapshot=deal.client_phone,
