@@ -39,7 +39,7 @@ export default function ClientDashboard() {
       setLoading(true);
 
       const response = await getDeals();
-      setDeals(response.items);
+      setDeals(response?.items || []);
     } catch (err) {
       console.error('Failed to load deals:', err);
       setError('Не удалось загрузить сделки. Попробуйте обновить страницу.');
@@ -97,14 +97,14 @@ export default function ClientDashboard() {
                     </div>
                     <span
                       className={`px-3 py-1 text-sm rounded-full whitespace-nowrap ${deal.status === 'draft'
-                          ? 'bg-gray-200 text-gray-900'
-                          : deal.status === 'closed'
-                            ? 'bg-black text-white'
-                            : deal.status === 'cancelled'
-                              ? 'bg-gray-100 text-gray-500'
-                              : deal.status === 'dispute'
-                                ? 'bg-gray-900 text-white'
-                                : 'bg-gray-100 text-gray-900'
+                        ? 'bg-gray-200 text-gray-900'
+                        : deal.status === 'closed'
+                          ? 'bg-black text-white'
+                          : deal.status === 'cancelled'
+                            ? 'bg-gray-100 text-gray-500'
+                            : deal.status === 'dispute'
+                              ? 'bg-gray-900 text-white'
+                              : 'bg-gray-100 text-gray-900'
                         }`}
                     >
                       {STATUS_LABELS[deal.status] || deal.status}
