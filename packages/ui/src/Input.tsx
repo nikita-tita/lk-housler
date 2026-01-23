@@ -26,7 +26,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
       'border rounded-lg',
       'transition-all duration-200',
       'placeholder:text-gray-500',
-      'focus:outline-none focus:ring-2',
+      'focus:outline-none focus:ring-2 leading-normal',
       hasError
         ? 'border-gray-900 focus:border-gray-900 focus:ring-gray-900'
         : 'border-gray-300 focus:border-black focus:ring-black',
@@ -41,20 +41,20 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             {label}
           </label>
         )}
-        
+
         <input
           ref={ref}
           className={inputStyles}
           disabled={disabled}
           {...props}
         />
-        
+
         {error && (
           <p className="text-sm text-gray-900 font-medium">
             {error}
           </p>
         )}
-        
+
         {helperText && !error && (
           <p className="text-sm text-gray-600">
             {helperText}
