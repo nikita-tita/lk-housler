@@ -65,8 +65,8 @@ export default function AdminDealsPage() {
       const status = statusFilter === 'all' ? undefined : statusFilter;
       const res: AdminDealsResponse = await getAdminDeals(status, limit, page * limit);
 
-      setDeals(res.items);
-      setTotal(res.total);
+      setDeals(res?.items || []);
+      setTotal(res?.total || 0);
     } catch (err) {
       console.error('Failed to load deals:', err);
       setError('Не удалось загрузить сделки. Проверьте права администратора.');
@@ -103,11 +103,10 @@ export default function AdminDealsPage() {
                   setStatusFilter(status);
                   setPage(0);
                 }}
-                className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-colors whitespace-nowrap ${
-                  statusFilter === status
+                className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-colors whitespace-nowrap ${statusFilter === status
                     ? 'bg-gray-900 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 {status === 'all' ? 'Все' : DEAL_STATUS_LABELS[status] || status}
               </button>
@@ -173,9 +172,8 @@ export default function AdminDealsPage() {
                       </td>
                       <td className="p-4">
                         <span
-                          className={`inline-block px-2 py-1 text-xs rounded-full ${
-                            STATUS_COLORS[deal.status] || 'bg-gray-100 text-gray-900'
-                          }`}
+                          className={`inline-block px-2 py-1 text-xs rounded-full ${STATUS_COLORS[deal.status] || 'bg-gray-100 text-gray-900'
+                            }`}
                         >
                           {DEAL_STATUS_LABELS[deal.status] || deal.status}
                         </span>
