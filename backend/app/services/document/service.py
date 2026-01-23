@@ -148,8 +148,9 @@ class DocumentService:
             # Prepare context
             context = await self._prepare_contract_context(deal)
 
-            # Get template
-            template_html = ContractTemplates.get_template(deal.type.value)
+            # Get template (deal.type may be string or enum)
+            deal_type_str = deal.type.value if hasattr(deal.type, 'value') else str(deal.type)
+            template_html = ContractTemplates.get_template(deal_type_str)
 
             # Render HTML
             rendered_html = self.generator.render_template(template_html, context)
@@ -183,7 +184,7 @@ class DocumentService:
                 details={
                     "document_id": str(document.id),
                     "document_hash": doc_hash,
-                    "deal_type": deal.type.value if deal.type else None,
+                    "deal_type": deal_type_str,
                 },
                 success=True,
             )
@@ -192,12 +193,13 @@ class DocumentService:
 
         except Exception as e:
             # Audit log failure
+            deal_type_for_log = deal.type.value if hasattr(deal.type, 'value') else str(deal.type) if deal.type else None
             log_audit_event(
                 event=AuditEvent.DOCUMENT_GENERATION_FAILED,
                 resource=f"deal:{deal.id}",
                 details={
                     "error": str(e),
-                    "deal_type": deal.type.value if deal.type else None,
+                    "deal_type": deal_type_for_log,
                 },
                 success=False,
             )
@@ -259,11 +261,12 @@ class DocumentService:
         commission_words = number_to_words_ru(commission_amount)
 
         # Deal type label
+        deal_type_key = deal.type.value if hasattr(deal.type, "value") else str(deal.type)
         deal_type_label = {
             "secondary_buy": "Покупка вторичного жилья",
             "secondary_sell": "Продажа вторичного жилья",
             "newbuild_booking": "Бронирование новостройки",
-        }.get(str(deal.type.value) if hasattr(deal.type, "value") else str(deal.type), str(deal.type))
+        }.get(deal_type_key, deal_type_key)
 
         # Contract number
         contract_number = self._generate_contract_number(deal)
