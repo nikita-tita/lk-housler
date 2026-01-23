@@ -79,7 +79,7 @@ export default function DealsPage() {
       ]);
 
       // Convert legacy deals to unified format
-      const legacyDeals: UnifiedDeal[] = legacyResponse.items.map((deal: Deal) => ({
+      const legacyDeals: UnifiedDeal[] = (legacyResponse?.items || []).map((deal: Deal) => ({
         id: deal.id,
         type: 'legacy' as DealType,
         address: deal.address,
@@ -91,7 +91,7 @@ export default function DealsPage() {
       }));
 
       // Convert bank-split deals to unified format
-      const bankSplitDeals: UnifiedDeal[] = bankSplitResponse.items.map(
+      const bankSplitDeals: UnifiedDeal[] = (bankSplitResponse?.items || []).map(
         (deal: BankSplitDeal) => ({
           id: deal.id,
           type: 'bank_split' as DealType,
@@ -174,11 +174,10 @@ export default function DealsPage() {
               <button
                 key={option.value}
                 onClick={() => setFilter(option.value)}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm transition-colors whitespace-nowrap ${
-                  filter === option.value
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm transition-colors whitespace-nowrap ${filter === option.value
                     ? 'bg-black text-white'
                     : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 {option.label}
               </button>
@@ -225,25 +224,24 @@ export default function DealsPage() {
                       </p>
                     </div>
                     <span
-                      className={`self-start sm:self-center px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-full whitespace-nowrap ${
-                        deal.status === 'draft'
+                      className={`self-start sm:self-center px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-full whitespace-nowrap ${deal.status === 'draft'
                           ? 'bg-gray-200 text-gray-900'
                           : deal.status === 'closed'
-                          ? 'bg-black text-white'
-                          : deal.status === 'cancelled'
-                          ? 'bg-gray-100 text-gray-500'
-                          : deal.status === 'hold_period'
-                          ? 'bg-gray-400 text-white'
-                          : deal.status === 'dispute'
-                          ? 'bg-gray-900 text-white'
-                          : deal.status === 'payment_failed'
-                          ? 'bg-gray-300 text-gray-700'
-                          : deal.status === 'payout_ready' || deal.status === 'payout_in_progress'
-                          ? 'bg-gray-500 text-white'
-                          : deal.status === 'refunded'
-                          ? 'bg-gray-200 text-gray-600'
-                          : 'bg-gray-100 text-gray-900'
-                      }`}
+                            ? 'bg-black text-white'
+                            : deal.status === 'cancelled'
+                              ? 'bg-gray-100 text-gray-500'
+                              : deal.status === 'hold_period'
+                                ? 'bg-gray-400 text-white'
+                                : deal.status === 'dispute'
+                                  ? 'bg-gray-900 text-white'
+                                  : deal.status === 'payment_failed'
+                                    ? 'bg-gray-300 text-gray-700'
+                                    : deal.status === 'payout_ready' || deal.status === 'payout_in_progress'
+                                      ? 'bg-gray-500 text-white'
+                                      : deal.status === 'refunded'
+                                        ? 'bg-gray-200 text-gray-600'
+                                        : 'bg-gray-100 text-gray-900'
+                        }`}
                     >
                       {deal.statusLabel}
                     </span>
