@@ -45,16 +45,16 @@ async def get_signing_token(token: str, db: AsyncSession) -> SigningToken:
         signing_token = result.scalar_one_or_none()
     except Exception:
         # Database error or invalid token format
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signing link not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ссылка для подписания не найдена")
 
     if not signing_token:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signing link not found or expired")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ссылка для подписания не найдена или истекла")
 
     if signing_token.expires_at < datetime.utcnow():
-        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Signing link has expired")
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Срок действия ссылки истёк")
 
     if signing_token.used:
-        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Document has already been signed")
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Документ уже подписан")
 
     return signing_token
 
@@ -70,7 +70,7 @@ async def get_signing_info(token: str, db: AsyncSession = Depends(get_db)):
     document = result.scalar_one_or_none()
 
     if not document:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Документ не найден")
 
     deal = document.deal
     party = signing_token.party
@@ -108,12 +108,12 @@ async def request_otp(token: str, request: Request, body: RequestOTPRequest, db:
     """Request OTP for signing"""
     if not body.consent_personal_data:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Consent to personal data processing is required"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Необходимо согласие на обработку персональных данных"
         )
 
     if not body.consent_pep:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Consent to use electronic signature is required"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Необходимо согласие на использование электронной подписи"
         )
 
     signing_token = await get_signing_token(token, db)
@@ -161,7 +161,7 @@ async def verify_and_sign(
     document = result.scalar_one_or_none()
 
     if not document:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Документ не найден")
 
     # Verify OTP and create signature via SignatureService
     signature_service = SignatureService(db)

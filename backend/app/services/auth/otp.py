@@ -101,13 +101,13 @@ class OTPService:
 
             # Check if blocked
             if existing.blocked_until and existing.blocked_until > datetime.utcnow():
-                raise ValueError("OTP attempts blocked. Try again later.")
+                raise ValueError("Слишком много попыток. Попробуйте позже.")
 
             # Check if too many attempts
             if existing.attempts >= settings.OTP_MAX_ATTEMPTS:
                 existing.blocked_until = datetime.utcnow() + timedelta(minutes=settings.OTP_BLOCK_MINUTES)
                 await redis.setex(key, settings.OTP_BLOCK_MINUTES * 60, json.dumps(existing.to_dict()))
-                raise ValueError("Too many attempts. Blocked for 10 minutes.")
+                raise ValueError("Слишком много попыток. Блокировка на 10 минут.")
 
             # Preserve attempt count for resend (prevents rate limit bypass)
             existing_attempts = existing.attempts
@@ -148,22 +148,22 @@ class OTPService:
 
         data = await redis.get(key)
         if not data:
-            raise ValueError("Invalid or expired OTP session")
+            raise ValueError("Код не найден или истёк. Запросите новый код.")
 
         otp_data = OTPData.from_dict(json.loads(data))
 
         # Check if blocked
         if otp_data.blocked_until and otp_data.blocked_until > datetime.utcnow():
-            raise ValueError("OTP attempts blocked. Try again later.")
+            raise ValueError("Слишком много попыток. Попробуйте позже.")
 
         # Check if expired
         if otp_data.expires_at < datetime.utcnow():
             await redis.delete(key)
-            raise ValueError("OTP code expired")
+            raise ValueError("Срок действия кода истёк. Запросите новый код.")
 
         # Check if already verified
         if otp_data.verified:
-            raise ValueError("OTP already used")
+            raise ValueError("Код уже был использован")
 
         # Increment attempts
         otp_data.attempts += 1
@@ -178,7 +178,7 @@ class OTPService:
             if remaining_ttl > 0:
                 await redis.setex(key, remaining_ttl, json.dumps(otp_data.to_dict()))
 
-            raise ValueError("Invalid OTP code")
+            raise ValueError("Неверный код подтверждения")
 
         # Mark as verified
         otp_data.verified = True

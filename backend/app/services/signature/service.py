@@ -46,13 +46,13 @@ class SignatureService:
         # Check if already signed
         existing = await self._get_party_signature(document.id, party_id)
         if existing and existing.signed_at:
-            raise ValueError("Party has already signed this document")
+            raise ValueError("Вы уже подписали этот документ")
 
         # Verify OTP
         verified = await self.otp_service.verify_otp(phone=phone, code=otp_code, purpose=f"sign_{document.id}")
 
         if not verified:
-            raise ValueError("Invalid OTP code")
+            raise ValueError("Неверный код подтверждения")
 
         # Create evidence for legal compliance
         now = datetime.utcnow()
