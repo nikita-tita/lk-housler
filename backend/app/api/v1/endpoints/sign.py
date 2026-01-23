@@ -82,14 +82,18 @@ async def get_signing_info(token: str, db: AsyncSession = Depends(get_db)):
     result_sig = await db.execute(stmt_sig)
     existing_signature = result_sig.scalar_one_or_none()
 
+    # Handle deal.type and party.party_role as string or enum
+    deal_type_str = deal.type.value if hasattr(deal.type, 'value') else str(deal.type) if deal.type else "unknown"
+    party_role_str = party.party_role.value if hasattr(party.party_role, 'value') else str(party.party_role) if party.party_role else "client"
+
     return SigningInfoResponse(
         document_id=document.id,
         document_hash=document.document_hash,
         document_url=document.file_url,
-        deal_type=deal.type.value if deal.type else "unknown",
+        deal_type=deal_type_str,
         property_address=deal.property_address or "Не указан",
         commission_total=str(deal.commission_agent) if deal.commission_agent else None,
-        party_role=party.party_role.value if party.party_role else "client",
+        party_role=party_role_str,
         party_name=party.display_name_snapshot,
         phone_masked=mask_phone(signing_token.phone),
         already_signed=existing_signature is not None,
