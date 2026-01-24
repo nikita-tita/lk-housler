@@ -39,7 +39,7 @@ def upgrade() -> None:
         sa.Column('name', sa.String(255), nullable=True),
         sa.Column('position', sa.String(255), nullable=True),
         sa.Column('invite_token', sa.String(64), nullable=False, unique=True, index=True),
-        sa.Column('status', sa.Enum('pending', 'accepted', 'expired', 'cancelled', name='employeeinvitestatus'),
+        sa.Column('status', sa.Enum('pending', 'accepted', 'expired', 'cancelled', name='employeeinvitestatus', create_type=False),
                   nullable=False, server_default='pending'),
         sa.Column('expires_at', sa.DateTime, nullable=False),
         sa.Column('accepted_user_id', sa.Integer, sa.ForeignKey('users.id'), nullable=True),
