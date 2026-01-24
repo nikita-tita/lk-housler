@@ -10,6 +10,7 @@ export type {
   SendSmsResult,
   SendEmailResult,
   AgentRegisterData,
+  ClientRegisterData,
   AgencyRegisterData,
   ConsentInput,
 } from './auth';
@@ -22,6 +23,7 @@ export {
   loginAgency,
   getCurrentUser,
   registerAgent,
+  registerClient,
   registerAgency,
 } from './auth';
 

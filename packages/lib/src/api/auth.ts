@@ -49,6 +49,7 @@ export interface SendSmsResult {
 }
 
 export async function sendSMS(phone: string): Promise<SendSmsResult> {
+  console.log('[DEBUG sendSMS] called with phone:', phone, 'IS_MOCK:', IS_MOCK);
   if (IS_MOCK) {
     console.log('[MOCK] sendSMS', phone);
     return {
@@ -59,14 +60,21 @@ export async function sendSMS(phone: string): Promise<SendSmsResult> {
     };
   }
 
-  const { data } = await authClient.post<ApiResponse<RequestSmsData>>('/auth/request-sms', { phone });
-  return {
-    success: data.success,
-    message: data.data?.message || data.error || '',
-    existingCode: data.data?.existingCode,
-    canResendAt: data.data?.canResendAt,
-    codeSentAt: data.data?.codeSentAt
-  };
+  try {
+    console.log('[DEBUG sendSMS] making request to /auth/request-sms');
+    const { data } = await authClient.post<ApiResponse<RequestSmsData>>('/auth/request-sms', { phone });
+    console.log('[DEBUG sendSMS] response:', data);
+    return {
+      success: data.success,
+      message: data.data?.message || data.error || '',
+      existingCode: data.data?.existingCode,
+      canResendAt: data.data?.canResendAt,
+      codeSentAt: data.data?.codeSentAt
+    };
+  } catch (error) {
+    console.error('[DEBUG sendSMS] error:', error);
+    throw error;
+  }
 }
 
 interface VerifySmsData {
@@ -270,10 +278,19 @@ export interface AgentRegisterData {
   phone: string;
   name: string;
   email: string;
+  birthDate?: string; // YYYY-MM-DD (optional for agents)
   consents: ConsentInput;
   city?: string;
   isSelfEmployed?: boolean;
   personalInn?: string;
+}
+
+export interface ClientRegisterData {
+  phone: string;
+  name: string;
+  email: string;
+  birthDate: string; // YYYY-MM-DD (required for clients)
+  consents: ConsentInput;
 }
 
 export interface AgencyRegisterData {
@@ -307,6 +324,35 @@ export async function registerAgent(data: AgentRegisterData): Promise<AuthRespon
 
   try {
     const { data: response } = await authClient.post<ApiResponse<RegisterData>>('/auth/register-realtor', data);
+
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Ошибка регистрации');
+    }
+
+    return {
+      access_token: response.data.token,
+      user: response.data.user,
+    };
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { data?: { error?: string } } };
+    if (axiosError.response?.data?.error) {
+      throw new Error(axiosError.response.data.error);
+    }
+    throw err;
+  }
+}
+
+export async function registerClient(data: ClientRegisterData): Promise<AuthResponse> {
+  if (IS_MOCK) {
+    if (typeof window !== 'undefined') localStorage.setItem('housler_mock_role', 'client');
+    return {
+      access_token: 'mock_client_token',
+      user: { ...MOCK_USER, ...data, role: 'client' } as User,
+    };
+  }
+
+  try {
+    const { data: response } = await authClient.post<ApiResponse<RegisterData>>('/auth/register-client', data);
 
     if (!response.success || !response.data) {
       throw new Error(response.error || 'Ошибка регистрации');

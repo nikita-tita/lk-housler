@@ -1,0 +1,208 @@
+# Patches for /auth/register-client endpoint on agent.housler.ru
+
+## STATUS: APPLIED (2026-01-24)
+
+All patches below have been applied to agent.housler.ru:
+- [x] DB: birth_date column added to users table
+- [x] schemas.ts: registerClientSchema added, birthDateRegex moved to top
+- [x] schemas.ts: registerRealtorSchema updated with optional birthDate
+- [x] auth.controller.ts: registerClient function added
+- [x] auth.service.ts: registerClient method added
+- [x] auth.service.ts: registerRealtor updated to save birth_date
+- [x] auth.routes.ts: /register-client route added
+
+---
+
+## 1. Add to schemas.ts (after registerRealtorSchema)
+
+```typescript
+// Дата в формате YYYY-MM-DD
+const birthDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+export const registerClientSchema = z.object({
+  phone: z.string().regex(phoneRegex, 'Некорректный телефон'),
+  name: z.string().min(2, 'Имя должно содержать минимум 2 символа').max(255),
+  email: z.string().email('Некорректный email').max(255),
+  birthDate: z.string().regex(birthDateRegex, 'Дата должна быть в формате YYYY-MM-DD'),
+  consents: z.object({
+    personalData: z.boolean().refine(val => val === true, 'Необходимо согласие на обработку ПД'),
+    terms: z.boolean().refine(val => val === true, 'Необходимо принять условия соглашения'),
+    marketing: z.boolean().optional().default(false)
+  })
+});
+
+export type RegisterClientInput = z.infer<typeof registerClientSchema>;
+```
+
+## 2. Add to auth.controller.ts (after registerRealtor)
+
+```typescript
+/**
+ * POST /api/auth/register-client - Регистрация клиента
+ */
+export async function registerClient(req: Request, res: Response) {
+  try {
+    const ipAddress = req.ip || req.socket.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+
+    const result = await authService.registerClient(req.body, ipAddress, userAgent);
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        error: result.message
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        user: result.user,
+        token: result.token,
+        message: result.message
+      }
+    });
+  } catch (error) {
+    console.error('Error in registerClient:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при регистрации'
+    });
+  }
+}
+```
+
+## 3. Add to auth.routes.ts
+
+Import:
+```typescript
+import { registerClientSchema } from '../../validation/schemas';
+```
+
+In controller imports:
+```typescript
+import {
+  // ... existing
+  registerClient,
+} from '../controllers/auth.controller';
+```
+
+Route:
+```typescript
+// POST /api/auth/register-client - Регистрация клиента
+router.post('/register-client', authLimiter, validateBody(registerClientSchema), registerClient);
+```
+
+## 4. Add to auth.service.ts (after registerRealtor method)
+
+```typescript
+  /**
+   * Регистрация клиента
+   */
+  async registerClient(data: RegisterClientInput, ipAddress?: string, userAgent?: string): Promise<{
+    success: boolean;
+    user?: User;
+    token?: string;
+    message: string;
+  }> {
+    // Проверяем, что email не занят
+    const existingEmail = await this.findUserByEmail(data.email);
+    if (existingEmail) {
+      return {
+        success: false,
+        message: 'Пользователь с таким email уже существует'
+      };
+    }
+
+    // Проверяем, что телефон не занят
+    const existingPhone = await this.findUserByPhone(data.phone);
+    if (existingPhone) {
+      return {
+        success: false,
+        message: 'Пользователь с таким телефоном уже существует'
+      };
+    }
+
+    // Создаём пользователя с зашифрованными PII полями
+    const normalizedEmail = data.email.toLowerCase().trim();
+    const result = await pool.query(`
+      INSERT INTO users (
+        email, email_encrypted, email_hash,
+        phone, phone_encrypted, phone_hash,
+        name, name_encrypted,
+        birth_date,
+        role, phone_verified
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'client', TRUE)
+      RETURNING id, email, email_encrypted, phone, phone_encrypted, name, name_encrypted,
+                role, agency_id, is_active, last_login_at, created_at, birth_date
+    `, [
+      normalizedEmail,
+      encrypt(normalizedEmail),
+      hash(normalizedEmail),
+      data.phone,
+      encrypt(data.phone),
+      hashPhone(data.phone),
+      data.name,
+      encrypt(data.name),
+      data.birthDate
+    ]);
+
+    const user = this.decryptUserPII(result.rows[0]);
+
+    // Сохраняем согласия
+    await this.saveConsents(user.id, data.consents, ipAddress, userAgent);
+
+    // Генерируем токен
+    const token = this.generateToken(user);
+
+    return {
+      success: true,
+      user,
+      token,
+      message: 'Регистрация успешна'
+    };
+  }
+```
+
+## 5. Update RegisterRealtorInput to include birthDate
+
+In schemas.ts, update registerRealtorSchema:
+```typescript
+export const registerRealtorSchema = z.object({
+  phone: z.string().regex(phoneRegex, 'Некорректный телефон'),
+  name: z.string().min(2, 'Имя должно содержать минимум 2 символа').max(255),
+  email: z.string().email('Некорректный email').max(255),
+  birthDate: z.string().regex(birthDateRegex, 'Дата должна быть в формате YYYY-MM-DD').optional(), // NEW - optional for backwards compatibility
+  city: z.string().min(2).max(100).optional(),
+  isSelfEmployed: z.boolean().optional().default(false),
+  personalInn: z.string().regex(/^\d{12}$/, 'ИНН должен содержать 12 цифр').optional(),
+  consents: z.object({
+    personalData: z.boolean().refine(val => val === true, 'Необходимо согласие на обработку ПД'),
+    terms: z.boolean().refine(val => val === true, 'Необходимо принять условия соглашения'),
+    realtorOffer: z.boolean().refine(val => val === true, 'Необходимо принять условия оферты'),
+    marketing: z.boolean().optional().default(false)
+  })
+});
+```
+
+## 6. Update registerRealtor in auth.service.ts to save birthDate
+
+Update the INSERT query to include birth_date:
+```sql
+INSERT INTO users (
+  email, email_encrypted, email_hash,
+  phone, phone_encrypted, phone_hash,
+  name, name_encrypted,
+  birth_date,  -- ADD THIS
+  role, agency_id, city, is_self_employed,
+  personal_inn, personal_inn_encrypted, personal_inn_hash,
+  phone_verified
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'agent', $10, $11, $12, $13, $14, $15, TRUE)
+```
+
+Add birthDate to values array:
+```typescript
+data.birthDate || null,  // ADD THIS after name_encrypted
+```
