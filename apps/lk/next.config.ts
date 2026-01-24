@@ -5,6 +5,11 @@ const nextConfig: NextConfig = {
   // Включаем standalone output для Docker
   output: 'standalone',
 
+  // Генерация уникального build ID для предотвращения проблем с кешем после деплоя
+  generateBuildId: async () => {
+    return `build-${Date.now()}`;
+  },
+
   // API URL из переменных окружения
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
@@ -34,6 +39,22 @@ const nextConfig: NextConfig = {
   // Security headers
   async headers() {
     return [
+      // Предотвращение кеширования для Server Actions и API
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'next-action',
+          },
+        ],
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          },
+        ],
+      },
       {
         source: '/:path*',
         headers: [
