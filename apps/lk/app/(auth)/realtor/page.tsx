@@ -247,6 +247,13 @@ export default function RealtorLoginPage() {
       return;
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.email || !emailRegex.test(formData.email)) {
+      setError('Введите корректный email адрес');
+      return;
+    }
+
     // Validate INN for self-employed
     if (formData.isSelfEmployed && formData.personalInn.length !== 12) {
       setError('ИНН должен содержать 12 цифр');

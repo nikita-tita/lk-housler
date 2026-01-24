@@ -20,9 +20,11 @@ async_engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
     future=True,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
+    pool_pre_ping=True,  # Validate connections before use
+    pool_size=10,  # Number of persistent connections
+    max_overflow=20,  # Additional connections under load
+    pool_timeout=30,  # Timeout waiting for connection from pool
+    pool_recycle=1800,  # Recycle connections after 30 minutes (avoid stale connections)
 )
 
 # Async session factory

@@ -118,11 +118,12 @@ async def rate_limit_otp_verify(request: Request, phone: str = None, email: str 
     )
 
     # Layer 2: Rate limit by phone (prevents brute-force on specific phone)
+    # Stricter limit: 5 attempts per hour to prevent OTP guessing
     if phone:
         await rate_limiter.check_rate_limit(
             identifier=f"phone:{phone}",
             endpoint="otp_verify",
-            max_requests=10,
+            max_requests=5,
             window_seconds=3600  # 1 hour
         )
 
@@ -131,7 +132,7 @@ async def rate_limit_otp_verify(request: Request, phone: str = None, email: str 
         await rate_limiter.check_rate_limit(
             identifier=f"email:{email}",
             endpoint="otp_verify",
-            max_requests=10,
+            max_requests=5,
             window_seconds=3600  # 1 hour
         )
 
@@ -157,11 +158,12 @@ async def rate_limit_login(request: Request, email: str = None):
     )
 
     # Layer 2: Rate limit by email (prevents brute-force on specific account)
+    # Stricter limit: 5 attempts per hour to prevent password guessing
     if email:
         await rate_limiter.check_rate_limit(
             identifier=f"email:{email}",
             endpoint="login",
-            max_requests=10,
+            max_requests=5,
             window_seconds=3600  # 1 hour
         )
 

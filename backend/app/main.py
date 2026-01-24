@@ -1,6 +1,7 @@
 """FastAPI application entry point"""
 
 import logging
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -81,11 +82,52 @@ tags_metadata = [
     {"name": "templates", "description": "Contract templates management"},
 ]
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan handler for startup/shutdown."""
+    # Startup
+    logger.info("Starting application...")
+
+    # Validate database connection
+    try:
+        async with async_engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        logger.info("Database connection validated")
+    except Exception as e:
+        logger.error(f"Database connection failed: {e}")
+        raise
+
+    # Validate Redis connection
+    try:
+        redis_client = aioredis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
+        await redis_client.ping()
+        await redis_client.close()
+        logger.info("Redis connection validated")
+    except Exception as e:
+        logger.error(f"Redis connection failed: {e}")
+        raise
+
+    logger.info("Application started successfully")
+
+    yield  # Application runs here
+
+    # Shutdown
+    logger.info("Shutting down application...")
+
+    # Close database connections
+    await async_engine.dispose()
+    logger.info("Database connections closed")
+
+    logger.info("Application shutdown complete")
+
+
 app = FastAPI(
     title=settings.APP_NAME,
     description="API for Housler Personal Account - real estate deals, contracts, and payments",
     version=settings.APP_VERSION,
     debug=settings.DEBUG,
+    lifespan=lifespan,
     docs_url=_docs_url,
     redoc_url=_redoc_url,
     openapi_url=_openapi_url,

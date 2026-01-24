@@ -242,7 +242,10 @@ export default function AgentsPage() {
               className="fixed inset-0 bg-black/50"
               onClick={() => setShowAddForm(false)}
             />
-            <div className="relative bg-[var(--color-bg)] rounded-lg shadow-xl max-w-md w-full p-6 border border-[var(--color-border)]">
+            <div
+              className="relative bg-[var(--color-bg)] rounded-lg shadow-xl max-w-md w-full p-6 border border-[var(--color-border)]"
+              onClick={(e) => e.stopPropagation()}
+            >
               <h2 className="text-xl font-semibold mb-4">
                 {formMode === 'add' ? 'Добавить существующего пользователя' : 'Пригласить нового сотрудника'}
               </h2>
