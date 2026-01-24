@@ -24,9 +24,7 @@ router = APIRouter()
 
 def require_admin(user: User):
     """Check if user is admin"""
-    # For now, check if user has admin role
-    # In production, this should check user.role or similar
-    if not user.is_superuser:
+    if not user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required"

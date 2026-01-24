@@ -26,8 +26,9 @@ export function useAuth() {
 /**
  * Хук для защищённых роутов (layouts).
  * Вызывает checkAuth() и делает редирект если не авторизован.
+ * @param requiredRole - одна роль или массив допустимых ролей
  */
-export function useRequireAuth(requiredRole?: UserRole) {
+export function useRequireAuth(requiredRole?: UserRole | UserRole[]) {
   const router = useRouter();
   const { user, isAuthenticated, isLoading, checkAuth } = useAuthStore();
 
@@ -44,9 +45,12 @@ export function useRequireAuth(requiredRole?: UserRole) {
     }
 
     // Редирект на правильный dashboard если роль не совпадает
-    if (requiredRole && user?.role !== requiredRole) {
-      const correctPath = getDashboardPath(user?.role || 'client');
-      router.push(correctPath);
+    if (requiredRole) {
+      const allowedRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+      if (user?.role && !allowedRoles.includes(user.role as UserRole)) {
+        const correctPath = getDashboardPath(user.role);
+        router.push(correctPath);
+      }
     }
   }, [isAuthenticated, isLoading, user, requiredRole, router]);
 

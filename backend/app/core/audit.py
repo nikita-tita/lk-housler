@@ -13,6 +13,8 @@ class AuditEvent(str, Enum):
     LOGIN_SUCCESS = "login_success"
     LOGIN_FAILED = "login_failed"
     LOGOUT = "logout"
+    TOKEN_REFRESHED = "token_refreshed"
+    USER_REGISTERED = "user_registered"
     OTP_SENT = "otp_sent"
     OTP_VERIFIED = "otp_verified"
     OTP_FAILED = "otp_failed"

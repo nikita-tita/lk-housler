@@ -16,7 +16,7 @@ export default function AgencyLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isLoading } = useRequireAuth('agency_admin');
+  const { isLoading } = useRequireAuth(['agency_admin', 'agency_employee']);
 
   if (isLoading) {
     return (

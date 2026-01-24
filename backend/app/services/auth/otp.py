@@ -180,8 +180,7 @@ class OTPService:
 
             raise ValueError("Неверный код подтверждения")
 
-        # Mark as verified
-        otp_data.verified = True
-        await redis.setex(key, 60, json.dumps(otp_data.to_dict()))  # Keep for 1 min after verification
+        # Delete OTP after successful verification to prevent reuse
+        await redis.delete(key)
 
         return True

@@ -32,6 +32,14 @@ async def get_current_user(
             detail="Invalid authentication credentials",
         )
 
+    # Verify token type (if present) - reject refresh tokens
+    token_type = payload.get("type")
+    if token_type and token_type != "access":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token type - access token required",
+        )
+
     # Support both lk-backend tokens (sub) and agent.housler.ru tokens (userId)
     user_id = payload.get("sub") or payload.get("userId")
     if not user_id:

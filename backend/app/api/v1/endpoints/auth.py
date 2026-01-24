@@ -19,7 +19,9 @@ from app.schemas.auth import (
     AgentRegisterRequest,
     AgencyRegisterRequest,
     Token,
+    TokenRefresh,
 )
+from app.core.security import decode_token, create_access_token
 from app.services.auth.service_extended import AuthServiceExtended
 
 router = APIRouter()
@@ -395,37 +397,57 @@ async def register_employee(
 
 
 # ==========================================
-# Legacy endpoints (backward compatibility)
+# 5. Token Refresh
 # ==========================================
 
+from pydantic import BaseModel
 
-@router.post("/otp/send", status_code=status.HTTP_200_OK)
-async def send_otp(
-    request: OTPRequest,
+
+class AccessTokenResponse(BaseModel):
+    """Access token response"""
+    access_token: str
+    token_type: str = "bearer"
+
+
+@router.post("/refresh", response_model=AccessTokenResponse)
+async def refresh_access_token(
+    request: TokenRefresh,
     http_request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    """Send OTP code (legacy - deprecated)"""
-    # Rate limit by IP + phone (even for deprecated endpoints)
-    await rate_limit_otp_send(http_request, phone=request.phone)
+    """Refresh access token using refresh token"""
+    # Decode refresh token
+    payload = decode_token(request.refresh_token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
 
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="This endpoint is deprecated. Use agent.housler.ru/api/auth/* for authentication"
+    # Verify this is a refresh token
+    token_type = payload.get("type")
+    if token_type != "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token type - refresh token required",
+        )
+
+    # Get user ID from token
+    user_id = payload.get("sub") or payload.get("userId")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+        )
+
+    # Create new access token
+    access_token = create_access_token(data={"sub": str(user_id)})
+
+    ip_address = http_request.client.host if http_request.client else None
+    log_audit_event(
+        AuditEvent.TOKEN_REFRESHED,
+        user_id=str(user_id),
+        ip_address=ip_address,
+        details={"method": "refresh_token"},
     )
 
-
-@router.post("/otp/verify", response_model=Token)
-async def verify_otp(
-    request: OTPVerify,
-    http_request: Request,
-    db: AsyncSession = Depends(get_db),
-):
-    """Verify OTP and login/register (legacy - deprecated)"""
-    # Rate limit by IP + phone (even for deprecated endpoints)
-    await rate_limit_otp_verify(http_request, phone=request.phone)
-
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="This endpoint is deprecated. Use agent.housler.ru/api/auth/* for authentication"
-    )
+    return AccessTokenResponse(access_token=access_token)
