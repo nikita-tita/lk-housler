@@ -19,8 +19,16 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create enum type for employee invite status
-    op.execute("CREATE TYPE employeeinvitestatus AS ENUM ('pending', 'accepted', 'expired', 'cancelled')")
+    # Create enum type for employee invite status (if not exists)
+    op.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'employeeinvitestatus') THEN
+                CREATE TYPE employeeinvitestatus AS ENUM ('pending', 'accepted', 'expired', 'cancelled');
+            END IF;
+        END
+        $$;
+    """)
 
     # Create pending_employees table
     op.create_table(
