@@ -164,3 +164,86 @@ async def rate_limit_login(request: Request, email: str = None):
             max_requests=10,
             window_seconds=3600  # 1 hour
         )
+
+
+async def rate_limit_invitation_lookup(request: Request):
+    """
+    Rate limit for public invitation lookup by token.
+
+    IP-based only: 30 requests per 60 seconds per IP.
+    Prevents brute-force token guessing (tokens are 43 chars, so enumeration is impractical,
+    but we still want to prevent abuse).
+    """
+    client_ip = request.client.host if request.client else "unknown"
+
+    await rate_limiter.check_rate_limit(
+        identifier=f"ip:{client_ip}",
+        endpoint="invitation_lookup",
+        max_requests=30,
+        window_seconds=60
+    )
+
+
+# ==============================================
+# Token Blacklist (for logout)
+# ==============================================
+
+
+class TokenBlacklist:
+    """Redis-based token blacklist for invalidating refresh tokens on logout"""
+
+    def __init__(self):
+        self._redis: Optional[aioredis.Redis] = None
+
+    async def _get_redis(self) -> aioredis.Redis:
+        """Get Redis connection"""
+        if self._redis is None:
+            self._redis = aioredis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
+        return self._redis
+
+    def _make_key(self, token_jti: str) -> str:
+        """Create Redis key for blacklisted token"""
+        return f"token_blacklist:{token_jti}"
+
+    async def add(self, token: str, ttl_seconds: int = 86400 * 7) -> bool:
+        """
+        Add token to blacklist.
+
+        Args:
+            token: JWT token to blacklist
+            ttl_seconds: How long to keep in blacklist (default: 7 days, matching refresh token expiry)
+        """
+        from app.core.security import decode_token
+        import hashlib
+
+        # Decode to get expiry (if valid) or just hash the token
+        payload = decode_token(token)
+
+        if payload and payload.get("exp"):
+            # Calculate actual TTL based on token expiry
+            from datetime import datetime
+            exp_time = datetime.fromtimestamp(payload["exp"])
+            remaining = (exp_time - datetime.utcnow()).total_seconds()
+            ttl_seconds = max(int(remaining), 1)  # At least 1 second
+
+        # Use token hash as key (shorter, no special chars)
+        token_hash = hashlib.sha256(token.encode()).hexdigest()[:32]
+        key = self._make_key(token_hash)
+
+        redis = await self._get_redis()
+        await redis.setex(key, ttl_seconds, "1")
+        return True
+
+    async def is_blacklisted(self, token: str) -> bool:
+        """Check if token is blacklisted"""
+        import hashlib
+
+        token_hash = hashlib.sha256(token.encode()).hexdigest()[:32]
+        key = self._make_key(token_hash)
+
+        redis = await self._get_redis()
+        return await redis.exists(key) > 0
+
+
+# Global instance
+token_blacklist = TokenBlacklist()

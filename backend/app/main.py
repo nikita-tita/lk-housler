@@ -211,13 +211,19 @@ async def health():
     services = {"api": "ok"}
     all_healthy = True
 
+    def _error_detail(e: Exception) -> str:
+        """Return error details only in debug mode"""
+        if settings.DEBUG:
+            return f"error: {str(e)[:100]}"
+        return "error"
+
     # Check PostgreSQL
     try:
         async with async_engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         services["database"] = "ok"
     except Exception as e:
-        services["database"] = f"error: {str(e)[:100]}"
+        services["database"] = _error_detail(e)
         all_healthy = False
 
     # Check Redis
@@ -227,7 +233,7 @@ async def health():
         await redis_client.close()
         services["redis"] = "ok"
     except Exception as e:
-        services["redis"] = f"error: {str(e)[:100]}"
+        services["redis"] = _error_detail(e)
         all_healthy = False
 
     # Check MinIO/S3
@@ -240,7 +246,7 @@ async def health():
         minio_client.bucket_exists(settings.S3_BUCKET_DOCUMENTS)
         services["s3"] = "ok"
     except Exception as e:
-        services["s3"] = f"error: {str(e)[:100]}"
+        services["s3"] = _error_detail(e)
         all_healthy = False
 
     response_data = {"status": "healthy" if all_healthy else "unhealthy", "services": services}

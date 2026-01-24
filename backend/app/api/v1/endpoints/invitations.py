@@ -5,12 +5,13 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.config import settings
+from app.core.rate_limit import rate_limit_invitation_lookup
 from app.db.session import get_db
 from app.models.user import User
 from app.models.invitation import DealInvitation, InvitationStatus
@@ -75,6 +76,25 @@ async def create_invitation(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Pending invitation already exists for this phone number"
+        )
+
+    # Validate total split percent doesn't exceed 100%
+    from sqlalchemy import func
+    from sqlalchemy.sql import or_
+    total_result = await db.execute(
+        select(func.coalesce(func.sum(DealInvitation.split_percent), 0)).where(
+            DealInvitation.deal_id == deal_id,
+            or_(
+                DealInvitation.status == "pending",
+                DealInvitation.status == "accepted"
+            )
+        )
+    )
+    current_total = total_result.scalar() or 0
+    if current_total + invitation_in.split_percent > 100:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Total split percent would exceed 100%. Current: {current_total}%, requested: {invitation_in.split_percent}%"
         )
 
     # Create invitation
@@ -162,6 +182,7 @@ async def cancel_invitation(
 @router.get("/invitations/{token}", response_model=InvitationPublicInfo)
 async def get_invitation_by_token(
     token: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -170,6 +191,9 @@ async def get_invitation_by_token(
     This is a PUBLIC endpoint - no authentication required.
     Used by the invitation acceptance page.
     """
+    # Rate limit by IP to prevent token enumeration
+    await rate_limit_invitation_lookup(request)
+
     result = await db.execute(
         select(DealInvitation).where(DealInvitation.token == token)
     )

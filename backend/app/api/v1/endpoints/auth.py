@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.core.rate_limit import rate_limit_otp_send, rate_limit_otp_verify, rate_limit_login
+from app.core.rate_limit import rate_limit_otp_send, rate_limit_otp_verify, rate_limit_login, rate_limit_invitation_lookup
 from app.core.audit import log_audit_event, AuditEvent
 from app.schemas.auth import (
     # Legacy
@@ -260,9 +260,13 @@ from app.core.security import create_access_token, create_refresh_token
 @router.get("/employee-invite/{token}", response_model=EmployeeInvitePublicInfo)
 async def get_employee_invite_info(
     token: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """Get public info about employee invitation (for registration page)"""
+    # Rate limit by IP to prevent token enumeration
+    await rate_limit_invitation_lookup(request)
+
     # Find invitation by token
     stmt = (
         select(PendingEmployee, Organization)
@@ -409,12 +413,22 @@ class AccessTokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+from app.core.rate_limit import token_blacklist
+
+
 @router.post("/refresh", response_model=AccessTokenResponse)
 async def refresh_access_token(
     request: TokenRefresh,
     http_request: Request,
 ):
     """Refresh access token using refresh token"""
+    # Check if token is blacklisted (logged out)
+    if await token_blacklist.is_blacklisted(request.refresh_token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+        )
+
     # Decode refresh token
     payload = decode_token(request.refresh_token)
     if not payload:
@@ -451,3 +465,37 @@ async def refresh_access_token(
     )
 
     return AccessTokenResponse(access_token=access_token)
+
+
+# ==========================================
+# 6. Logout
+# ==========================================
+
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+async def logout(
+    request: TokenRefresh,
+    http_request: Request,
+):
+    """
+    Logout user by invalidating refresh token.
+
+    The refresh token is added to a blacklist stored in Redis.
+    Access tokens are short-lived and will expire naturally.
+    """
+    # Decode to get user ID for audit logging
+    payload = decode_token(request.refresh_token)
+    user_id = payload.get("sub") or payload.get("userId") if payload else None
+
+    # Add to blacklist
+    await token_blacklist.add(request.refresh_token)
+
+    ip_address = http_request.client.host if http_request.client else None
+    log_audit_event(
+        AuditEvent.LOGOUT,
+        user_id=str(user_id) if user_id else None,
+        ip_address=ip_address,
+        details={"method": "refresh_token_revoke"},
+    )
+
+    return {"message": "Logged out successfully"}
