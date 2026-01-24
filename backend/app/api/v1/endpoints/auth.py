@@ -348,7 +348,7 @@ async def register_employee(
             phone=invitation.phone,
             email=request.email,
             name=request.name,
-            role="agency_employee",
+            role="agent",  # Employee gets agent role, organization membership defines access
             is_active=True,
         )
         db.add(user)
