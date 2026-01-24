@@ -159,7 +159,7 @@ class PendingEmployee(BaseModel):
     # Invite token for registration link
     invite_token = Column(String(64), nullable=False, unique=True, index=True)
 
-    status = Column(Enum(EmployeeInviteStatus), default=EmployeeInviteStatus.PENDING, nullable=False)
+    status = Column(Enum(EmployeeInviteStatus, create_type=False), default=EmployeeInviteStatus.PENDING, nullable=False)
 
     expires_at = Column(DateTime, nullable=False)
 
