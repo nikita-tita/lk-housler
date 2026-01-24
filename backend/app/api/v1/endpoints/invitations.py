@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.core.config import settings
 from app.core.rate_limit import rate_limit_invitation_lookup
+from app.core.audit import log_audit_event, AuditEvent
 from app.db.session import get_db
 from app.models.user import User
 from app.models.invitation import DealInvitation, InvitationStatus
@@ -40,6 +41,7 @@ router = APIRouter()
 async def create_invitation(
     deal_id: UUID,
     invitation_in: InvitationCreate,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -62,6 +64,22 @@ async def create_invitation(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot invite partners after deal is signed"
+        )
+
+    # Limit pending invitations per deal (prevent abuse)
+    MAX_PENDING_INVITATIONS = 10
+    from sqlalchemy import func
+    pending_count_result = await db.execute(
+        select(func.count(DealInvitation.id)).where(
+            DealInvitation.deal_id == deal_id,
+            DealInvitation.status == "pending"
+        )
+    )
+    pending_count = pending_count_result.scalar() or 0
+    if pending_count >= MAX_PENDING_INVITATIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Maximum {MAX_PENDING_INVITATIONS} pending invitations per deal"
         )
 
     # Check if there's already a pending invitation for this phone
@@ -114,6 +132,15 @@ async def create_invitation(
     # Send invitation SMS
     await _send_invitation_sms(invitation, deal.property_address)
 
+    # Audit log
+    log_audit_event(
+        AuditEvent.INVITATION_SENT,
+        user_id=str(current_user.id),
+        ip_address=request.client.host if request.client else None,
+        resource=f"deal:{deal_id}",
+        details={"invitation_id": str(invitation.id), "invited_phone": invitation_in.invited_phone[-4:]},
+    )
+
     return InvitationResponse.model_validate(invitation)
 
 
@@ -146,6 +173,7 @@ async def get_deal_invitations(
 async def cancel_invitation(
     deal_id: UUID,
     invitation_id: UUID,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -166,6 +194,15 @@ async def cancel_invitation(
 
     invitation.cancel()
     await db.commit()
+
+    # Audit log
+    log_audit_event(
+        AuditEvent.INVITATION_CANCELLED,
+        user_id=str(current_user.id),
+        ip_address=request.client.host if request.client else None,
+        resource=f"deal:{deal_id}",
+        details={"invitation_id": str(invitation.id)},
+    )
 
     return InvitationActionResponse(
         invitation_id=invitation.id,
@@ -231,6 +268,7 @@ async def get_invitation_by_token(
 @router.post("/invitations/{token}/accept", response_model=InvitationActionResponse)
 async def accept_invitation(
     token: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -239,8 +277,11 @@ async def accept_invitation(
 
     Requires authentication - the accepting user becomes the co-agent/partner.
     """
+    # Use FOR UPDATE to prevent race condition (double accept)
     result = await db.execute(
-        select(DealInvitation).where(DealInvitation.token == token)
+        select(DealInvitation)
+        .where(DealInvitation.token == token)
+        .with_for_update()
     )
     invitation = result.scalar_one_or_none()
 
@@ -275,6 +316,15 @@ async def accept_invitation(
 
     await db.commit()
 
+    # Audit log
+    log_audit_event(
+        AuditEvent.INVITATION_ACCEPTED,
+        user_id=str(current_user.id),
+        ip_address=request.client.host if request.client else None,
+        resource=f"deal:{invitation.deal_id}",
+        details={"invitation_id": str(invitation.id)},
+    )
+
     return InvitationActionResponse(
         invitation_id=invitation.id,
         status="accepted",
@@ -285,6 +335,7 @@ async def accept_invitation(
 @router.post("/invitations/{token}/decline", response_model=InvitationActionResponse)
 async def decline_invitation(
     token: str,
+    request: Request,
     decline_request: InvitationDecline = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -309,6 +360,15 @@ async def decline_invitation(
     reason = decline_request.reason if decline_request else None
     invitation.decline(reason)
     await db.commit()
+
+    # Audit log
+    log_audit_event(
+        AuditEvent.INVITATION_DECLINED,
+        user_id=str(current_user.id),
+        ip_address=request.client.host if request.client else None,
+        resource=f"deal:{invitation.deal_id}",
+        details={"invitation_id": str(invitation.id), "reason": reason},
+    )
 
     return InvitationActionResponse(
         invitation_id=invitation.id,

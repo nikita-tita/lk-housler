@@ -58,8 +58,16 @@ const retryRequest = async (error: AxiosError, client: typeof axios): Promise<un
   return Promise.reject(error);
 };
 
-// Add token to both clients
+// Generate unique request ID for distributed tracing
+const generateRequestId = (): string => {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+};
+
+// Add token and request ID to both clients
 const addAuthToken = (config: InternalAxiosRequestConfig) => {
+  // Add X-Request-ID for distributed tracing
+  config.headers['X-Request-ID'] = generateRequestId();
+
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('housler_token');
     if (token) {
@@ -91,21 +99,8 @@ authClient.interceptors.response.use(
   }
 );
 
-// Request interceptor - добавляем JWT token
-apiClient.interceptors.request.use(
-  (config) => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('housler_token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+// Request interceptor - добавляем JWT token и X-Request-ID
+apiClient.interceptors.request.use(addAuthToken, (error) => Promise.reject(error));
 
 // Response interceptor - retry + обработка ошибок
 apiClient.interceptors.response.use(

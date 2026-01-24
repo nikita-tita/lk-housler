@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@housler/ui';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, useToast } from '@housler/ui';
 import { Button } from '@housler/ui';
 import { Input } from '@housler/ui';
 import {
@@ -21,6 +21,7 @@ import {
 type TabType = 'employees' | 'invitations';
 
 export default function AgentsPage() {
+  const toast = useToast();
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [invitations, setInvitations] = useState<EmployeeInvitation[]>([]);
@@ -160,8 +161,9 @@ export default function AgentsPage() {
     try {
       await removeAgent(organization.id, userId);
       setAgents(agents.filter((a) => a.user_id !== userId));
+      toast.success('Сотрудник удалён');
     } catch (err) {
-      alert('Ошибка удаления сотрудника');
+      toast.error('Ошибка удаления сотрудника');
       console.error(err);
     }
   };
@@ -173,8 +175,9 @@ export default function AgentsPage() {
     try {
       await cancelEmployeeInvitation(organization.id, invitationId);
       setInvitations(invitations.filter((i) => i.id !== invitationId));
+      toast.success('Приглашение отменено');
     } catch (err) {
-      alert('Ошибка отмены приглашения');
+      toast.error('Ошибка отмены приглашения');
       console.error(err);
     }
   };
@@ -184,9 +187,9 @@ export default function AgentsPage() {
 
     try {
       await resendEmployeeInvitation(organization.id, invitationId);
-      alert('SMS с приглашением отправлено повторно');
+      toast.success('SMS с приглашением отправлено повторно');
     } catch (err) {
-      alert('Ошибка отправки SMS');
+      toast.error('Ошибка отправки SMS');
       console.error(err);
     }
   };

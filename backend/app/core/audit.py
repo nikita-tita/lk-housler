@@ -40,6 +40,12 @@ class AuditEvent(str, Enum):
     PAYOUT_PROCESSED = "payout_processed"
     PAYOUT_FAILED = "payout_failed"
 
+    # Invitation actions
+    INVITATION_SENT = "invitation_sent"
+    INVITATION_ACCEPTED = "invitation_accepted"
+    INVITATION_DECLINED = "invitation_declined"
+    INVITATION_CANCELLED = "invitation_cancelled"
+
 
 # Separate audit logger for security events
 audit_logger = logging.getLogger("security.audit")
