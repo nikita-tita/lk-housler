@@ -8,7 +8,7 @@ import { sendSMS, verifySMS, registerClient } from '@housler/lib';
 import { getDashboardPath } from '@housler/lib';
 import { PhoneInput, SmsCodeInput, DateInput, ConsentCheckbox, RegistrationStepper } from '@/components/auth';
 
-type Step = 'phone' | 'code' | 'registration';
+type Step = 'phone' | 'code' | 'registration' | 'wrong_role';
 
 const STEPS = [
   { id: 'phone', title: 'Телефон' },
@@ -61,6 +61,9 @@ export default function ClientLoginPage() {
   // State for resend cooldown (24 hours)
   const [canResendAt, setCanResendAt] = useState<Date | null>(null);
   const [resendCountdown, setResendCountdown] = useState(0);
+
+  // State for wrong role (user registered as agent/agency trying to login as client)
+  const [wrongRole, setWrongRole] = useState<{ role: string; name: string } | null>(null);
 
   // Countdown timer (shows hours if > 60 min)
   useEffect(() => {
@@ -156,6 +159,28 @@ export default function ClientLoginPage() {
     }
   };
 
+  // Get role display name in Russian
+  const getRoleDisplayName = (role: string): string => {
+    const roleNames: Record<string, string> = {
+      agent: 'риелтор',
+      agency_admin: 'администратор агентства',
+      agency_employee: 'сотрудник агентства',
+      client: 'клиент',
+    };
+    return roleNames[role] || role;
+  };
+
+  // Get login path for role
+  const getLoginPathForRole = (role: string): string => {
+    const paths: Record<string, string> = {
+      agent: '/realtor',
+      agency_admin: '/login/agency',
+      agency_employee: '/login/agency',
+      client: '/login/client',
+    };
+    return paths[role] || '/login';
+  };
+
   // Verify SMS code
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,7 +189,19 @@ export default function ClientLoginPage() {
 
     try {
       const response = await verifySMS(formData.phone, code);
-      // User exists - login successful
+
+      // Check if user role matches expected role (client)
+      if (response.user.role !== 'client') {
+        // User is registered with different role - show message
+        setWrongRole({
+          role: response.user.role,
+          name: response.user.name || '',
+        });
+        setStep('wrong_role');
+        return;
+      }
+
+      // User is client - login successful
       setAuth(response.access_token, response.user);
       router.push(getDashboardPath(response.user.role));
     } catch (err: unknown) {
@@ -466,6 +503,48 @@ export default function ClientLoginPage() {
             Назад
           </button>
         </form>
+      )}
+
+      {step === 'wrong_role' && wrongRole && (
+        <div className="space-y-6 text-center">
+          <div className="p-6 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg">
+            <div className="text-4xl mb-4">!</div>
+            <h2 className="text-lg font-semibold mb-2">
+              Вы уже зарегистрированы
+            </h2>
+            <p className="text-[var(--color-text-light)] mb-4">
+              Номер <strong>+{formData.phone}</strong> зарегистрирован как <strong>{getRoleDisplayName(wrongRole.role)}</strong>.
+              {wrongRole.name && (
+                <><br />Имя: {wrongRole.name}</>
+              )}
+            </p>
+            <p className="text-sm text-[var(--color-text-light)]">
+              Для входа используйте соответствующую форму авторизации.
+            </p>
+          </div>
+
+          <Link
+            href={getLoginPathForRole(wrongRole.role)}
+            className="btn btn-primary btn-block"
+          >
+            Войти как {getRoleDisplayName(wrongRole.role)}
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => {
+              setStep('phone');
+              setCode('');
+              setError('');
+              setWrongRole(null);
+              setPhone('');
+              setFormData(prev => ({ ...prev, phone: '' }));
+            }}
+            className="w-full py-2 text-sm text-[var(--color-text-light)] hover:text-[var(--color-text)]"
+          >
+            Использовать другой номер
+          </button>
+        </div>
       )}
     </div>
   );
