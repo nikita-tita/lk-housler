@@ -12,6 +12,8 @@ export type {
   AgentRegisterData,
   ClientRegisterData,
   AgencyRegisterData,
+  EmployeeInviteInfo,
+  EmployeeRegisterData,
   ConsentInput,
 } from './auth';
 
@@ -25,6 +27,8 @@ export {
   registerAgent,
   registerClient,
   registerAgency,
+  getEmployeeInvite,
+  registerEmployee,
 } from './auth';
 
 // Exports from bank-split.ts

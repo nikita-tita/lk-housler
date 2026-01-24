@@ -399,3 +399,83 @@ export async function registerAgency(data: AgencyRegisterData): Promise<AuthResp
     throw err;
   }
 }
+
+// ==========================================
+// 4. Employee Registration (via invite token)
+// ==========================================
+
+export interface EmployeeInviteInfo {
+  token: string;
+  agencyName: string;
+  agencyId: number;
+  phone: string;
+  position?: string;
+  expiresAt: string;
+  isExpired: boolean;
+}
+
+export interface EmployeeRegisterData {
+  token: string;
+  name: string;
+  email: string;
+  consents: ConsentInput;
+}
+
+export async function getEmployeeInvite(token: string): Promise<EmployeeInviteInfo> {
+  if (IS_MOCK) {
+    console.log('[MOCK] getEmployeeInvite', token);
+    return {
+      token,
+      agencyName: 'ООО "Недвижимость Плюс"',
+      agencyId: 1,
+      phone: '79999000001',
+      position: 'Риелтор',
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      isExpired: false,
+    };
+  }
+
+  try {
+    const { data } = await authClient.get<ApiResponse<EmployeeInviteInfo>>(`/auth/employee-invite/${token}`);
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Приглашение не найдено');
+    }
+    return data.data;
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { data?: { error?: string } } };
+    if (axiosError.response?.data?.error) {
+      throw new Error(axiosError.response.data.error);
+    }
+    throw err;
+  }
+}
+
+export async function registerEmployee(data: EmployeeRegisterData): Promise<AuthResponse> {
+  if (IS_MOCK) {
+    console.log('[MOCK] registerEmployee', data);
+    if (typeof window !== 'undefined') localStorage.setItem('housler_mock_role', 'agency_employee');
+    return {
+      access_token: 'mock_employee_token',
+      user: { ...MOCK_USER, name: data.name, email: data.email, role: 'agency_employee', agency_id: 1, agency: { id: '1', legal_name: 'ООО "Недвижимость Плюс"', short_name: 'Недвижимость Плюс' } } as User,
+    };
+  }
+
+  try {
+    const { data: response } = await authClient.post<ApiResponse<RegisterData>>('/auth/register-employee', data);
+
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Ошибка регистрации');
+    }
+
+    return {
+      access_token: response.data.token,
+      user: response.data.user,
+    };
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { data?: { error?: string } } };
+    if (axiosError.response?.data?.error) {
+      throw new Error(axiosError.response.data.error);
+    }
+    throw err;
+  }
+}
