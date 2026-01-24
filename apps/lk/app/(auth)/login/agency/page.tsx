@@ -11,7 +11,7 @@ import { PhoneInput } from '@/components/auth/PhoneInput';
 import { ConsentCheckbox } from '@/components/auth/ConsentCheckbox';
 import { RegistrationStepper } from '@/components/auth/RegistrationStepper';
 
-type Mode = 'login' | 'register';
+type Mode = 'login' | 'register' | 'wrong_role';
 type RegisterStep = 'company' | 'contact' | 'password' | 'consents';
 
 const REGISTER_STEPS = [
@@ -54,6 +54,9 @@ export default function AgencyLoginPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // State for wrong role
+  const [wrongRole, setWrongRole] = useState<{ role: string; name: string; email: string } | null>(null);
+
   // Login form
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -86,6 +89,28 @@ export default function AgencyLoginPage() {
     }
   }, [isAuthenticated, router]);
 
+  // Get role display name in Russian
+  const getRoleDisplayName = (role: string): string => {
+    const roleNames: Record<string, string> = {
+      agent: 'риелтор',
+      agency_admin: 'администратор агентства',
+      agency_employee: 'сотрудник агентства',
+      client: 'клиент',
+    };
+    return roleNames[role] || role;
+  };
+
+  // Get login path for role
+  const getLoginPathForRole = (role: string): string => {
+    const paths: Record<string, string> = {
+      agent: '/realtor',
+      agency_admin: '/login/agency',
+      agency_employee: '/login/agency',
+      client: '/login/client',
+    };
+    return paths[role] || '/login';
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -93,6 +118,19 @@ export default function AgencyLoginPage() {
 
     try {
       const response = await loginAgency(loginEmail.toLowerCase().trim(), loginPassword);
+
+      // Check if user role matches expected roles (agency_admin or agency_employee)
+      if (response.user.role !== 'agency_admin' && response.user.role !== 'agency_employee') {
+        // User is registered with different role - show message
+        setWrongRole({
+          role: response.user.role,
+          name: response.user.name || '',
+          email: loginEmail,
+        });
+        setMode('wrong_role');
+        return;
+      }
+
       setAuth(response.access_token, response.user);
       router.push(getDashboardPath(response.user.role));
     } catch (err: unknown) {
@@ -644,6 +682,47 @@ export default function AgencyLoginPage() {
               </p>
             </form>
           )}
+        </div>
+      )}
+
+      {mode === 'wrong_role' && wrongRole && (
+        <div className="space-y-6 text-center">
+          <div className="p-6 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg">
+            <div className="text-4xl mb-4">!</div>
+            <h2 className="text-lg font-semibold mb-2">
+              Вы уже зарегистрированы
+            </h2>
+            <p className="text-[var(--color-text-light)] mb-4">
+              Email <strong>{wrongRole.email}</strong> зарегистрирован как <strong>{getRoleDisplayName(wrongRole.role)}</strong>.
+              {wrongRole.name && (
+                <><br />Имя: {wrongRole.name}</>
+              )}
+            </p>
+            <p className="text-sm text-[var(--color-text-light)]">
+              Для входа используйте соответствующую форму авторизации.
+            </p>
+          </div>
+
+          <Link
+            href={getLoginPathForRole(wrongRole.role)}
+            className="btn btn-primary btn-block"
+          >
+            Войти как {getRoleDisplayName(wrongRole.role)}
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMode('login');
+              setLoginEmail('');
+              setLoginPassword('');
+              setError('');
+              setWrongRole(null);
+            }}
+            className="w-full py-2 text-sm text-[var(--color-text-light)] hover:text-[var(--color-text)]"
+          >
+            Использовать другой email
+          </button>
         </div>
       )}
     </div>
