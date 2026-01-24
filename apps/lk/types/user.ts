@@ -2,6 +2,7 @@ export type UserRole =
   | 'client'
   | 'agent'
   | 'agency_admin'
+  | 'agency_employee'
   | 'operator'
   | 'admin';
 

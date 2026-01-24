@@ -301,9 +301,9 @@ export interface AgencyRegisterData {
   companyEmail?: string; // Company email
   contactName: string;
   contactPosition?: string;
-  contactPhone: string;
+  contactPhone: string;  // Admin's verified phone (used for SMS auth)
   contactEmail: string;
-  password: string;
+  password?: string;     // Optional - not needed with SMS auth
   consents: ConsentInput;
 }
 

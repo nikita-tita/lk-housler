@@ -10,6 +10,7 @@ export function getDashboardPath(role: UserRole): string {
     case 'client':
       return '/client/dashboard';
     case 'agency_admin':
+    case 'agency_employee':
       return '/agency/dashboard';
     case 'operator':
     case 'admin':
