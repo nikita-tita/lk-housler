@@ -102,7 +102,9 @@ class Settings(BaseSettings):
     # SMS (SMS.RU for Housler)
     SMS_PROVIDER: str = "sms_ru"
     SMS_RU_API_ID: str = ""  # SMS.RU API ID
-    SMS_TEST_MODE: bool = False  # Test mode: accept 79999xxxxxx phones
+    SMS_TEST_MODE: bool = False  # Test mode: accept test phones with fixed code
+    SMS_TEST_PHONE_PREFIX: str = "79999"  # Phone prefix for test mode (e.g., 79999xxxxxx)
+    SMS_TEST_CODE: str = "123456"  # Fixed OTP code for test phones
     SMS_SENDER_NAME: str = "Housler"
 
     # Email (Yandex 360 SMTP or SendGrid)

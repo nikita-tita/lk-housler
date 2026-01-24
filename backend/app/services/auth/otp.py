@@ -114,8 +114,8 @@ class OTPService:
 
         # Generate new OTP
         normalized_phone = phone.lstrip("+")
-        if settings.SMS_TEST_MODE and normalized_phone.startswith("79999"):
-            code = "123456"
+        if settings.SMS_TEST_MODE and normalized_phone.startswith(settings.SMS_TEST_PHONE_PREFIX):
+            code = settings.SMS_TEST_CODE
         else:
             code = generate_otp(settings.OTP_LENGTH)
 

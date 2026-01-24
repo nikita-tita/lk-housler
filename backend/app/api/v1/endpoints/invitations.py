@@ -228,6 +228,10 @@ async def get_invitation_by_token(
     This is a PUBLIC endpoint - no authentication required.
     Used by the invitation acceptance page.
     """
+    # Quick validation: token should be ~43 chars (32 bytes base64)
+    if not token or len(token) < 40 or len(token) > 50:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invitation not found")
+
     # Rate limit by IP to prevent token enumeration
     await rate_limit_invitation_lookup(request)
 

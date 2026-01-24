@@ -34,14 +34,14 @@ class UserSearchResponse(BaseModel):
 
 
 def mask_phone(phone: Optional[str]) -> Optional[str]:
-    """Mask phone for privacy: +7 (911) ***-**-20"""
+    """Mask phone for privacy: +7 (***) ***-**-20"""
     if not phone:
         return None
     digits = ''.join(filter(str.isdigit, phone))
     if len(digits) < 10:
         return None
-    # Format: +7 (XXX) ***-**-XX
-    return f"+7 ({digits[1:4]}) ***-**-{digits[-2:]}"
+    # Format: +7 (***) ***-**-XX (show only last 2 digits)
+    return f"+7 (***) ***-**-{digits[-2:]}"
 
 
 @router.get("/me")
