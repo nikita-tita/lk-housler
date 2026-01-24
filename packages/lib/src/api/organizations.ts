@@ -72,3 +72,112 @@ export async function addAgentByPhone(
 export async function removeAgent(orgId: string, userId: number): Promise<void> {
   await apiClient.delete(`/organizations/${orgId}/agents/${userId}`);
 }
+
+// ==========================================
+// Employee Invitations
+// ==========================================
+
+export interface EmployeeInvitation {
+  id: string;
+  phone: string;
+  name?: string;
+  position?: string;
+  status: 'pending' | 'accepted' | 'expired' | 'cancelled';
+  inviteToken: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface EmployeeInvitationCreate {
+  phone: string;
+  name?: string;
+  position?: string;
+}
+
+export interface EmployeeInvitationsListResponse {
+  items: EmployeeInvitation[];
+  total: number;
+}
+
+const IS_MOCK = process.env.NEXT_PUBLIC_MOCK_AUTH === 'true';
+
+/**
+ * Get list of pending employee invitations
+ */
+export async function getEmployeeInvitations(orgId: string): Promise<EmployeeInvitationsListResponse> {
+  if (IS_MOCK) {
+    console.log('[MOCK] getEmployeeInvitations', orgId);
+    return {
+      items: [
+        {
+          id: '1',
+          phone: '79999000005',
+          name: 'Петров Петр',
+          position: 'Риелтор',
+          status: 'pending',
+          inviteToken: 'mock-token-1',
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      total: 1,
+    };
+  }
+
+  const { data } = await apiClient.get<EmployeeInvitationsListResponse>(
+    `/organizations/${orgId}/employee-invitations`
+  );
+  return data;
+}
+
+/**
+ * Send employee invitation (creates pending invite + sends SMS)
+ */
+export async function sendEmployeeInvitation(
+  orgId: string,
+  data: EmployeeInvitationCreate
+): Promise<EmployeeInvitation> {
+  if (IS_MOCK) {
+    console.log('[MOCK] sendEmployeeInvitation', orgId, data);
+    return {
+      id: 'mock-' + Date.now(),
+      phone: data.phone,
+      name: data.name,
+      position: data.position,
+      status: 'pending',
+      inviteToken: 'mock-token-' + Date.now(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  const { data: response } = await apiClient.post<EmployeeInvitation>(
+    `/organizations/${orgId}/employee-invitations`,
+    data
+  );
+  return response;
+}
+
+/**
+ * Cancel employee invitation
+ */
+export async function cancelEmployeeInvitation(orgId: string, invitationId: string): Promise<void> {
+  if (IS_MOCK) {
+    console.log('[MOCK] cancelEmployeeInvitation', orgId, invitationId);
+    return;
+  }
+
+  await apiClient.delete(`/organizations/${orgId}/employee-invitations/${invitationId}`);
+}
+
+/**
+ * Resend employee invitation SMS
+ */
+export async function resendEmployeeInvitation(orgId: string, invitationId: string): Promise<void> {
+  if (IS_MOCK) {
+    console.log('[MOCK] resendEmployeeInvitation', orgId, invitationId);
+    return;
+  }
+
+  await apiClient.post(`/organizations/${orgId}/employee-invitations/${invitationId}/resend`);
+}

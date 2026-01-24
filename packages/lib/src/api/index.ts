@@ -185,6 +185,9 @@ export type {
   AgentInfo,
   AgentListResponse,
   Organization,
+  EmployeeInvitation,
+  EmployeeInvitationCreate,
+  EmployeeInvitationsListResponse,
 } from './organizations';
 
 export {
@@ -193,6 +196,10 @@ export {
   getAgents,
   addAgentByPhone,
   removeAgent,
+  getEmployeeInvitations,
+  sendEmployeeInvitation,
+  cancelEmployeeInvitation,
+  resendEmployeeInvitation,
 } from './organizations';
 
 // Exports from profile.ts
