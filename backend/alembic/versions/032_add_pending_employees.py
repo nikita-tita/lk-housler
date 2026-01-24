@@ -19,7 +19,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create enum type for employee invite status (if not exists)
+    # Create enum type and table via raw SQL to avoid SQLAlchemy auto-create issues
     op.execute("""
         DO $$
         BEGIN
@@ -28,26 +28,27 @@ def upgrade() -> None:
             END IF;
         END
         $$;
-    """)
 
-    # Create pending_employees table
-    op.create_table(
-        'pending_employees',
-        sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
-        sa.Column('org_id', UUID(as_uuid=True), sa.ForeignKey('organizations.id'), nullable=False, index=True),
-        sa.Column('phone', sa.String(20), nullable=False, index=True),
-        sa.Column('name', sa.String(255), nullable=True),
-        sa.Column('position', sa.String(255), nullable=True),
-        sa.Column('invite_token', sa.String(64), nullable=False, unique=True, index=True),
-        sa.Column('status', sa.Enum('pending', 'accepted', 'expired', 'cancelled', name='employeeinvitestatus', create_type=False),
-                  nullable=False, server_default='pending'),
-        sa.Column('expires_at', sa.DateTime, nullable=False),
-        sa.Column('accepted_user_id', sa.Integer, sa.ForeignKey('users.id'), nullable=True),
-        sa.Column('accepted_at', sa.DateTime, nullable=True),
-        sa.Column('invited_by_user_id', sa.Integer, sa.ForeignKey('users.id'), nullable=False),
-        sa.Column('created_at', sa.DateTime, nullable=False, server_default=sa.text('now()')),
-        sa.Column('updated_at', sa.DateTime, nullable=False, server_default=sa.text('now()')),
-    )
+        CREATE TABLE IF NOT EXISTS pending_employees (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            org_id UUID NOT NULL REFERENCES organizations(id),
+            phone VARCHAR(20) NOT NULL,
+            name VARCHAR(255),
+            position VARCHAR(255),
+            invite_token VARCHAR(64) NOT NULL UNIQUE,
+            status employeeinvitestatus NOT NULL DEFAULT 'pending',
+            expires_at TIMESTAMP NOT NULL,
+            accepted_user_id INTEGER REFERENCES users(id),
+            accepted_at TIMESTAMP,
+            invited_by_user_id INTEGER NOT NULL REFERENCES users(id),
+            created_at TIMESTAMP NOT NULL DEFAULT now(),
+            updated_at TIMESTAMP NOT NULL DEFAULT now()
+        );
+
+        CREATE INDEX IF NOT EXISTS ix_pending_employees_org_id ON pending_employees(org_id);
+        CREATE INDEX IF NOT EXISTS ix_pending_employees_phone ON pending_employees(phone);
+        CREATE INDEX IF NOT EXISTS ix_pending_employees_invite_token ON pending_employees(invite_token);
+    """)
 
 
 def downgrade() -> None:
