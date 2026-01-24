@@ -44,6 +44,15 @@ class MemberRole(str, PyEnum):
     SIGNER = "signer"
 
 
+class EmployeeInviteStatus(str, PyEnum):
+    """Employee invitation status"""
+
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    EXPIRED = "expired"
+    CANCELLED = "cancelled"
+
+
 class PayoutMethod(str, PyEnum):
     """Payout method"""
 
@@ -131,3 +140,37 @@ class PayoutAccount(BaseModel):
 
     # Note: Polymorphic owner - no FK relationship, use manual queries
     # owner_type='user' -> users.id, owner_type='org' -> organizations.id
+
+
+class PendingEmployee(BaseModel):
+    """Pending employee invitation"""
+
+    __tablename__ = "pending_employees"
+
+    org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False, index=True)
+
+    # Invited phone (normalized, digits only)
+    phone = Column(String(20), nullable=False, index=True)
+
+    # Optional info provided by admin
+    name = Column(String(255), nullable=True)
+    position = Column(String(255), nullable=True)
+
+    # Invite token for registration link
+    invite_token = Column(String(64), nullable=False, unique=True, index=True)
+
+    status = Column(Enum(EmployeeInviteStatus), default=EmployeeInviteStatus.PENDING, nullable=False)
+
+    expires_at = Column(DateTime, nullable=False)
+
+    # When accepted, store the user_id
+    accepted_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    accepted_at = Column(DateTime, nullable=True)
+
+    # Who sent the invitation
+    invited_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # Relationships
+    organization = relationship("Organization")
+    invited_by = relationship("User", foreign_keys=[invited_by_user_id])
+    accepted_user = relationship("User", foreign_keys=[accepted_user_id])

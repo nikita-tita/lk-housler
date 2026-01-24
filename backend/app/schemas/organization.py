@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.models.organization import OrganizationType, OrganizationStatus, KYCStatus, MemberRole, PayoutMethod
+from app.models.organization import OrganizationType, OrganizationStatus, KYCStatus, MemberRole, PayoutMethod, EmployeeInviteStatus
 
 
 class OrganizationBase(BaseModel):
@@ -99,3 +99,61 @@ class PayoutAccount(PayoutAccountBase):
 
     class Config:
         from_attributes = True
+
+
+# Employee Invitation Schemas
+
+class EmployeeInvitationCreate(BaseModel):
+    """Create employee invitation schema"""
+
+    phone: str = Field(..., description="Phone number (will be normalized)")
+    name: Optional[str] = Field(None, description="Employee name (optional)")
+    position: Optional[str] = Field(None, description="Position (optional)")
+
+
+class EmployeeInvitation(BaseModel):
+    """Employee invitation response schema"""
+
+    id: UUID
+    phone: str
+    name: Optional[str] = None
+    position: Optional[str] = None
+    status: EmployeeInviteStatus
+    invite_token: str = Field(..., alias="inviteToken")
+    expires_at: datetime = Field(..., alias="expiresAt")
+    created_at: datetime = Field(..., alias="createdAt")
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+
+class EmployeeInvitationsListResponse(BaseModel):
+    """Employee invitations list response"""
+
+    items: list[EmployeeInvitation]
+    total: int
+
+
+class EmployeeInvitePublicInfo(BaseModel):
+    """Public info about employee invite (for registration page)"""
+
+    token: str
+    agency_name: str = Field(..., alias="agencyName")
+    agency_id: UUID = Field(..., alias="agencyId")
+    phone: str
+    position: Optional[str] = None
+    expires_at: datetime = Field(..., alias="expiresAt")
+    is_expired: bool = Field(..., alias="isExpired")
+
+    class Config:
+        populate_by_name = True
+
+
+class EmployeeRegisterRequest(BaseModel):
+    """Request to complete employee registration"""
+
+    token: str
+    name: str = Field(..., min_length=2, max_length=255)
+    email: str = Field(..., description="Email address")
+    consents: dict = Field(..., description="Consent flags")

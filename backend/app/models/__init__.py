@@ -2,7 +2,13 @@
 
 from app.db.base import Base, BaseModel
 from app.models.user import User, UserRole
-from app.models.organization import Organization, OrganizationMember, PayoutAccount
+from app.models.organization import (
+    Organization,
+    OrganizationMember,
+    PayoutAccount,
+    PendingEmployee,
+    EmployeeInviteStatus,
+)
 from app.models.deal import Deal, DealParty, DealTerms, BankDealStatus
 from app.models.document import ContractTemplate, Document, Signature, AuditLog, SigningToken, ContractLayer
 from app.models.payment import PaymentSchedule, PaymentIntent, Payment
@@ -44,6 +50,8 @@ __all__ = [
     "Organization",
     "OrganizationMember",
     "PayoutAccount",
+    "PendingEmployee",
+    "EmployeeInviteStatus",
     "Deal",
     "DealParty",
     "DealTerms",

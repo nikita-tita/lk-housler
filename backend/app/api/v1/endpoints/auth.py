@@ -244,6 +244,157 @@ async def register_agency(request: AgencyRegisterRequest, http_request: Request,
 
 
 # ==========================================
+# 4. Employee Invitations (Public)
+# ==========================================
+
+from datetime import datetime
+from sqlalchemy import select, and_
+from app.models.organization import PendingEmployee, EmployeeInviteStatus, OrganizationMember, MemberRole, Organization
+from app.schemas.organization import EmployeeInvitePublicInfo, EmployeeRegisterRequest
+from app.models.user import User
+from app.core.security import create_access_token, create_refresh_token
+
+
+@router.get("/employee-invite/{token}", response_model=EmployeeInvitePublicInfo)
+async def get_employee_invite_info(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get public info about employee invitation (for registration page)"""
+    # Find invitation by token
+    stmt = (
+        select(PendingEmployee, Organization)
+        .join(Organization, PendingEmployee.org_id == Organization.id)
+        .where(PendingEmployee.invite_token == token)
+    )
+    result = await db.execute(stmt)
+    row = result.first()
+
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Приглашение не найдено")
+
+    invitation, organization = row
+
+    is_expired = invitation.expires_at < datetime.utcnow() or invitation.status != EmployeeInviteStatus.PENDING
+
+    return EmployeeInvitePublicInfo(
+        token=invitation.invite_token,
+        agency_name=organization.legal_name,
+        agency_id=organization.id,
+        phone=invitation.phone,
+        position=invitation.position,
+        expires_at=invitation.expires_at,
+        is_expired=is_expired,
+    )
+
+
+@router.post("/register-employee", response_model=Token)
+async def register_employee(
+    request: EmployeeRegisterRequest,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Complete employee registration via invite token"""
+    ip_address = http_request.client.host if http_request.client else None
+    user_agent = http_request.headers.get("user-agent")
+
+    # Find invitation by token
+    stmt = (
+        select(PendingEmployee, Organization)
+        .join(Organization, PendingEmployee.org_id == Organization.id)
+        .where(PendingEmployee.invite_token == request.token)
+    )
+    result = await db.execute(stmt)
+    row = result.first()
+
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Приглашение не найдено")
+
+    invitation, organization = row
+
+    # Check if expired
+    if invitation.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Приглашение истекло")
+
+    if invitation.status != EmployeeInviteStatus.PENDING:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Приглашение уже использовано")
+
+    # Check if user already exists with this phone
+    from sqlalchemy import or_
+    stmt = select(User).where(
+        or_(
+            User.phone == invitation.phone,
+            User.phone == f"+{invitation.phone}",
+        )
+    )
+    result = await db.execute(stmt)
+    existing_user = result.scalar_one_or_none()
+
+    if existing_user:
+        # User exists - just add them to the organization
+        user = existing_user
+        # Update user name if provided
+        if request.name and not user.name:
+            user.name = request.name
+    else:
+        # Create new user
+        user = User(
+            phone=invitation.phone,
+            email=request.email,
+            name=request.name,
+            role="agency_employee",
+            is_active=True,
+        )
+        db.add(user)
+        await db.flush()
+
+    # Add user to organization as employee
+    stmt = select(OrganizationMember).where(
+        and_(
+            OrganizationMember.org_id == organization.id,
+            OrganizationMember.user_id == user.id,
+        )
+    )
+    result = await db.execute(stmt)
+    existing_member = result.scalar_one_or_none()
+
+    if existing_member:
+        # Reactivate if inactive
+        existing_member.is_active = True
+    else:
+        # Create new membership
+        member = OrganizationMember(
+            org_id=organization.id,
+            user_id=user.id,
+            role=MemberRole.AGENT,
+            is_active=True,
+        )
+        db.add(member)
+
+    # Mark invitation as accepted
+    invitation.status = EmployeeInviteStatus.ACCEPTED
+    invitation.accepted_user_id = user.id
+    invitation.accepted_at = datetime.utcnow()
+
+    await db.commit()
+    await db.refresh(user)
+
+    # Generate tokens
+    access_token = create_access_token({"sub": str(user.id)})
+    refresh_token = create_refresh_token({"sub": str(user.id)})
+
+    log_audit_event(
+        AuditEvent.USER_REGISTERED,
+        user_id=str(user.id),
+        ip_address=ip_address,
+        user_agent=user_agent,
+        details={"method": "employee_invite", "org_id": str(organization.id)},
+    )
+
+    return Token(access_token=access_token, refresh_token=refresh_token)
+
+
+# ==========================================
 # Legacy endpoints (backward compatibility)
 # ==========================================
 
