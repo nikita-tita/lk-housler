@@ -26,8 +26,19 @@ from app.schemas.organization import (
     EmployeeInvitationsListResponse,
 )
 from app.services.organization.service import OrganizationService
+from app.services.sms.provider import get_sms_provider
+from app.core.config import settings
 
 router = APIRouter()
+
+
+async def send_employee_invite_sms(phone: str, invite_token: str, agency_name: str) -> bool:
+    """Send SMS with employee invitation link"""
+    invite_url = f"{settings.FRONTEND_URL}/invite/{invite_token}"
+    message = f"Приглашение в {agency_name}. Пройдите регистрацию: {invite_url}"
+
+    sms_provider = get_sms_provider()
+    return await sms_provider.send(phone, message)
 
 
 class AddAgentByPhoneRequest(BaseModel):
@@ -419,7 +430,12 @@ async def create_employee_invitation(
         await db.commit()
         await db.refresh(existing_invite)
 
-        # TODO: Send SMS with new link
+        # Send SMS with new link
+        await send_employee_invite_sms(
+            phone=existing_invite.phone,
+            invite_token=existing_invite.invite_token,
+            agency_name=organization.legal_name
+        )
 
         return EmployeeInvitation(
             id=existing_invite.id,
@@ -446,8 +462,12 @@ async def create_employee_invitation(
     await db.commit()
     await db.refresh(invitation)
 
-    # TODO: Send SMS with registration link
-    # sms_service.send_invite_sms(phone, invitation.invite_token, organization.legal_name)
+    # Send SMS with registration link
+    await send_employee_invite_sms(
+        phone=phone,
+        invite_token=invitation.invite_token,
+        agency_name=organization.legal_name
+    )
 
     return EmployeeInvitation(
         id=invitation.id,
@@ -536,7 +556,11 @@ async def resend_employee_invitation(
     invitation.invite_token = secrets.token_urlsafe(32)
     await db.commit()
 
-    # TODO: Send SMS with new link
-    # sms_service.send_invite_sms(invitation.phone, invitation.invite_token, organization.legal_name)
+    # Send SMS with new link
+    await send_employee_invite_sms(
+        phone=invitation.phone,
+        invite_token=invitation.invite_token,
+        agency_name=organization.legal_name
+    )
 
     return {"success": True, "message": "SMS отправлено"}
