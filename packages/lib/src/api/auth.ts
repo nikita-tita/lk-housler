@@ -436,45 +436,75 @@ export async function getEmployeeInvite(token: string): Promise<EmployeeInviteIn
   }
 
   try {
-    const { data } = await authClient.get<ApiResponse<EmployeeInviteInfo>>(`/auth/employee-invite/${token}`);
-    if (!data.success || !data.data) {
-      throw new Error(data.error || 'Приглашение не найдено');
-    }
-    return data.data;
+    // Uses lk.housler.ru API (apiClient), not agent.housler.ru
+    const { data } = await apiClient.get<EmployeeInviteInfo>(`/auth/employee-invite/${token}`);
+    return data;
   } catch (err: unknown) {
-    const axiosError = err as { response?: { data?: { error?: string } } };
-    if (axiosError.response?.data?.error) {
-      throw new Error(axiosError.response.data.error);
+    const axiosError = err as { response?: { data?: { detail?: string } } };
+    if (axiosError.response?.data?.detail) {
+      throw new Error(axiosError.response.data.detail);
     }
     throw err;
   }
 }
 
+// lk.housler.ru returns tokens directly (not wrapped in ApiResponse)
+interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+}
+
 export async function registerEmployee(data: EmployeeRegisterData): Promise<AuthResponse> {
   if (IS_MOCK) {
     console.log('[MOCK] registerEmployee', data);
-    if (typeof window !== 'undefined') localStorage.setItem('housler_mock_role', 'agency_employee');
+    if (typeof window !== 'undefined') localStorage.setItem('housler_mock_role', 'agent');
     return {
       access_token: 'mock_employee_token',
-      user: { ...MOCK_USER, name: data.name, email: data.email, role: 'agency_employee', agency_id: 1, agency: { id: '1', legal_name: 'ООО "Недвижимость Плюс"', short_name: 'Недвижимость Плюс' } } as User,
+      user: { ...MOCK_USER, name: data.name, email: data.email, role: 'agent', agency_id: 1, agency: { id: '1', legal_name: 'ООО "Недвижимость Плюс"', short_name: 'Недвижимость Плюс' } } as User,
     };
   }
 
   try {
-    const { data: response } = await authClient.post<ApiResponse<RegisterData>>('/auth/register-employee', data);
+    // Uses lk.housler.ru API (apiClient), not agent.housler.ru
+    // Convert consents from camelCase to snake_case for backend
+    const backendData = {
+      token: data.token,
+      name: data.name,
+      email: data.email,
+      consents: {
+        personal_data: data.consents.personalData,
+        terms: data.consents.terms,
+        marketing: data.consents.marketing,
+        agency_offer: data.consents.agencyOffer,
+      },
+    };
 
-    if (!response.success || !response.data) {
-      throw new Error(response.error || 'Ошибка регистрации');
-    }
+    const { data: response } = await apiClient.post<TokenResponse>('/auth/register-employee', backendData);
+
+    // Decode user info from token (basic info only)
+    // Full user info will be fetched by getCurrentUser
+    const user: User = {
+      id: 0, // Will be updated when fetching full user
+      name: data.name,
+      email: data.email,
+      phone: '',
+      role: 'agent',
+      is_active: true,
+      created_at: new Date().toISOString(),
+      agency_id: null,
+      agency: null,
+      last_login_at: new Date().toISOString(),
+    };
 
     return {
-      access_token: response.data.token,
-      user: response.data.user,
+      access_token: response.access_token,
+      user,
     };
   } catch (err: unknown) {
-    const axiosError = err as { response?: { data?: { error?: string } } };
-    if (axiosError.response?.data?.error) {
-      throw new Error(axiosError.response.data.error);
+    const axiosError = err as { response?: { data?: { detail?: string } } };
+    if (axiosError.response?.data?.detail) {
+      throw new Error(axiosError.response.data.detail);
     }
     throw err;
   }
