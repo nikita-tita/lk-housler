@@ -3,7 +3,7 @@
 from datetime import datetime
 from enum import Enum as PyEnum
 
-from sqlalchemy import Column, String, Integer, DateTime, Boolean, Text
+from sqlalchemy import Column, String, Integer, DateTime, Boolean, Text, Enum
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
@@ -42,7 +42,7 @@ class User(Base):
     name = Column(String(255), nullable=True)
 
     # Role (uses existing DB enum 'user_role')
-    role = Column(String(20), nullable=False, default="client")
+    role = Column(Enum(UserRole, name='user_role', create_type=False), nullable=False, default=UserRole.CLIENT)
 
     # Status - agent.housler.ru uses is_active boolean, NOT status enum
     is_active = Column(Boolean, default=True, nullable=True)

@@ -253,7 +253,7 @@ from datetime import datetime
 from sqlalchemy import select, and_
 from app.models.organization import PendingEmployee, EmployeeInviteStatus, OrganizationMember, MemberRole, Organization
 from app.schemas.organization import EmployeeInvitePublicInfo, EmployeeRegisterRequest
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.core.security import create_access_token, create_refresh_token
 
 
@@ -348,7 +348,7 @@ async def register_employee(
             phone=invitation.phone,
             email=request.email,
             name=request.name,
-            role="agent",  # Employee gets agent role, organization membership defines access
+            role=UserRole.AGENT,  # Employee gets agent role, organization membership defines access
             is_active=True,
         )
         db.add(user)
