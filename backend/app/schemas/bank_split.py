@@ -292,7 +292,7 @@ class BankSplitDealList(BaseModel):
 
 
 class CreateInvoiceRequest(BaseModel):
-    """Request to create invoice (payment link)"""
+    """Request to create invoice (payment link) - LEGACY: creates invoice for full amount"""
     return_url: Optional[str] = None
 
 
@@ -303,6 +303,103 @@ class CreateInvoiceResponse(BaseModel):
     payment_url: str
     qr_code: Optional[str] = None
     expires_at: Optional[datetime] = None
+
+
+# ============================================
+# Partial Invoice schemas (multiple invoices per deal)
+# ============================================
+
+
+class CreatePartialInvoiceRequest(BaseModel):
+    """Request to create invoice for specific amount
+
+    Allows agent to create multiple invoices:
+    - Advance (e.g., 30% of commission)
+    - Remainder after service
+    - Or full amount at once
+
+    Validation:
+    - Amount must be <= remaining commission (total - already invoiced)
+    - Deal must be in signed status or partially paid
+    """
+    amount: Decimal = Field(..., gt=0, description="Invoice amount in rubles")
+    description: Optional[str] = Field(None, max_length=500, description="Invoice description, e.g. 'Advance 30%'")
+    return_url: Optional[str] = Field(None, description="URL to redirect after payment")
+    milestone_id: Optional[UUID] = Field(None, description="Optional link to milestone")
+
+
+class PartialInvoiceResponse(BaseModel):
+    """Response for partial invoice creation"""
+    invoice_id: UUID
+    deal_id: UUID
+    amount: Decimal
+    description: Optional[str] = None
+    status: str
+    payment_url: Optional[str] = None
+    qr_code: Optional[str] = None
+    expires_at: Optional[datetime] = None
+
+    # Summary
+    total_commission: Decimal  # Total deal commission
+    total_invoiced: Decimal    # Sum of all invoices
+    total_paid: Decimal        # Sum of paid invoices
+    remaining_amount: Decimal  # Amount that can still be invoiced
+
+    class Config:
+        from_attributes = True
+
+
+class InvoiceListItem(BaseModel):
+    """Invoice item in list"""
+    id: UUID
+    invoice_number: Optional[str] = None
+    amount: Decimal
+    description: Optional[str] = None
+    status: str
+    payment_url: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    paid_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class InvoiceListResponse(BaseModel):
+    """List of invoices for a deal"""
+    deal_id: UUID
+    invoices: List[InvoiceListItem]
+
+    # Summary
+    total_commission: Decimal
+    total_invoiced: Decimal
+    total_paid: Decimal
+    remaining_amount: Decimal
+
+
+class PaymentSummaryResponse(BaseModel):
+    """Payment summary for a deal"""
+    deal_id: UUID
+    payment_scheme: str  # prepayment_full / advance_postpay / postpayment_full
+
+    # Commission info
+    total_commission: Decimal
+    commission_type: str  # percent / fixed / mixed
+    commission_percent: Optional[Decimal] = None
+    commission_fixed: Optional[Decimal] = None
+
+    # Advance info (if payment_scheme == advance_postpay)
+    advance_type: Optional[str] = None  # none / advance_fixed / advance_percent
+    advance_amount: Optional[Decimal] = None
+    advance_percent: Optional[Decimal] = None
+    calculated_advance: Optional[Decimal] = None  # Actual advance amount
+
+    # Invoice summary
+    total_invoiced: Decimal
+    total_paid: Decimal
+    remaining_amount: Decimal
+    invoices_count: int
+    paid_invoices_count: int
 
 
 class RegeneratePaymentLinkResponse(BaseModel):

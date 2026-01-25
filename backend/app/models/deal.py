@@ -48,6 +48,19 @@ class AdvanceType(str, PyEnum):
     PERCENT = "advance_percent"   # Процент от комиссии
 
 
+class PaymentScheme(str, PyEnum):
+    """Схема оплаты услуг агента
+
+    Определяет когда и как клиент оплачивает комиссию:
+    - PREPAYMENT_FULL: 100% предоплата до оказания услуги
+    - ADVANCE_POSTPAY: Аванс (часть суммы) + постоплата остатка
+    - POSTPAYMENT_FULL: 100% постоплата после оказания услуги
+    """
+    PREPAYMENT_FULL = "prepayment_full"      # 100% предоплата
+    ADVANCE_POSTPAY = "advance_postpay"      # Аванс + постоплата
+    POSTPAYMENT_FULL = "postpayment_full"    # 100% постоплата
+
+
 class DealStatus(str, PyEnum):
     """Deal status - unified for all payment models"""
 
@@ -239,7 +252,10 @@ class Deal(BaseModel, SoftDeleteMixin):
         """Sync commission_agent from typed fields for backward compatibility."""
         self.commission_agent = self.calculated_commission
 
-    # Аванс
+    # Схема оплаты
+    payment_scheme = Column(String(30), default="prepayment_full", nullable=False)  # prepayment_full/advance_postpay/postpayment_full
+
+    # Аванс (используется при payment_scheme = advance_postpay)
     advance_type = Column(String(20), default="none", nullable=False)  # none/advance_fixed/advance_percent
     advance_amount = Column(Numeric(15, 2), nullable=True)  # Сумма аванса (фикс)
     advance_percent = Column(Numeric(5, 2), nullable=True)  # Процент аванса
@@ -273,6 +289,7 @@ class Deal(BaseModel, SoftDeleteMixin):
     service_completions = relationship("ServiceCompletion", back_populates="deal", cascade="all, delete-orphan")
     split_adjustments = relationship("SplitAdjustment", back_populates="deal", cascade="all, delete-orphan")
     contracts = relationship("SignedContract", back_populates="deal", cascade="all, delete-orphan")
+    invoices = relationship("DealInvoice", back_populates="deal", cascade="all, delete-orphan")
 
 
 class DealParty(BaseModel):

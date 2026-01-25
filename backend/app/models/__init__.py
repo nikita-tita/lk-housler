@@ -9,7 +9,7 @@ from app.models.organization import (
     PendingEmployee,
     EmployeeInviteStatus,
 )
-from app.models.deal import Deal, DealParty, DealTerms, BankDealStatus
+from app.models.deal import Deal, DealParty, DealTerms, BankDealStatus, PaymentScheme
 from app.models.document import ContractTemplate, Document, Signature, AuditLog, SigningToken, ContractLayer
 from app.models.payment import PaymentSchedule, PaymentIntent, Payment
 from app.models.ledger import LedgerEntry, Split, Payout
@@ -24,6 +24,8 @@ from app.models.bank_split import (
     DealMilestone,
     ReleaseTrigger,
     MilestoneStatus,
+    DealInvoice,
+    InvoiceStatus,
 )
 from app.models.consent import DealConsent, ConsentType, CONSENT_TEXTS, get_consent_text
 from app.models.invitation import DealInvitation, InvitationStatus, InvitationRole
@@ -56,6 +58,7 @@ __all__ = [
     "DealParty",
     "DealTerms",
     "BankDealStatus",
+    "PaymentScheme",
     "ContractTemplate",
     "ContractLayer",
     "Document",
@@ -82,6 +85,8 @@ __all__ = [
     "DealMilestone",
     "ReleaseTrigger",
     "MilestoneStatus",
+    "DealInvoice",
+    "InvoiceStatus",
     # Consent models
     "DealConsent",
     "ConsentType",

@@ -30,12 +30,19 @@ from app.schemas.bank_split import (
     ConsentCreate,
     ConsentResponse,
     ConsentCheckResponse,
+    # Partial invoice schemas
+    CreatePartialInvoiceRequest,
+    PartialInvoiceResponse,
+    InvoiceListResponse,
+    InvoiceListItem,
+    PaymentSummaryResponse,
 )
 from app.services.bank_split import (
     BankSplitDealService,
     SplitService,
     InvoiceService,
 )
+from app.services.bank_split.deal_invoice_service import DealInvoiceService
 from app.services.bank_split.deal_service import CreateBankSplitDealInput
 from app.integrations.tbank.webhooks import TBankWebhookHandler
 from app.models.bank_split import BankEvent, PayoutStatus
@@ -348,6 +355,238 @@ async def regenerate_payment_link(
         )
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+# ============================================
+# Partial Invoices (multiple invoices per deal)
+# ============================================
+
+
+@router.post("/{deal_id}/invoices", response_model=PartialInvoiceResponse, status_code=status.HTTP_201_CREATED)
+async def create_partial_invoice(
+    deal_id: UUID,
+    request: CreatePartialInvoiceRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Create invoice for specific amount.
+
+    Allows agent to create multiple invoices:
+    - Advance (e.g., 30% of commission before service)
+    - Remainder (e.g., 70% after service)
+    - Or full amount at once
+
+    Validation:
+    - Amount must be <= remaining commission (total - already invoiced)
+    - Deal must be in signed status or partially paid
+    """
+    deal_service = BankSplitDealService(db)
+    invoice_service = DealInvoiceService(db)
+
+    deal = await deal_service.get_deal(deal_id)
+
+    if not deal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
+
+    if deal.created_by_user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only deal creator can create invoices")
+
+    try:
+        invoice, summary = await invoice_service.create_invoice(
+            deal=deal,
+            amount=request.amount,
+            user=current_user,
+            description=request.description,
+            return_url=request.return_url,
+            milestone_id=request.milestone_id,
+        )
+        await db.commit()
+
+        return PartialInvoiceResponse(
+            invoice_id=invoice.id,
+            deal_id=deal.id,
+            amount=invoice.amount,
+            description=invoice.description,
+            status=invoice.status,
+            payment_url=invoice.payment_link_url,
+            qr_code=invoice.payment_qr_payload,
+            expires_at=invoice.expires_at,
+            total_commission=summary.total_commission,
+            total_invoiced=summary.total_invoiced,
+            total_paid=summary.total_paid,
+            remaining_amount=summary.remaining_amount,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/{deal_id}/invoices", response_model=InvoiceListResponse)
+async def list_invoices(
+    deal_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get list of all invoices for a deal.
+
+    Returns invoices sorted by creation date (newest first)
+    and summary of total/paid/remaining amounts.
+    """
+    deal_service = BankSplitDealService(db)
+    invoice_service = DealInvoiceService(db)
+
+    deal = await deal_service.get_deal(deal_id)
+
+    if not deal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
+
+    invoices = await invoice_service.get_deal_invoices(deal_id)
+    summary = await invoice_service.get_invoice_summary(deal)
+
+    invoice_items = [
+        InvoiceListItem(
+            id=inv.id,
+            invoice_number=inv.invoice_number,
+            amount=inv.amount,
+            description=inv.description,
+            status=inv.status,
+            payment_url=inv.payment_link_url,
+            expires_at=inv.expires_at,
+            paid_at=inv.paid_at,
+            created_at=inv.created_at,
+        )
+        for inv in invoices
+    ]
+
+    return InvoiceListResponse(
+        deal_id=deal_id,
+        invoices=invoice_items,
+        total_commission=summary.total_commission,
+        total_invoiced=summary.total_invoiced,
+        total_paid=summary.total_paid,
+        remaining_amount=summary.remaining_amount,
+    )
+
+
+@router.get("/{deal_id}/payment-summary", response_model=PaymentSummaryResponse)
+async def get_payment_summary(
+    deal_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get payment summary for a deal.
+
+    Returns:
+    - Commission configuration (type, percent, fixed)
+    - Payment scheme (prepayment/advance/postpayment)
+    - Advance configuration (if applicable)
+    - Invoice summary (total/paid/remaining)
+    """
+    deal_service = BankSplitDealService(db)
+    invoice_service = DealInvoiceService(db)
+
+    deal = await deal_service.get_deal(deal_id)
+
+    if not deal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
+
+    summary = await invoice_service.get_invoice_summary(deal)
+
+    # Calculate advance amount if applicable
+    calculated_advance = invoice_service.calculate_advance_amount(deal)
+
+    return PaymentSummaryResponse(
+        deal_id=deal_id,
+        payment_scheme=deal.payment_scheme or "prepayment_full",
+        total_commission=summary.total_commission,
+        commission_type=deal.payment_type or "percent",
+        commission_percent=deal.commission_percent,
+        commission_fixed=deal.commission_fixed,
+        advance_type=deal.advance_type,
+        advance_amount=deal.advance_amount,
+        advance_percent=deal.advance_percent,
+        calculated_advance=calculated_advance,
+        total_invoiced=summary.total_invoiced,
+        total_paid=summary.total_paid,
+        remaining_amount=summary.remaining_amount,
+        invoices_count=summary.invoices_count,
+        paid_invoices_count=summary.paid_invoices_count,
+    )
+
+
+@router.post("/{deal_id}/invoices/{invoice_id}/regenerate-link", response_model=PartialInvoiceResponse)
+async def regenerate_invoice_payment_link(
+    deal_id: UUID,
+    invoice_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Regenerate payment link for specific invoice"""
+    deal_service = BankSplitDealService(db)
+    invoice_service = DealInvoiceService(db)
+
+    deal = await deal_service.get_deal(deal_id)
+
+    if not deal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
+
+    if deal.created_by_user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only deal creator can regenerate links")
+
+    try:
+        new_url = await invoice_service.regenerate_payment_link(invoice_id)
+        await db.commit()
+
+        invoice = await invoice_service.get_invoice(invoice_id)
+        summary = await invoice_service.get_invoice_summary(deal)
+
+        return PartialInvoiceResponse(
+            invoice_id=invoice.id,
+            deal_id=deal.id,
+            amount=invoice.amount,
+            description=invoice.description,
+            status=invoice.status,
+            payment_url=new_url,
+            qr_code=invoice.payment_qr_payload,
+            expires_at=invoice.expires_at,
+            total_commission=summary.total_commission,
+            total_invoiced=summary.total_invoiced,
+            total_paid=summary.total_paid,
+            remaining_amount=summary.remaining_amount,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.delete("/{deal_id}/invoices/{invoice_id}")
+async def cancel_invoice(
+    deal_id: UUID,
+    invoice_id: UUID,
+    reason: Optional[str] = Query(None, description="Cancellation reason"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cancel an unpaid invoice"""
+    deal_service = BankSplitDealService(db)
+    invoice_service = DealInvoiceService(db)
+
+    deal = await deal_service.get_deal(deal_id)
+
+    if not deal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found")
+
+    if deal.created_by_user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only deal creator can cancel invoices")
+
+    try:
+        await invoice_service.cancel_invoice(invoice_id, reason)
+        await db.commit()
+
+        return {"status": "cancelled", "invoice_id": str(invoice_id)}
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.post("/{deal_id}/send-payment-link", response_model=SendPaymentLinkResponse)

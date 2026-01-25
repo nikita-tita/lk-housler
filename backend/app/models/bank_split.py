@@ -95,6 +95,15 @@ class EvidenceStatus(str, PyEnum):
     REJECTED = "rejected"
 
 
+class InvoiceStatus(str, PyEnum):
+    """Статус счета на оплату"""
+    DRAFT = "draft"                # Черновик (не отправлен в банк)
+    PENDING = "pending"            # Ожидает оплаты
+    PAID = "paid"                  # Оплачен
+    EXPIRED = "expired"            # Истёк срок оплаты
+    CANCELLED = "cancelled"        # Отменён
+
+
 class DealSplitRecipient(BaseModel):
     """Deal split participant - who receives money from the deal"""
 
@@ -335,3 +344,57 @@ class DealMilestone(BaseModel):
     # Relationships
     deal = relationship("Deal", back_populates="milestones")
     confirmed_by = relationship("User", foreign_keys=[confirmed_by_user_id])
+
+
+class DealInvoice(BaseModel):
+    """Счёт на оплату по сделке
+
+    Позволяет агенту выставлять несколько счетов на разные суммы:
+    - Аванс (например, 30% от комиссии)
+    - Остаток после оказания услуги
+    - Или полную сумму сразу
+
+    Сценарии:
+    1. Предоплата 100%: один счёт на всю сумму
+    2. Аванс + постоплата: счёт на аванс → услуга → счёт на остаток
+    3. Постоплата: услуга → счёт на всю сумму
+
+    Ограничения:
+    - Сумма всех счетов не может превышать commission_agent сделки
+    - Новый счёт можно создать только если сделка в статусе signed или частично оплачена
+    """
+
+    __tablename__ = "deal_invoices"
+
+    deal_id = Column(UUID(as_uuid=True), ForeignKey("lk_deals.id"), nullable=False, index=True)
+    milestone_id = Column(UUID(as_uuid=True), ForeignKey("deal_milestones.id"), nullable=True, index=True)
+
+    # Идентификация счёта
+    invoice_number = Column(String(50), nullable=True, unique=True)  # Номер счёта (генерируется)
+    description = Column(String(500), nullable=True)  # "Аванс 30%", "Остаток по договору" и т.д.
+
+    # Сумма
+    amount = Column(Numeric(15, 2), nullable=False)
+    currency = Column(String(3), default="RUB", nullable=False)
+
+    # T-Bank интеграция
+    external_deal_id = Column(String(255), nullable=True, index=True)  # T-Bank deal ID
+    external_account_number = Column(String(50), nullable=True)  # Номер счёта в T-Bank
+    payment_link_url = Column(String(500), nullable=True)  # Ссылка на оплату
+    payment_qr_payload = Column(Text, nullable=True)  # QR код
+
+    # Статус и сроки
+    status = Column(String(20), default="draft", nullable=False, index=True)  # draft/pending/paid/expired/cancelled
+    expires_at = Column(DateTime, nullable=True)  # Срок действия ссылки
+
+    # Оплата
+    paid_at = Column(DateTime, nullable=True)
+    paid_amount = Column(Numeric(15, 2), nullable=True)  # Фактически оплаченная сумма
+
+    # Создание
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # Relationships
+    deal = relationship("Deal", back_populates="invoices")
+    milestone = relationship("DealMilestone", foreign_keys=[milestone_id])
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
