@@ -180,7 +180,7 @@ export default function AdminDisputesPage() {
                         <div>
                           <p className="text-xs sm:text-sm text-gray-500">Причина</p>
                           <p className="font-medium text-sm">
-                            {DISPUTE_REASON_LABELS[dispute.reason] || dispute.reason}
+                            {DISPUTE_REASON_LABELS[dispute.reason as keyof typeof DISPUTE_REASON_LABELS] || dispute.reason}
                           </p>
                         </div>
                         <div>
@@ -257,7 +257,7 @@ export default function AdminDisputesPage() {
                 <div>
                   <p className="text-sm text-gray-500 mb-1">Причина спора</p>
                   <p className="font-medium">
-                    {DISPUTE_REASON_LABELS[resolveModal.reason] || resolveModal.reason}
+                    {DISPUTE_REASON_LABELS[resolveModal.reason as keyof typeof DISPUTE_REASON_LABELS] || resolveModal.reason}
                   </p>
                 </div>
 
