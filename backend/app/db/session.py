@@ -52,7 +52,15 @@ SessionLocal = sessionmaker(
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Dependency for getting async database session"""
+    """Dependency for getting async database session.
+
+    ADR: Auto-commit after yield is intentional as safety net.
+    - If endpoint does explicit commit() — session is clean, auto-commit is no-op
+    - If endpoint forgets commit() — auto-commit saves changes
+    - Explicit commits in endpoints are preferred for clarity
+
+    This is NOT a double-commit bug — SQLAlchemy skips empty commits.
+    """
     async with AsyncSessionLocal() as session:
         try:
             yield session

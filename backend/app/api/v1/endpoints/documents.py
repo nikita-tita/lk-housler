@@ -95,6 +95,22 @@ async def download_document(
 
 
 @router.post("/{document_id}/sign")
-async def sign_document(document_id: str):
+async def sign_document(
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """Sign document (TODO: будет реализовано в Signature Service)"""
+    doc_service = DocumentService(db)
+    document = await doc_service.get_by_id(document_id)
+
+    if not document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    deal_service = DealService(db)
+    deal = await deal_service.get_by_id(document.deal_id)
+    if deal:
+        require_deal_access(deal, current_user)
+
+    # TODO: Signature Service integration
     return {"message": f"Sign document {document_id} - TODO in Signature Service"}

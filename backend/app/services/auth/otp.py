@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from app.core.config import settings
-from app.core.security import generate_otp
+from app.core.security import generate_otp, utc_now
 from app.services.sms.provider import SMSProvider
 
 
@@ -100,12 +100,12 @@ class OTPService:
             existing = OTPData.from_dict(json.loads(existing_data))
 
             # Check if blocked
-            if existing.blocked_until and existing.blocked_until > datetime.utcnow():
+            if existing.blocked_until and existing.blocked_until > utc_now():
                 raise ValueError("Слишком много попыток. Попробуйте позже.")
 
             # Check if too many attempts
             if existing.attempts >= settings.OTP_MAX_ATTEMPTS:
-                existing.blocked_until = datetime.utcnow() + timedelta(minutes=settings.OTP_BLOCK_MINUTES)
+                existing.blocked_until = utc_now() + timedelta(minutes=settings.OTP_BLOCK_MINUTES)
                 await redis.setex(key, settings.OTP_BLOCK_MINUTES * 60, json.dumps(existing.to_dict()))
                 raise ValueError("Слишком много попыток. Блокировка на 10 минут.")
 
@@ -119,7 +119,7 @@ class OTPService:
         else:
             code = generate_otp(settings.OTP_LENGTH)
 
-        expires_at = datetime.utcnow() + timedelta(minutes=settings.OTP_EXPIRE_MINUTES)
+        expires_at = utc_now() + timedelta(minutes=settings.OTP_EXPIRE_MINUTES)
 
         # Create OTP data, preserving attempt count from previous session
         otp_data = OTPData(
@@ -153,11 +153,11 @@ class OTPService:
         otp_data = OTPData.from_dict(json.loads(data))
 
         # Check if blocked
-        if otp_data.blocked_until and otp_data.blocked_until > datetime.utcnow():
+        if otp_data.blocked_until and otp_data.blocked_until > utc_now():
             raise ValueError("Слишком много попыток. Попробуйте позже.")
 
         # Check if expired
-        if otp_data.expires_at < datetime.utcnow():
+        if otp_data.expires_at < utc_now():
             await redis.delete(key)
             raise ValueError("Срок действия кода истёк. Запросите новый код.")
 
@@ -171,7 +171,7 @@ class OTPService:
         # Verify code
         if otp_data.code != code:
             if otp_data.attempts >= settings.OTP_MAX_ATTEMPTS:
-                otp_data.blocked_until = datetime.utcnow() + timedelta(minutes=settings.OTP_BLOCK_MINUTES)
+                otp_data.blocked_until = utc_now() + timedelta(minutes=settings.OTP_BLOCK_MINUTES)
 
             # Update Redis
             remaining_ttl = await redis.ttl(key)

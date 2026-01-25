@@ -36,8 +36,8 @@ def verify_webhook_signature(payload: bytes, signature: str, secret: str) -> boo
         True if signature is valid
     """
     if not secret:
-        logger.warning("TBANK_WEBHOOK_SECRET not configured, skipping signature verification")
-        return True
+        logger.error("TBANK_WEBHOOK_SECRET not configured - rejecting webhook (fail-closed)")
+        return False
 
     if not signature:
         logger.warning("No signature provided in webhook request")

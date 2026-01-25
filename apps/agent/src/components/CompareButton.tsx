@@ -44,6 +44,7 @@ export function CompareButton({ offerId, className = '', size = 'md' }: Props) {
         }
         ${className}
       `}
+      aria-label={inCompare ? 'Убрать из сравнения' : canAddMore ? 'Добавить к сравнению' : 'Максимум 4 объекта'}
       title={inCompare ? 'Убрать из сравнения' : canAddMore ? 'Добавить к сравнению' : 'Максимум 4 объекта'}
     >
       {inCompare ? (

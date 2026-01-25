@@ -86,8 +86,8 @@ class TBankWebhookHandler:
             True if signature is valid
         """
         if not self.secret_key:
-            logger.warning("Webhook secret not configured, skipping signature verification")
-            return True
+            logger.error("Webhook secret not configured - rejecting webhook (fail-closed)")
+            return False
 
         # Get signature from payload if not provided
         provided_signature = signature or payload.get("Token") or payload.get("Signature")

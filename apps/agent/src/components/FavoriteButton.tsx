@@ -51,6 +51,7 @@ export function FavoriteButton({ offerId, className = '', size = 'md' }: Favorit
     <button
       onClick={handleClick}
       className={`${sizeClasses[size]} flex items-center justify-center rounded-full bg-white/90 hover:bg-white shadow-sm transition-all ${className}`}
+      aria-label={isFav ? 'Убрать из избранного' : 'Добавить в избранное'}
       title={isFav ? 'Убрать из избранного' : 'Добавить в избранное'}
     >
       <svg

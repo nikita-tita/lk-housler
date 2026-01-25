@@ -48,8 +48,10 @@ lk.housler.ru (frontend) → agent.housler.ru/api/auth/* → housler_agent (DB)
 **Frontend:** Next.js 14 (App Router) + Tailwind + Zustand
 
 ```
-apps/lk/          # Next.js frontend
+apps/lk/          # Next.js frontend (lk.housler.ru)
+apps/agent/       # Next.js frontend (agent.housler.ru)
 packages/lib/     # Shared API client (@housler/lib)
+packages/ui/      # Shared UI components (@housler/ui)
 backend/          # FastAPI backend
 ```
 
@@ -58,17 +60,21 @@ backend/          # FastAPI backend
 ## CODE PATTERNS
 
 ```python
-# Rate limiting
+# Rate limiting (async function, NOT decorator)
 from app.core.rate_limit import rate_limit_otp_send
-@rate_limit_otp_send  # 3/min per phone
+await rate_limit_otp_send(request, phone=phone)  # 3/min per phone
 
 # Audit
 from app.core.audit import log_audit_event, AuditEvent
 log_audit_event(AuditEvent.LOGIN_SUCCESS, user_id=str(id), ip_address=ip)
 
-# PII
-from housler_crypto import HouslerCrypto
-crypto.encrypt(phone, "phone")
+# PII Encryption (use wrapper, not direct import)
+from app.core.encryption import encrypt_phone, decrypt_phone
+encrypted = encrypt_phone(phone)
+
+# Timezone-aware datetime (Python 3.12+ compatible)
+from app.core.security import utc_now
+now = utc_now()  # instead of datetime.utcnow()
 ```
 
 ---

@@ -166,6 +166,17 @@ async def payment_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         logger.warning(f"Payment webhook validation error: {e}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        # Log error but return 200 to avoid webhook retry storms
-        logger.error(f"Payment webhook error: {e}", exc_info=True)
-        return {"status": "error", "message": "Webhook processing failed"}
+        # ADR: Return 200 to avoid webhook retry storms from payment provider.
+        # Errors are logged for monitoring/alerting. Consider adding DLQ for manual handling.
+        # See T-Bank webhook handler for DLQ pattern: bank_split.py:1620-1648
+        logger.error(
+            f"Payment webhook processing failed: {e}",
+            exc_info=True,
+            extra={
+                "provider_intent_id": data.get("provider_intent_id") if "data" in dir() else None,
+                "provider_tx_id": data.get("provider_tx_id") if "data" in dir() else None,
+                "webhook_error": str(e),
+            },
+        )
+        # TODO: Add DLQ for failed payment webhooks (similar to WebhookDLQ model)
+        return {"status": "error", "message": "Webhook processing failed", "logged": True}

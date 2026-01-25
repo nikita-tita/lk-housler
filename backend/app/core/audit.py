@@ -5,6 +5,8 @@ from datetime import datetime
 from typing import Optional, Any, Dict
 from enum import Enum
 
+from app.core.security import utc_now
+
 
 class AuditEvent(str, Enum):
     """Security audit event types"""
@@ -73,7 +75,7 @@ def log_audit_event(
         success: Whether the action was successful
     """
     audit_record = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": utc_now().isoformat(),
         "event": event.value,
         "success": success,
         "user_id": user_id,

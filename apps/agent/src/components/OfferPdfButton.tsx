@@ -268,6 +268,7 @@ export function OfferPdfButton({ offer, className = '', variant = 'default' }: O
           ? `w-10 h-10 flex items-center justify-center rounded-full bg-[var(--color-bg-gray)] hover:bg-gray-200 transition-colors ${className}`
           : `btn btn-secondary inline-flex items-center gap-2 ${className}`
         }
+        aria-label={isGenerating ? 'Генерация PDF...' : 'Скачать PDF'}
         title="Скачать PDF"
       >
         {isGenerating ? (

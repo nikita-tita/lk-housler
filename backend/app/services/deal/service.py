@@ -65,8 +65,13 @@ class DealService:
         total_result = await self.db.execute(count_stmt)
         total = total_result.scalar()
 
-        # Paginate
-        stmt = stmt.order_by(Deal.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+        # Paginate and eager-load relationships to avoid N+1
+        stmt = (
+            stmt.options(selectinload(Deal.parties), selectinload(Deal.terms))
+            .order_by(Deal.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
 
         result = await self.db.execute(stmt)
         deals = list(result.scalars().all())
@@ -109,8 +114,13 @@ class DealService:
         total_result = await self.db.execute(count_stmt)
         total = total_result.scalar()
 
-        # Paginate
-        stmt = stmt.order_by(Deal.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+        # Paginate and eager-load relationships to avoid N+1
+        stmt = (
+            stmt.options(selectinload(Deal.parties), selectinload(Deal.terms))
+            .order_by(Deal.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
 
         result = await self.db.execute(stmt)
         deals = list(result.scalars().all())

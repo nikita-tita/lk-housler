@@ -223,9 +223,10 @@ class TokenBlacklist:
 
         if payload and payload.get("exp"):
             # Calculate actual TTL based on token expiry
-            from datetime import datetime
-            exp_time = datetime.fromtimestamp(payload["exp"])
-            remaining = (exp_time - datetime.utcnow()).total_seconds()
+            from datetime import datetime, timezone
+            from app.core.security import utc_now
+            exp_time = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+            remaining = (exp_time - utc_now()).total_seconds()
             ttl_seconds = max(int(remaining), 1)  # At least 1 second
 
         # Use token hash as key (shorter, no special chars)

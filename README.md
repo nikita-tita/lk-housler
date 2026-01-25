@@ -159,7 +159,7 @@ curl -X POST http://localhost:8000/api/v1/auth/agent/sms/send \
 
 curl -X POST http://localhost:8000/api/v1/auth/agent/sms/verify \
   -H "Content-Type: application/json" \
-  -d '{"phone": "+79999123456", "code": "111111"}'
+  -d '{"phone": "+79999123456", "code": "123456"}'
 
 # Email Auth (Client)
 curl -X POST http://localhost:8000/api/v1/auth/client/email/send \
@@ -168,7 +168,7 @@ curl -X POST http://localhost:8000/api/v1/auth/client/email/send \
 
 curl -X POST http://localhost:8000/api/v1/auth/client/email/verify \
   -H "Content-Type: application/json" \
-  -d '{"email": "client@test.com", "code": "111111"}'
+  -d '{"email": "client@test.com", "code": "123456"}'
 ```
 
 ## Документация
@@ -274,7 +274,7 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 ### SMS Test Mode
 - **Телефоны**: `+79999000000` - `+79999999999`
-- **Коды**: `111111` - `666666`
+- **Код**: `123456` (фиксированный, настраивается через `SMS_TEST_CODE`)
 
 ### Email Test Mode
 - Все Email логируются в консоль (если `EMAIL_PROVIDER=mock`)
