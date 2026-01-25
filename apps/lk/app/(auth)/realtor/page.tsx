@@ -336,9 +336,6 @@ export default function RealtorLoginPage() {
             </Link>
           </p>
 
-          <p className="text-xs text-[var(--color-text-light)] text-center border-t border-[var(--color-border)] pt-4 mt-4">
-            Тест: номера 79999xxxxxx, коды 111111-666666
-          </p>
         </form>
       )}
 
