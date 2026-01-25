@@ -341,23 +341,32 @@ export async function registerAgent(data: AgentRegisterData): Promise<AuthRespon
     };
   }
 
-  try {
-    const { data: response } = await authClient.post<ApiResponse<RegisterData>>('/auth/register-realtor', data);
+  // Use native fetch instead of axios for better cross-origin compatibility
+  const AUTH_API_URL = authClient.defaults.baseURL || 'https://agent.housler.ru/api';
 
-    if (!response.success || !response.data) {
-      throw new Error(response.error || 'Ошибка регистрации');
+  try {
+    const response = await fetch(`${AUTH_API_URL}/auth/register-realtor`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(data),
+    });
+
+    const result: ApiResponse<RegisterData> = await response.json();
+
+    if (!result.success || !result.data) {
+      throw new Error(result.error || 'Ошибка регистрации');
     }
 
     return {
-      access_token: response.data.token,
-      user: response.data.user,
+      access_token: result.data.token,
+      user: result.data.user,
     };
   } catch (err: unknown) {
-    const axiosError = err as { response?: { data?: { error?: string } } };
-    if (axiosError.response?.data?.error) {
-      throw new Error(axiosError.response.data.error);
+    if (err instanceof Error) {
+      throw err;
     }
-    throw err;
+    throw new Error('Ошибка регистрации');
   }
 }
 
