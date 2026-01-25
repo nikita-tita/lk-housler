@@ -33,6 +33,15 @@
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+## Типы авторизации
+
+| Тип пользователя | Метод входа | API | Страница |
+|------------------|-------------|-----|----------|
+| Клиент | SMS код | agent.housler.ru | `/login/client` |
+| Агент (риелтор) | SMS код | agent.housler.ru | `/realtor` |
+| Сотрудник агентства | SMS код | agent.housler.ru | `/login/employee` |
+| Администратор агентства | Email + пароль | lk.housler.ru | `/login/agency` |
+
 ## Критические зависимости
 
 | Компонент | Расположение | Влияние |
@@ -43,49 +52,193 @@
 | База данных | `housler_agent` | Общая для обоих проектов |
 | Таблица users | `agent-postgres` | Общая для обоих проектов |
 
-## Как это работает
+---
 
-### 1. SMS авторизация (агенты)
+## API Эндпоинты
 
-```
-lk.housler.ru/login
-    │
-    ├── POST https://agent.housler.ru/api/auth/request-sms
-    │       Body: { "phone": "79991234567" }
-    │       Response: { "success": true, "message": "Код отправлен" }
-    │
-    └── POST https://agent.housler.ru/api/auth/verify-sms
-            Body: { "phone": "79991234567", "code": "123456" }
-            Response: { "success": true, "token": "...", "user": {...} }
-```
+### 1. SMS авторизация (клиенты, агенты, сотрудники)
 
-### 2. Email авторизация (клиенты)
+Все SMS авторизации проходят через `agent.housler.ru`:
 
-```
-lk.housler.ru/login
-    │
-    ├── POST https://agent.housler.ru/api/auth/request-code
-    │       Body: { "email": "client@mail.ru" }
-    │
-    └── POST https://agent.housler.ru/api/auth/verify-code
-            Body: { "email": "client@mail.ru", "code": "123456" }
+```bash
+# Запросить SMS код
+POST https://agent.housler.ru/api/auth/request-sms
+Content-Type: application/json
+{"phone": "79991234567"}
+
+# Ответ
+{"success": true, "data": {"message": "Код отправлен", "codeSentAt": "..."}}
 ```
 
-### 3. Пароль (агентства)
+```bash
+# Подтвердить код
+POST https://agent.housler.ru/api/auth/verify-sms
+Content-Type: application/json
+{"phone": "79991234567", "code": "123456"}
 
+# Ответ (существующий пользователь)
+{"success": true, "data": {"token": "...", "user": {...}}}
+
+# Ответ (новый пользователь)
+{"success": true, "data": {"isNewUser": true, "message": "Заполните профиль"}}
 ```
-lk.housler.ru/login
-    │
-    └── POST https://agent.housler.ru/api/auth/login-agency
-            Body: { "email": "admin@agency.ru", "password": "..." }
+
+### 2. Email + Пароль (администраторы агентств)
+
+```bash
+POST https://lk.housler.ru/api/v1/auth/agency/login
+Content-Type: application/json
+{"email": "admin@agency.ru", "password": "..."}
+
+# Ответ
+{"access_token": "...", "refresh_token": "...", "token_type": "bearer"}
 ```
+
+### 3. Приглашения сотрудников
+
+Приглашения сотрудников обрабатываются на `lk.housler.ru`:
+
+```bash
+# Создать приглашение (требует токен админа агентства)
+POST https://lk.housler.ru/api/v1/organizations/{org_id}/employee-invitations
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+{"phone": "79991234567", "name": "Иван Петров", "position": "Риелтор"}
+
+# Ответ
+{
+  "id": "uuid",
+  "phone": "79991234567",
+  "inviteToken": "abc123...",
+  "expiresAt": "2026-02-01T00:00:00"
+}
+```
+
+```bash
+# Получить информацию о приглашении (публичный эндпоинт)
+GET https://lk.housler.ru/api/v1/auth/employee-invite/{token}
+
+# Ответ
+{
+  "token": "abc123...",
+  "agencyName": "ООО Агентство",
+  "phone": "79991234567",
+  "position": "Риелтор",
+  "isExpired": false
+}
+```
+
+```bash
+# Завершить регистрацию сотрудника
+POST https://lk.housler.ru/api/v1/auth/register-employee
+Content-Type: application/json
+{
+  "token": "abc123...",
+  "name": "Иван Петров",
+  "email": "ivan@mail.ru",
+  "consents": {"personal_data": true, "terms": true, "agency_offer": true}
+}
+
+# Ответ
+{"access_token": "...", "refresh_token": "...", "token_type": "bearer"}
+```
+
+---
 
 ## Тестовые данные
 
-| Тип | Идентификатор | Код |
-|-----|---------------|-----|
-| SMS | `79999xxxxxx` | `111111`, `222222`, `333333`, `444444`, `555555`, `666666` |
+| Тип | Идентификатор | Коды |
+|-----|---------------|------|
+| SMS (все роли) | `79999xxxxxx` | `111111`, `222222`, `333333`, `444444`, `555555`, `666666` |
 | Email | `*@test.housler.ru` | `111111`, `222222`, `333333`, `444444`, `555555`, `666666` |
+
+### Примеры тестовых аккаунтов:
+
+| Телефон | Роль | Код |
+|---------|------|-----|
+| `79999000001` | Агент | любой из 6 |
+| `79999000002` | Агент | любой из 6 |
+| `79999100001` | Клиент | любой из 6 |
+| `79999100002` | Клиент | любой из 6 |
+
+### Тестовое агентство:
+
+| Поле | Значение |
+|------|----------|
+| ID | `b2d15739-919b-4ec9-bac6-b1112913d831` |
+| Название | Test Agency |
+| Админ email | `admin@test.housler.ru` |
+| Админ пароль | `test1234` |
+
+---
+
+## Flow авторизации
+
+### Клиент / Агент / Сотрудник (SMS)
+
+```
+┌─────────────┐     ┌─────────────────┐     ┌─────────────┐
+│   Frontend  │────>│ agent.housler.ru│────>│  PostgreSQL │
+│ lk.housler  │     │   /auth/...     │     │ housler_agent│
+└─────────────┘     └─────────────────┘     └─────────────┘
+      │                                            │
+      │  1. request-sms (phone)                    │
+      │  2. verify-sms (phone, code)               │
+      │  3. Получить token + user                  │
+      └────────────────────────────────────────────┘
+```
+
+### Администратор агентства (пароль)
+
+```
+┌─────────────┐     ┌─────────────────┐     ┌─────────────┐
+│   Frontend  │────>│  lk.housler.ru  │────>│  PostgreSQL │
+│ lk.housler  │     │ /auth/agency/.. │     │ housler_agent│
+└─────────────┘     └─────────────────┘     └─────────────┘
+      │                                            │
+      │  1. agency/login (email, password)         │
+      │  2. Получить access_token + refresh_token  │
+      └────────────────────────────────────────────┘
+```
+
+### Регистрация сотрудника (приглашение)
+
+```
+┌────────────┐     ┌─────────────────┐     ┌─────────────┐
+│   Админ    │────>│  lk.housler.ru  │────>│  PostgreSQL │
+│ агентства  │     │ POST /invite    │     │   pending_  │
+└────────────┘     └─────────────────┘     │  employees  │
+                                           └─────────────┘
+      │
+      │  1. Создать приглашение
+      │  2. Отправить ссылку сотруднику
+      │
+      ▼
+┌────────────┐     ┌─────────────────┐     ┌─────────────┐
+│ Сотрудник  │────>│  lk.housler.ru  │────>│  PostgreSQL │
+│            │     │ /register-emp.  │     │   users +   │
+└────────────┘     └─────────────────┘     │   org_memb  │
+                                           └─────────────┘
+      │
+      │  1. GET /employee-invite/{token}
+      │  2. POST /register-employee
+      │  3. Получить токены
+```
+
+---
+
+## Проверка ролей
+
+При входе проверяется роль пользователя:
+
+| Страница входа | Разрешённые роли |
+|----------------|------------------|
+| `/login/client` | `client` |
+| `/realtor` | `agent` |
+| `/login/employee` | `agent` (с членством в организации) |
+| `/login/agency` | `agency_admin` |
+
+---
 
 ## Правила изменений
 
@@ -94,22 +247,29 @@ lk.housler.ru/login
 1. **Эндпоинты auth API** в `agent.housler.ru`
    - `/api/auth/request-sms`
    - `/api/auth/verify-sms`
-   - `/api/auth/request-code`
-   - `/api/auth/verify-code`
-   - `/api/auth/login-agency`
-   - `/api/auth/me`
 
-2. **Формат ответа** auth endpoints
+2. **Эндпоинты auth API** в `lk.housler.ru`
+   - `/api/v1/auth/agency/login`
+   - `/api/v1/auth/employee-invite/{token}`
+   - `/api/v1/auth/register-employee`
 
-3. **Структуру таблицы `users`** в БД
+3. **Формат ответа** auth endpoints
 
-4. **JWT_SECRET** и **ENCRYPTION_KEY**
+4. **Структуру таблиц**:
+   - `users`
+   - `organizations`
+   - `organization_members`
+   - `pending_employees`
 
-### При изменении auth в agent.housler.ru:
+5. **JWT_SECRET** и **ENCRYPTION_KEY**
 
-1. Проверить совместимость с `lk.housler.ru`
+### При изменении auth:
+
+1. Проверить совместимость с обоими проектами
 2. Обновить оба проекта одновременно
 3. Задеплоить оба проекта
+
+---
 
 ## Конфигурация
 
@@ -120,6 +280,7 @@ DB_HOST=postgres
 DB_NAME=housler_agent
 JWT_SECRET=<из 1Password: "Housler JWT Secret">
 ENCRYPTION_KEY=<из 1Password: "Housler Encryption Key">
+ENABLE_TEST_ACCOUNTS=true  # для staging/demo
 ```
 
 ### lk.housler.ru (.env)
@@ -138,12 +299,48 @@ ENCRYPTION_KEY=<из 1Password: "Housler Encryption Key">
 
 > **Security:** Никогда не коммитьте реальные секреты. Все credentials хранятся в 1Password.
 
-### lk.housler.ru (frontend)
+---
 
-```typescript
-// lib/api/client.ts
-const AUTH_API_URL = 'https://agent.housler.ru/api';
+## Диагностика
+
+### Проверить авторизацию SMS:
+
+```bash
+# Отправить SMS (тестовый номер)
+curl -X POST https://agent.housler.ru/api/auth/request-sms \
+  -H "Content-Type: application/json" \
+  -d '{"phone": "79999222222"}'
+
+# Проверить код
+curl -X POST https://agent.housler.ru/api/auth/verify-sms \
+  -H "Content-Type: application/json" \
+  -d '{"phone": "79999222222", "code": "111111"}'
 ```
+
+### Проверить авторизацию агентства:
+
+```bash
+curl -X POST https://lk.housler.ru/api/v1/auth/agency/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@test.housler.ru", "password": "test1234"}'
+```
+
+### Проверить приглашение сотрудника:
+
+```bash
+# Получить токен админа
+TOKEN=$(curl -s -X POST https://lk.housler.ru/api/v1/auth/agency/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@test.housler.ru","password":"test1234"}' | jq -r '.access_token')
+
+# Создать приглашение
+curl -X POST "https://lk.housler.ru/api/v1/organizations/b2d15739-919b-4ec9-bac6-b1112913d831/employee-invitations" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"phone":"79999333444","name":"Тест","position":"Агент"}'
+```
+
+---
 
 ## Docker сети
 
@@ -164,72 +361,9 @@ lkhouslerru_lk-network
     └── lk-nginx
 ```
 
-## Диагностика
-
-### Проверить подключение lk-backend к agent-postgres:
-
-```bash
-ssh -i ~/.ssh/id_housler root@95.163.227.26
-docker exec lk-backend python -c "
-from app.db.session import engine
-from sqlalchemy import text
-with engine.connect() as conn:
-    result = conn.execute(text('SELECT COUNT(*) FROM users'))
-    print(f'Users count: {result.scalar()}')
-"
-```
-
-### Проверить сети контейнера:
-
-```bash
-docker inspect lk-backend --format '{{json .NetworkSettings.Networks}}' | jq
-```
-
-### Тест авторизации:
-
-```bash
-# Отправить SMS
-curl -X POST https://agent.housler.ru/api/auth/request-sms \
-  -H "Content-Type: application/json" \
-  -d '{"phone": "79999222222"}'
-
-# Проверить код
-curl -X POST https://agent.housler.ru/api/auth/verify-sms \
-  -H "Content-Type: application/json" \
-  -d '{"phone": "79999222222", "code": "111111"}'
-```
-
-## Общие компоненты (Shared Components)
-
-Некоторые UI компоненты синхронизированы между проектами:
-
-| Компонент | agent.housler.ru | lk.housler.ru |
-|-----------|-----------------|---------------|
-| Footer | `src/components/Footer.tsx` | `components/shared/Footer.tsx` |
-| CookieBanner | `src/components/CookieBanner.tsx` | `components/shared/CookieBanner.tsx` |
-
-### Правила синхронизации
-
-1. **Источник правды** - `agent.housler.ru`
-2. При изменении компонента в agent.housler.ru - скопировать в lk.housler.ru
-3. Компоненты в lk.housler.ru содержат `@sync-with` комментарий с путем к оригиналу
-4. Ссылки на документы ведут на `agent.housler.ru` (там хранятся все правовые документы)
-
-### Чеклист при обновлении:
-
-```
-[ ] Изменен компонент в agent.housler.ru
-[ ] Скопировано изменение в lk.housler.ru
-[ ] Проверено на обоих сайтах
-[ ] Задеплоены оба проекта
-```
-
-## Контакты
-
-При проблемах с авторизацией проверять ОБА проекта:
-- `agent.housler.ru` - основной auth provider
-- `lk.housler.ru` - использует auth через API
+---
 
 ## Связанные документы
 
-- [housler_pervichka/docs/SHARED/AUTH_API.md](../../housler_pervichka/docs/SHARED/AUTH_API.md) — Полный API reference авторизации
+- [AUTH_SPECIFICATION.md](./AUTH_SPECIFICATION.md) — Спецификация авторизации
+- [TESTING_GUIDE.md](./TESTING_GUIDE.md) — Руководство по тестированию
