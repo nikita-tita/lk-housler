@@ -48,9 +48,12 @@ pytz==2023.3
 # Excel Export
 openpyxl==3.1.2
 
-# OCR (Passport Recognition)
-easyocr==1.7.1
-opencv-python-headless==4.9.0.80
+# OCR (Passport Recognition) - disabled, adds ~3GB dependencies
+# TODO: uncomment when passport OCR is implemented
+# easyocr==1.7.1
+# opencv-python-headless==4.9.0.80
+
+# Image processing
 Pillow==10.2.0
 
 # PDF Generation
