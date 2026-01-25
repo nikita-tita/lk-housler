@@ -209,7 +209,7 @@ class Deal(BaseModel, SoftDeleteMixin):
     coagent = relationship("User", foreign_keys=[coagent_user_id])
     parties = relationship("DealParty", back_populates="deal", cascade="all, delete-orphan")
     terms = relationship("DealTerms", back_populates="deal", uselist=False, cascade="all, delete-orphan")
-    documents = relationship("Document", back_populates="deal", cascade="all, delete-orphan")
+    documents = relationship("Document", back_populates="deal", cascade="all, delete-orphan", foreign_keys="[Document.deal_id]")
     payment_schedules = relationship("PaymentSchedule", back_populates="deal", cascade="all, delete-orphan")
 
     # Тип объекта недвижимости
