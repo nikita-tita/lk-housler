@@ -1,7 +1,7 @@
 """Add act signing fields for client confirmation (UC-3.2)
 
-Revision ID: 026_add_act_signing_fields
-Revises: 025_add_fiscal_receipts
+Revision ID: 033_add_act_signing_fields
+Revises: 032_add_pending_employees
 Create Date: 2026-01-25
 
 UC-3.2: Client confirmation through Act signing
@@ -31,8 +31,8 @@ from sqlalchemy.dialects.postgresql import UUID
 
 
 # revision identifiers, used by Alembic.
-revision: str = '026_add_act_signing_fields'
-down_revision: Union[str, None] = '025_add_fiscal_receipts'
+revision: str = '033_add_act_signing_fields'
+down_revision: Union[str, None] = '032_add_pending_employees'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
