@@ -8,6 +8,10 @@ const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 const RETRYABLE_STATUS_CODES = [408, 500, 502, 503, 504];
 
+// Token refresh state (prevent multiple simultaneous refresh attempts)
+let isRefreshing = false;
+let refreshPromise: Promise<string | null> | null = null;
+
 // Main API client for lk.housler.ru
 export const apiClient = axios.create({
   baseURL: API_URL,
@@ -65,6 +69,77 @@ const generateRequestId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };
 
+/**
+ * Attempt to refresh access token using httpOnly refresh_token cookie.
+ * Uses raw axios to avoid interceptor loops.
+ */
+const attemptTokenRefresh = async (): Promise<string | null> => {
+  // If already refreshing, wait for that to complete
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      // Use raw axios to avoid triggering our interceptors
+      const response = await axios.post<{ access_token: string }>(
+        `${API_URL}/auth/refresh`,
+        {},
+        { withCredentials: true }
+      );
+
+      const newToken = response.data.access_token;
+
+      // Store for backward compatibility
+      if (typeof window !== 'undefined' && newToken) {
+        localStorage.setItem('housler_token', newToken);
+      }
+
+      return newToken;
+    } catch {
+      return null;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+};
+
+/**
+ * Get redirect URL based on user role stored in localStorage.
+ */
+const getAuthRedirectUrl = (): string => {
+  if (typeof window === 'undefined') return '/';
+
+  const role = localStorage.getItem('housler_user_role');
+
+  switch (role) {
+    case 'agent':
+      return '/realtor';
+    case 'client':
+      return '/client';
+    case 'agency':
+    case 'agency_owner':
+    case 'agency_admin':
+      return '/agency';
+    default:
+      return '/';
+  }
+};
+
+/**
+ * Clear auth state and redirect to login.
+ */
+const handleAuthFailure = (): void => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('housler_token');
+    window.location.href = getAuthRedirectUrl();
+  }
+};
+
 // Add token and request ID to both clients
 const addAuthToken = (config: InternalAxiosRequestConfig) => {
   // Add X-Request-ID for distributed tracing
@@ -86,16 +161,30 @@ authClient.interceptors.request.use(addAuthToken, (error) => Promise.reject(erro
 authClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    // Try to retry the request
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+    // Handle 401 - try to refresh token
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      const newToken = await attemptTokenRefresh();
+      if (newToken) {
+        // Retry original request with new token
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return authClient.request(originalRequest);
+      }
+
+      // Refresh failed - clear auth but don't redirect (authClient is for login flows)
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('housler_token');
+      }
+      return Promise.reject(error);
+    }
+
+    // Try to retry the request for other errors
     try {
       return await retryRequest(error, authClient as typeof axios);
     } catch {
-      // Retry failed or not retryable
-      if (error.response?.status === 401) {
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('housler_token');
-        }
-      }
       return Promise.reject(error);
     }
   }
@@ -104,22 +193,38 @@ authClient.interceptors.response.use(
 // Request interceptor - добавляем JWT token и X-Request-ID
 apiClient.interceptors.request.use(addAuthToken, (error) => Promise.reject(error));
 
-// Response interceptor - retry + обработка ошибок
+// Response interceptor - retry + auto-refresh + обработка ошибок
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    // Try to retry the request
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+    // Handle 401 - try to refresh token first
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      // Skip refresh for the refresh endpoint itself
+      if (originalRequest.url?.includes('/auth/refresh')) {
+        handleAuthFailure();
+        return Promise.reject(error);
+      }
+
+      originalRequest._retry = true;
+
+      const newToken = await attemptTokenRefresh();
+      if (newToken) {
+        // Retry original request with new token
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return apiClient.request(originalRequest);
+      }
+
+      // Refresh failed - redirect to login
+      handleAuthFailure();
+      return Promise.reject(error);
+    }
+
+    // Try to retry the request for other errors
     try {
       return await retryRequest(error, apiClient as typeof axios);
     } catch {
-      // Retry failed or not retryable
-      if (error.response?.status === 401) {
-        // Unauthorized - очистить токен и редирект на login
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('housler_token');
-          window.location.href = '/login';
-        }
-      }
       return Promise.reject(error);
     }
   }

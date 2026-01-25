@@ -509,3 +509,64 @@ export async function registerEmployee(data: EmployeeRegisterData): Promise<Auth
     throw err;
   }
 }
+
+// ==========================================
+// Token Refresh
+// ==========================================
+
+interface RefreshResponse {
+  access_token: string;
+}
+
+/**
+ * Refresh access token using httpOnly refresh_token cookie.
+ * Called automatically by axios interceptor on 401.
+ *
+ * @returns new access token or null if refresh failed
+ */
+export async function refreshAccessToken(): Promise<string | null> {
+  if (IS_MOCK) {
+    console.log('[MOCK] refreshAccessToken');
+    return 'mock_refreshed_token';
+  }
+
+  try {
+    // POST to /auth/refresh - refresh_token is sent automatically via httpOnly cookie
+    const { data } = await apiClient.post<RefreshResponse>('/auth/refresh');
+
+    // Store new access token for backward compatibility
+    if (typeof window !== 'undefined' && data.access_token) {
+      localStorage.setItem('housler_token', data.access_token);
+    }
+
+    return data.access_token;
+  } catch {
+    // Refresh failed - token expired or invalid
+    return null;
+  }
+}
+
+/**
+ * Get redirect URL based on user role stored in localStorage.
+ * Falls back to landing page if role unknown.
+ */
+export function getAuthRedirectUrl(): string {
+  if (typeof window === 'undefined') return '/';
+
+  // Try to get role from localStorage (set during login)
+  const role = localStorage.getItem('housler_user_role');
+
+  switch (role) {
+    case 'agent':
+      return '/realtor';
+    case 'client':
+      return '/client';
+    case 'agency':
+    case 'agency_owner':
+    case 'agency_admin':
+      return '/agency';
+    default:
+      // Landing page with role selection
+      return '/';
+  }
+}

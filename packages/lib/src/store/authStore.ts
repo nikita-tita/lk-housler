@@ -25,10 +25,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: true,
 
   setAuth: (token, user) => {
-    // Store token in localStorage for backward compatibility
+    // Store token and role in localStorage for backward compatibility
     // New auth flow uses httpOnly cookies (set by server)
     if (typeof window !== 'undefined') {
       localStorage.setItem('housler_token', token);
+      // Store role for redirect after session expiry
+      if (user.role) {
+        localStorage.setItem('housler_user_role', user.role);
+      }
     }
     set({
       token,
@@ -41,6 +45,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('housler_token');
+      localStorage.removeItem('housler_user_role');
     }
     checkAuthPromise = null;
     set({
@@ -82,6 +87,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Get token from localStorage if available (backward compatibility)
         const token = localStorage.getItem('housler_token');
 
+        // Store role for redirect after session expiry
+        if (user.role) {
+          localStorage.setItem('housler_user_role', user.role);
+        }
+
         set({
           token,
           user,
@@ -92,6 +102,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Auth failed - clear local state
         if (typeof window !== 'undefined') {
           localStorage.removeItem('housler_token');
+          localStorage.removeItem('housler_user_role');
         }
         set({
           token: null,
