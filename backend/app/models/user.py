@@ -42,7 +42,12 @@ class User(Base):
     name = Column(String(255), nullable=True)
 
     # Role (uses existing DB enum 'user_role')
-    role = Column(Enum(UserRole, name='user_role', create_type=False), nullable=False, default=UserRole.CLIENT)
+    # Note: values_callable ensures SQLAlchemy uses enum values (lowercase) not names (uppercase)
+    role = Column(
+        Enum(UserRole, name='user_role', create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=UserRole.CLIENT
+    )
 
     # Status - agent.housler.ru uses is_active boolean, NOT status enum
     is_active = Column(Boolean, default=True, nullable=True)
