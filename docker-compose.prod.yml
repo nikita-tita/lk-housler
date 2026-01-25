@@ -76,6 +76,7 @@ services:
       - SMS_PROVIDER=${SMS_PROVIDER:-sms_ru}
       - SMS_RU_API_ID=${SMS_RU_API_ID}
       - SMS_TEST_MODE=${SMS_TEST_MODE:-false}
+      - ALLOW_TEST_MODE_IN_PROD=${ALLOW_TEST_MODE_IN_PROD:-false}
       - MINIO_ENDPOINT=minio:9000
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}

@@ -26,10 +26,10 @@ class Settings(BaseSettings):
         if self.APP_ENV == "production":
             if self.DEBUG:
                 raise ValueError("DEBUG must be False in production")
-            if self.SMS_TEST_MODE:
-                raise ValueError("SMS_TEST_MODE must be False in production")
-            if self.EMAIL_TEST_MODE:
-                raise ValueError("EMAIL_TEST_MODE must be False in production")
+            if self.SMS_TEST_MODE and not self.ALLOW_TEST_MODE_IN_PROD:
+                raise ValueError("SMS_TEST_MODE must be False in production (set ALLOW_TEST_MODE_IN_PROD=true to override)")
+            if self.EMAIL_TEST_MODE and not self.ALLOW_TEST_MODE_IN_PROD:
+                raise ValueError("EMAIL_TEST_MODE must be False in production (set ALLOW_TEST_MODE_IN_PROD=true to override)")
             if "localhost" in self.FRONTEND_URL:
                 raise ValueError("FRONTEND_URL cannot contain 'localhost' in production")
 
@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"  # development | staging | production
     DEBUG: bool = False
     SECRET_KEY: str
+    ALLOW_TEST_MODE_IN_PROD: bool = False  # Allow SMS/Email test mode in production (for E2E testing)
 
     # Frontend URL (for links in emails, SMS, etc.)
     FRONTEND_URL: str = "http://localhost:3000"
