@@ -106,7 +106,8 @@ class OrganizationMember(BaseModel):
     org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    role = Column(Enum(MemberRole), nullable=False)
+    # Note: DB column is varchar(20), not enum. Store lowercase values.
+    role = Column(String(20), nullable=False)
 
     # Персональная настройка сплита для агента
     default_split_percent_agent = Column(Integer, nullable=True)

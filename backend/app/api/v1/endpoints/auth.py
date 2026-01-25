@@ -251,7 +251,7 @@ async def register_agency(request: AgencyRegisterRequest, http_request: Request,
 
 from datetime import datetime
 from sqlalchemy import select, and_
-from app.models.organization import PendingEmployee, EmployeeInviteStatus, OrganizationMember, MemberRole, Organization
+from app.models.organization import PendingEmployee, EmployeeInviteStatus, OrganizationMember, Organization
 from app.schemas.organization import EmployeeInvitePublicInfo, EmployeeRegisterRequest
 from app.models.user import User, UserRole
 from app.core.security import create_access_token, create_refresh_token
@@ -372,7 +372,7 @@ async def register_employee(
         member = OrganizationMember(
             org_id=organization.id,
             user_id=user.id,
-            role=MemberRole.AGENT,
+            role="agent",  # DB uses varchar, not enum
             is_active=True,
         )
         db.add(member)
