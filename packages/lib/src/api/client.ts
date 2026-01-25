@@ -15,6 +15,7 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Send httpOnly cookies with requests
 });
 
 // Auth API client - uses agent.housler.ru for unified auth
@@ -24,6 +25,7 @@ export const authClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Send httpOnly cookies with requests
 });
 
 // Retry logic for failed requests

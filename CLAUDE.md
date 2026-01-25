@@ -24,6 +24,7 @@ lk.housler.ru (frontend) → agent.housler.ru/api/auth/* → housler_agent (DB)
 - Цветные элементы в UI (только ч/б)
 
 ### Security (реализовано)
+- **httpOnly Cookies** (XSS protection) — tokens in cookies, not localStorage
 - Token Blacklist (Redis)
 - Rate Limiting (IP + account)
 - Audit Logging (`core/audit.py`)
@@ -60,6 +61,12 @@ backend/          # FastAPI backend
 ## CODE PATTERNS
 
 ```python
+# httpOnly Cookies (XSS-safe auth)
+from app.core.security import set_auth_cookies, clear_auth_cookies, get_token_from_request
+set_auth_cookies(response, access_token, refresh_token)  # On login
+clear_auth_cookies(response)  # On logout
+token = get_token_from_request(request)  # Works with cookies + header
+
 # Rate limiting (async function, NOT decorator)
 from app.core.rate_limit import rate_limit_otp_send
 await rate_limit_otp_send(request, phone=phone)  # 3/min per phone

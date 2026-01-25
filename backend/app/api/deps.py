@@ -3,27 +3,43 @@
 from typing import Optional
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import decode_token
+from app.core.security import decode_token, get_token_from_request
 from app.db.session import get_db
 from app.models.user import User
 from app.models.deal import Deal
 from app.models.organization import OrganizationMember
 from app.services.user.service import UserService
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)  # Don't auto-error, we check cookies too
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Get current authenticated user"""
-    token = credentials.credentials
+    """Get current authenticated user.
+
+    Supports both:
+    1. httpOnly cookies (preferred, XSS-safe)
+    2. Authorization header (backward compatibility)
+    """
+    # Get token from cookie or header
+    token = get_token_from_request(request)
+    if not token and credentials:
+        token = credentials.credentials
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     payload = decode_token(token)
     if not payload:
@@ -76,15 +92,21 @@ async def get_current_user(
 
 
 async def get_current_user_optional(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> Optional[User]:
-    """Get current user if authenticated, None otherwise"""
-    if not credentials:
+    """Get current user if authenticated, None otherwise.
+
+    Supports both cookies and Authorization header.
+    """
+    # Check if we have any token at all
+    token = get_token_from_request(request)
+    if not token and not credentials:
         return None
 
     try:
-        return await get_current_user(credentials, db)
+        return await get_current_user(request, credentials, db)
     except HTTPException:
         return None
 

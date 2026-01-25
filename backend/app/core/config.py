@@ -93,6 +93,13 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # Cookies (httpOnly for security)
+    COOKIE_DOMAIN: str = ""  # Empty = current domain, ".housler.ru" for cross-domain
+    COOKIE_SECURE: bool = True  # True in production (HTTPS only)
+    COOKIE_SAMESITE: str = "lax"  # "lax" prevents CSRF on GET, allows cross-site navigation
+    COOKIE_HTTPONLY: bool = True  # Prevent JS access (XSS protection)
+    COOKIE_PATH: str = "/"  # Cookie available for all paths
+
     # OTP
     OTP_LENGTH: int = 6
     OTP_EXPIRE_MINUTES: int = 5

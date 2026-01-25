@@ -82,3 +82,90 @@ def hash_value(value: str) -> str:
     import hashlib
 
     return hashlib.sha256(value.encode()).hexdigest()
+
+
+# ==============================================
+# Cookie-based Auth (httpOnly for XSS protection)
+# ==============================================
+
+from fastapi import Response, Request
+
+
+def set_auth_cookies(
+    response: Response,
+    access_token: str,
+    refresh_token: str,
+) -> None:
+    """
+    Set httpOnly cookies for access and refresh tokens.
+
+    Security features:
+    - httpOnly: Prevents JavaScript access (XSS protection)
+    - Secure: Only sent over HTTPS
+    - SameSite=Lax: Prevents CSRF on state-changing requests
+    """
+    # Access token cookie (short-lived)
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        httponly=settings.COOKIE_HTTPONLY,
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
+        domain=settings.COOKIE_DOMAIN or None,
+        path=settings.COOKIE_PATH,
+    )
+
+    # Refresh token cookie (long-lived)
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        httponly=settings.COOKIE_HTTPONLY,
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
+        domain=settings.COOKIE_DOMAIN or None,
+        path=settings.COOKIE_PATH,
+    )
+
+
+def clear_auth_cookies(response: Response) -> None:
+    """Clear auth cookies on logout."""
+    response.delete_cookie(
+        key="access_token",
+        domain=settings.COOKIE_DOMAIN or None,
+        path=settings.COOKIE_PATH,
+    )
+    response.delete_cookie(
+        key="refresh_token",
+        domain=settings.COOKIE_DOMAIN or None,
+        path=settings.COOKIE_PATH,
+    )
+
+
+def get_token_from_request(request: Request) -> Optional[str]:
+    """
+    Extract access token from request.
+
+    Priority:
+    1. Cookie (preferred, httpOnly)
+    2. Authorization header (fallback for backward compatibility)
+    """
+    # Try cookie first
+    access_token = request.cookies.get("access_token")
+    if access_token:
+        return access_token
+
+    # Fallback to Authorization header
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        return auth_header[7:]  # Remove "Bearer " prefix
+
+    return None
+
+
+def get_refresh_token_from_request(request: Request) -> Optional[str]:
+    """
+    Extract refresh token from request (cookie only for security).
+    """
+    return request.cookies.get("refresh_token")

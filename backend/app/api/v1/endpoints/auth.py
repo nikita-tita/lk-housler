@@ -1,6 +1,11 @@
-"""Auth endpoints - Housler 3 auth types"""
+"""Auth endpoints - Housler 3 auth types
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+Supports both:
+- httpOnly cookies (preferred, XSS-safe)
+- Authorization header (backward compatibility)
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -21,7 +26,13 @@ from app.schemas.auth import (
     Token,
     TokenRefresh,
 )
-from app.core.security import decode_token, create_access_token
+from app.core.security import (
+    decode_token,
+    create_access_token,
+    set_auth_cookies,
+    clear_auth_cookies,
+    get_refresh_token_from_request,
+)
 from app.services.auth.service_extended import AuthServiceExtended
 
 router = APIRouter()
@@ -70,9 +81,14 @@ async def send_agent_sms(
 async def verify_agent_sms(
     request: SMSOTPVerify,
     http_request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
-    """Verify SMS OTP and login/register agent"""
+    """Verify SMS OTP and login/register agent.
+
+    Sets httpOnly cookies for tokens (XSS protection).
+    Also returns tokens in body for backward compatibility.
+    """
     # Rate limit by IP + phone number
     await rate_limit_otp_verify(http_request, phone=request.phone)
 
@@ -81,6 +97,10 @@ async def verify_agent_sms(
     try:
         auth_service = AuthServiceExtended(db)
         user, access_token, refresh_token = await auth_service.verify_sms_otp(request.phone, request.code)
+
+        # Set httpOnly cookies (primary auth method)
+        set_auth_cookies(response, access_token, refresh_token)
+
         log_audit_event(
             AuditEvent.LOGIN_SUCCESS,
             user_id=str(user.id),
@@ -88,6 +108,7 @@ async def verify_agent_sms(
             user_agent=user_agent,
             details={"method": "sms", "role": user.role},
         )
+        # Return tokens in body for backward compatibility
         return Token(access_token=access_token, refresh_token=refresh_token)
     except ValueError as e:
         log_audit_event(
@@ -130,15 +151,23 @@ async def send_client_email(
 async def verify_client_email(
     request: EmailOTPVerify,
     http_request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
-    """Verify Email OTP and login/register client"""
+    """Verify Email OTP and login/register client.
+
+    Sets httpOnly cookies for tokens (XSS protection).
+    Also returns tokens in body for backward compatibility.
+    """
     # Rate limit by IP + email
     await rate_limit_otp_verify(http_request, email=request.email)
 
     try:
         auth_service = AuthServiceExtended(db)
         user, access_token, refresh_token = await auth_service.verify_email_otp(request.email, request.code)
+
+        # Set httpOnly cookies (primary auth method)
+        set_auth_cookies(response, access_token, refresh_token)
 
         return Token(access_token=access_token, refresh_token=refresh_token)
     except ValueError as e:
@@ -154,9 +183,14 @@ async def verify_client_email(
 async def login_agency(
     request: AgencyLoginRequest,
     http_request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
-    """Agency admin login with email + password"""
+    """Agency admin login with email + password.
+
+    Sets httpOnly cookies for tokens (XSS protection).
+    Also returns tokens in body for backward compatibility.
+    """
     # Rate limit by IP + email
     await rate_limit_login(http_request, email=request.email)
 
@@ -165,6 +199,10 @@ async def login_agency(
     try:
         auth_service = AuthServiceExtended(db)
         user, access_token, refresh_token = await auth_service.login_agency(request.email, request.password)
+
+        # Set httpOnly cookies (primary auth method)
+        set_auth_cookies(response, access_token, refresh_token)
+
         log_audit_event(
             AuditEvent.LOGIN_SUCCESS,
             user_id=str(user.id),
@@ -298,9 +336,14 @@ async def get_employee_invite_info(
 async def register_employee(
     request: EmployeeRegisterRequest,
     http_request: Request,
+    http_response: Response,
     db: AsyncSession = Depends(get_db),
 ):
-    """Complete employee registration via invite token"""
+    """Complete employee registration via invite token.
+
+    Sets httpOnly cookies for tokens (XSS protection).
+    Also returns tokens in body for backward compatibility.
+    """
     ip_address = http_request.client.host if http_request.client else None
     user_agent = http_request.headers.get("user-agent")
 
@@ -389,6 +432,9 @@ async def register_employee(
     access_token = create_access_token({"sub": str(user.id)})
     refresh_token = create_refresh_token({"sub": str(user.id)})
 
+    # Set httpOnly cookies (primary auth method)
+    set_auth_cookies(http_response, access_token, refresh_token)
+
     log_audit_event(
         AuditEvent.USER_REGISTERED,
         user_id=str(user.id),
@@ -418,19 +464,38 @@ from app.core.rate_limit import token_blacklist
 
 @router.post("/refresh", response_model=AccessTokenResponse)
 async def refresh_access_token(
-    request: TokenRefresh,
-    http_request: Request,
+    request: TokenRefresh = None,
+    http_request: Request = None,
+    http_response: Response = None,
 ):
-    """Refresh access token using refresh token"""
+    """Refresh access token using refresh token.
+
+    Accepts refresh token from:
+    1. httpOnly cookie (preferred)
+    2. Request body (backward compatibility)
+
+    Sets new access token in httpOnly cookie.
+    """
+    # Get refresh token from cookie or body
+    refresh_token = get_refresh_token_from_request(http_request)
+    if not refresh_token and request and request.refresh_token:
+        refresh_token = request.refresh_token
+
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token required",
+        )
+
     # Check if token is blacklisted (logged out)
-    if await token_blacklist.is_blacklisted(request.refresh_token):
+    if await token_blacklist.is_blacklisted(refresh_token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has been revoked",
         )
 
     # Decode refresh token
-    payload = decode_token(request.refresh_token)
+    payload = decode_token(refresh_token)
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -456,6 +521,9 @@ async def refresh_access_token(
     # Create new access token
     access_token = create_access_token(data={"sub": str(user_id)})
 
+    # Set new access token in cookie (refresh token stays the same)
+    set_auth_cookies(http_response, access_token, refresh_token)
+
     ip_address = http_request.client.host if http_request.client else None
     log_audit_event(
         AuditEvent.TOKEN_REFRESHED,
@@ -474,21 +542,37 @@ async def refresh_access_token(
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
 async def logout(
-    request: TokenRefresh,
-    http_request: Request,
+    request: TokenRefresh = None,
+    http_request: Request = None,
+    http_response: Response = None,
 ):
     """
     Logout user by invalidating refresh token.
 
+    Accepts refresh token from:
+    1. httpOnly cookie (preferred)
+    2. Request body (backward compatibility)
+
     The refresh token is added to a blacklist stored in Redis.
     Access tokens are short-lived and will expire naturally.
+    Clears httpOnly cookies.
     """
-    # Decode to get user ID for audit logging
-    payload = decode_token(request.refresh_token)
-    user_id = payload.get("sub") or payload.get("userId") if payload else None
+    # Get refresh token from cookie or body
+    refresh_token = get_refresh_token_from_request(http_request)
+    if not refresh_token and request and request.refresh_token:
+        refresh_token = request.refresh_token
 
-    # Add to blacklist
-    await token_blacklist.add(request.refresh_token)
+    user_id = None
+    if refresh_token:
+        # Decode to get user ID for audit logging
+        payload = decode_token(refresh_token)
+        user_id = payload.get("sub") or payload.get("userId") if payload else None
+
+        # Add to blacklist
+        await token_blacklist.add(refresh_token)
+
+    # Clear httpOnly cookies
+    clear_auth_cookies(http_response)
 
     ip_address = http_request.client.host if http_request.client else None
     log_audit_event(

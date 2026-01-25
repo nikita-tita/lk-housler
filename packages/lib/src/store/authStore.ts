@@ -4,7 +4,7 @@ import { getCurrentUser } from '../api/auth';
 
 interface AuthState {
   user: User | null;
-  token: string | null;
+  token: string | null; // Kept for backward compatibility, may be null with httpOnly cookies
   isAuthenticated: boolean;
   isLoading: boolean;
 
@@ -25,6 +25,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: true,
 
   setAuth: (token, user) => {
+    // Store token in localStorage for backward compatibility
+    // New auth flow uses httpOnly cookies (set by server)
     if (typeof window !== 'undefined') {
       localStorage.setItem('housler_token', token);
     }
@@ -71,20 +73,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           return;
         }
 
-        const token = localStorage.getItem('housler_token');
-        if (!token) {
-          set({ isLoading: false, isAuthenticated: false });
-          return;
-        }
-
+        // Try to get current user from server
+        // Server validates auth via:
+        // 1. httpOnly cookies (preferred, XSS-safe)
+        // 2. Authorization header from localStorage (backward compatibility)
         const user = await getCurrentUser();
+
+        // Get token from localStorage if available (backward compatibility)
+        const token = localStorage.getItem('housler_token');
+
         set({
           token,
           user,
           isAuthenticated: true,
           isLoading: false,
         });
-      } catch (error) {
+      } catch {
+        // Auth failed - clear local state
         if (typeof window !== 'undefined') {
           localStorage.removeItem('housler_token');
         }
