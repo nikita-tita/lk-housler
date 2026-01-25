@@ -247,15 +247,16 @@ export async function loginAgency(email: string, password: string): Promise<Auth
 // ==========================================
 
 export async function getCurrentUser(): Promise<User> {
-  // В мок-режиме, если есть токен, возвращаем мок-юзера
-  // Токен мы не проверяем на валидность, просто его наличие (обычно делается в axios interceptor)
-  if (typeof window !== 'undefined') {
-    const mockRole = localStorage.getItem('housler_mock_role');
-    if (mockRole) {
-      return { ...MOCK_USER, role: mockRole as any };
+  if (IS_MOCK) {
+    // В мок-режиме возвращаем мок-юзера с ролью из localStorage
+    if (typeof window !== 'undefined') {
+      const mockRole = localStorage.getItem('housler_mock_role');
+      if (mockRole) {
+        return { ...MOCK_USER, role: mockRole as any };
+      }
     }
+    return MOCK_USER;
   }
-  return MOCK_USER;
 
   // Use lk.housler.ru API to get user with organization info
   const { data } = await apiClient.get<User>('/users/me');
