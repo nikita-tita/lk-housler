@@ -49,7 +49,6 @@ export interface SendSmsResult {
 }
 
 export async function sendSMS(phone: string): Promise<SendSmsResult> {
-  console.log('[DEBUG sendSMS] called with phone:', phone, 'IS_MOCK:', IS_MOCK);
   if (IS_MOCK) {
     console.log('[MOCK] sendSMS', phone);
     return {
@@ -60,10 +59,19 @@ export async function sendSMS(phone: string): Promise<SendSmsResult> {
     };
   }
 
+  // Use native fetch instead of axios for better cross-origin compatibility
+  const AUTH_API_URL = authClient.defaults.baseURL || 'https://agent.housler.ru/api';
+
   try {
-    console.log('[DEBUG sendSMS] making request to /auth/request-sms');
-    const { data } = await authClient.post<ApiResponse<RequestSmsData>>('/auth/request-sms', { phone });
-    console.log('[DEBUG sendSMS] response:', data);
+    const response = await fetch(`${AUTH_API_URL}/auth/request-sms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ phone }),
+    });
+
+    const data: ApiResponse<RequestSmsData> = await response.json();
+
     return {
       success: data.success,
       message: data.data?.message || data.error || '',
@@ -72,7 +80,7 @@ export async function sendSMS(phone: string): Promise<SendSmsResult> {
       codeSentAt: data.data?.codeSentAt
     };
   } catch (error) {
-    console.error('[DEBUG sendSMS] error:', error);
+    console.error('[sendSMS] error:', error);
     throw error;
   }
 }
@@ -95,8 +103,19 @@ export async function verifySMS(phone: string, code: string): Promise<AuthRespon
     };
   }
 
+  // Use native fetch instead of axios for better cross-origin compatibility
+  // authClient.defaults.baseURL is set from NEXT_PUBLIC_AUTH_API_URL at build time
+  const AUTH_API_URL = authClient.defaults.baseURL || 'https://agent.housler.ru/api';
+
   try {
-    const { data } = await authClient.post<ApiResponse<VerifySmsData>>('/auth/verify-sms', { phone, code });
+    const response = await fetch(`${AUTH_API_URL}/auth/verify-sms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ phone, code }),
+    });
+
+    const data: ApiResponse<VerifySmsData> = await response.json();
 
     if (!data.success || !data.data) {
       throw new Error(data.error || 'Ошибка авторизации');
@@ -118,11 +137,10 @@ export async function verifySMS(phone: string, code: string): Promise<AuthRespon
       user: user,
     };
   } catch (err: unknown) {
-    const axiosError = err as { response?: { data?: { error?: string } } };
-    if (axiosError.response?.data?.error) {
-      throw new Error(axiosError.response.data.error);
+    if (err instanceof Error) {
+      throw err;
     }
-    throw err;
+    throw new Error('Ошибка проверки кода');
   }
 }
 
