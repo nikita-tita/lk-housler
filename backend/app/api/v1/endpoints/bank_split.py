@@ -782,6 +782,18 @@ async def confirm_completion(
         except Exception as e:
             logger.warning(f"Failed to send notification for completion: {e}")
 
+        # UC-3.2: Client confirmation flow
+        if result.awaiting_client_confirmation:
+            return {
+                "message": "Все агенты подтвердили. Ожидается подтверждение клиента.",
+                "deal_status": deal.status,
+                "all_confirmed": result.all_confirmed,
+                "awaiting_client_confirmation": True,
+                "act_document_id": str(result.act_document.id) if result.act_document else None,
+                "signing_url": result.signing_url,
+                "client_confirmation_deadline": deal.client_confirmation_deadline.isoformat() if deal.client_confirmation_deadline else None,
+            }
+
         if result.release_triggered:
             return {
                 "message": "Service confirmed. All parties confirmed - funds released.",

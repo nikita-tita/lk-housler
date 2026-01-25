@@ -250,6 +250,27 @@ export {
   formatPartyRole,
 } from './signing';
 
+// Exports from act-signing.ts (UC-3.2)
+export type {
+  ActInfo,
+  ActRequestOTPResponse,
+  ActSignResponse,
+  GeoLocation,
+  DisputeReason,
+  CreateDisputeRequest,
+  CreateDisputeResponse,
+} from './act-signing';
+
+export {
+  getActInfo,
+  requestActOTP,
+  signAct,
+  formatDaysRemaining,
+  getAutoReleaseWarning,
+  createActDispute,
+  DISPUTE_REASON_LABELS,
+} from './act-signing';
+
 // Exports from users.ts
 export type {
   UserSearchResult,

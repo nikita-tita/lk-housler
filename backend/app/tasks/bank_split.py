@@ -255,3 +255,211 @@ def send_invitation_notification_task(
     except Exception as e:
         logger.error(f"Invitation notification failed: {e}")
         self.retry(exc=e)
+
+
+# =============================================================================
+# UC-3.2: Act signing tasks
+# =============================================================================
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def send_act_signing_reminder(self, deal_id: str, day: int):
+    """
+    UC-3.2: Send reminder to client to sign Act of Completed Services.
+
+    Scheduled reminders:
+    - Day 1: "Подпишите акт"
+    - Day 3: "Напоминаем о подписании"
+    - Day 5: "Осталось 2 дня"
+    - Day 6: "Завтра auto-release"
+
+    Args:
+        deal_id: UUID of the deal
+        day: Day number since confirmation was requested
+    """
+    import asyncio
+    from uuid import UUID
+    from app.db.session import async_session_maker
+    from sqlalchemy import select
+    from app.models.deal import Deal, DealStatus
+
+    logger.info(f"Sending act signing reminder for deal {deal_id}, day {day}")
+
+    reminder_messages = {
+        1: "Подпишите акт выполненных работ по сделке. Ссылка для подписания в SMS.",
+        3: "Напоминаем о подписании акта. Осталось 4 дня до автоматической выплаты.",
+        5: "Осталось 2 дня для подписания акта или открытия спора.",
+        6: "Завтра произойдёт автоматическая выплата. Подпишите акт сегодня.",
+    }
+
+    async def _send_reminder():
+        async with async_session_maker() as db:
+            # Get deal
+            stmt = select(Deal).where(Deal.id == UUID(deal_id))
+            result = await db.execute(stmt)
+            deal = result.scalar_one_or_none()
+
+            if not deal:
+                logger.warning(f"Deal {deal_id} not found for reminder")
+                return {"status": "not_found"}
+
+            # Check if deal is still in AWAITING_CLIENT_CONFIRMATION
+            if deal.status != DealStatus.AWAITING_CLIENT_CONFIRMATION.value:
+                logger.info(
+                    f"Deal {deal_id} no longer awaiting confirmation "
+                    f"(status: {deal.status}), skipping reminder"
+                )
+                return {"status": "skipped", "reason": "status_changed"}
+
+            # Check if act was already signed
+            if deal.act_signed_at:
+                logger.info(f"Deal {deal_id} act already signed, skipping reminder")
+                return {"status": "skipped", "reason": "already_signed"}
+
+            # Send SMS reminder
+            from app.services.notification.service import send_sms_notification
+
+            message = reminder_messages.get(day, reminder_messages[1])
+            phone = deal.client_phone
+
+            if phone:
+                await send_sms_notification(
+                    phone=phone,
+                    message=message,
+                )
+                logger.info(f"Sent day {day} reminder for deal {deal_id} to {phone}")
+                return {"status": "sent", "day": day}
+            else:
+                logger.warning(f"No phone for deal {deal_id}, cannot send reminder")
+                return {"status": "no_phone"}
+
+    try:
+        result = asyncio.get_event_loop().run_until_complete(_send_reminder())
+        return {
+            "status": "ok",
+            "deal_id": deal_id,
+            "day": day,
+            **result,
+        }
+    except Exception as e:
+        logger.error(f"Failed to send act signing reminder for deal {deal_id}: {e}")
+        self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def check_act_signature_timeout(self, deal_id: str):
+    """
+    UC-3.2: Check if Act signature timeout has expired and auto-release funds.
+
+    Called on day 7 after confirmation request.
+    If act not signed and no dispute opened → auto-release to PAYOUT_READY.
+
+    Args:
+        deal_id: UUID of the deal to check
+    """
+    import asyncio
+    from uuid import UUID
+    from app.db.session import async_session_maker
+    from sqlalchemy import select
+    from app.models.deal import Deal, DealStatus
+
+    logger.info(f"Checking act signature timeout for deal {deal_id}")
+
+    async def _check_timeout():
+        async with async_session_maker() as db:
+            # Get deal
+            stmt = select(Deal).where(Deal.id == UUID(deal_id))
+            result = await db.execute(stmt)
+            deal = result.scalar_one_or_none()
+
+            if not deal:
+                logger.warning(f"Deal {deal_id} not found for timeout check")
+                return {"status": "not_found"}
+
+            # Check if deal is still in AWAITING_CLIENT_CONFIRMATION
+            if deal.status != DealStatus.AWAITING_CLIENT_CONFIRMATION.value:
+                logger.info(
+                    f"Deal {deal_id} no longer awaiting confirmation "
+                    f"(status: {deal.status}), skipping auto-release"
+                )
+                return {"status": "skipped", "reason": "status_changed"}
+
+            # Check if act was signed
+            if deal.act_signed_at:
+                logger.info(f"Deal {deal_id} act was signed, skipping auto-release")
+                return {"status": "skipped", "reason": "already_signed"}
+
+            # Check if dispute is open
+            if deal.dispute_locked:
+                logger.info(f"Deal {deal_id} has dispute, skipping auto-release")
+                return {"status": "skipped", "reason": "dispute_open"}
+
+            # Auto-release
+            from app.services.bank_split.deal_service import BankSplitDealService
+
+            deal_service = BankSplitDealService(db)
+            await deal_service.auto_release_confirmation(deal)
+            await db.commit()
+
+            logger.info(f"Deal {deal_id} auto-released after confirmation timeout")
+
+            # Send notification to client
+            from app.services.notification.service import send_sms_notification
+
+            if deal.client_phone:
+                await send_sms_notification(
+                    phone=deal.client_phone,
+                    message="Акт выполненных работ принят автоматически. Выплата исполнителям будет произведена в ближайшее время.",
+                )
+
+            return {"status": "auto_released"}
+
+    try:
+        result = asyncio.get_event_loop().run_until_complete(_check_timeout())
+        return {
+            "status": "ok",
+            "deal_id": deal_id,
+            **result,
+        }
+    except Exception as e:
+        logger.error(f"Failed to check act signature timeout for deal {deal_id}: {e}")
+        self.retry(exc=e)
+
+
+@celery_app.task(bind=True)
+def check_expired_confirmations(self):
+    """
+    UC-3.2: Periodic check for deals with expired client confirmation deadline.
+    Runs every hour as a backup to individual timeout tasks.
+
+    This catches any deals where the scheduled check_act_signature_timeout task
+    might have failed.
+    """
+    import asyncio
+    from app.db.session import async_session_maker
+    from app.services.bank_split.deal_service import BankSplitDealService
+
+    logger.info("Starting periodic expired confirmations check")
+
+    async def _check():
+        async with async_session_maker() as db:
+            service = BankSplitDealService(db)
+            released = await service.check_expired_confirmations()
+            await db.commit()
+            return len(released)
+
+    try:
+        released_count = asyncio.get_event_loop().run_until_complete(_check())
+        logger.info(f"Auto-released {released_count} deals from expired confirmation")
+        return {
+            "status": "ok",
+            "released": released_count,
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"Expired confirmations check failed: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+        }

@@ -1,12 +1,18 @@
-"""Service completion service - handles service completion confirmations (TASK-2.2)
+"""Service completion service - handles service completion confirmations (TASK-2.2, UC-3.2)
 
 This service manages the process of confirming service delivery and triggering
-fund release when appropriate.
+client confirmation through Act signing.
+
+UC-3.2 Flow:
+1. Agent(s) confirm service completed → AWAITING_CLIENT_CONFIRMATION
+2. Act generated, signing link sent to client
+3. Client signs Act via PEP → PAYOUT_READY → release
+4. If no action in 7 days → auto-release
 """
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional, Set
 from uuid import UUID
 
@@ -20,6 +26,7 @@ from app.models.dispute import Dispute, DisputeStatus
 from app.models.user import User
 from app.models.organization import OrganizationMember, MemberRole
 from app.models.bank_split import DealSplitRecipient
+from app.models.document import Document
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +46,10 @@ class CompletionResult:
     release_triggered: bool
     confirmations_count: int
     required_count: int
+    # UC-3.2: Act signing
+    act_document: Optional[Document] = None
+    signing_url: Optional[str] = None
+    awaiting_client_confirmation: bool = False
 
 
 class ServiceCompletionService:
@@ -108,8 +119,8 @@ class ServiceCompletionService:
         """
         Get set of user IDs that need to confirm service completion.
 
-        For now: creator and agent (if different)
-        Future: could include all split recipients
+        UC-3.2: Both agent AND coagent (if exists) must confirm.
+        The creator is included only if they are the agent.
 
         Args:
             deal: The deal
@@ -117,19 +128,19 @@ class ServiceCompletionService:
         Returns:
             Set of user IDs required to confirm
         """
-        required = {deal.created_by_user_id, deal.agent_user_id}
+        required = set()
 
-        # Optionally include split recipients (users only, not orgs)
-        # This is commented out for now - can be enabled if all parties
-        # need to confirm before release
-        #
-        # stmt = select(DealSplitRecipient).where(
-        #     DealSplitRecipient.deal_id == deal.id,
-        #     DealSplitRecipient.user_id.isnot(None),
-        # )
-        # result = await self.db.execute(stmt)
-        # for r in result.scalars().all():
-        #     required.add(r.user_id)
+        # Primary agent must confirm
+        if deal.agent_user_id:
+            required.add(deal.agent_user_id)
+
+        # UC-3.2: Coagent must also confirm if exists
+        if deal.coagent_user_id:
+            required.add(deal.coagent_user_id)
+
+        # If no agents set (shouldn't happen), fall back to creator
+        if not required and deal.created_by_user_id:
+            required.add(deal.created_by_user_id)
 
         return required
 
@@ -152,14 +163,21 @@ class ServiceCompletionService:
         user_agent: Optional[str] = None,
     ) -> CompletionResult:
         """
-        Confirm service completion and optionally trigger release.
+        Confirm service completion.
+
+        UC-3.2 Flow:
+        1. Agent confirms → record ServiceCompletion
+        2. If coagent exists, both must confirm
+        3. When all agents confirmed → generate Act → AWAITING_CLIENT_CONFIRMATION
+        4. Client receives signing link
+        5. Client signs Act → PAYOUT_READY → release
 
         Args:
             deal: The deal to confirm
             user: The user confirming
             notes: Optional notes
             evidence_file_ids: Optional evidence file IDs
-            trigger_release: Whether this confirmation should trigger release
+            trigger_release: Whether to trigger client confirmation flow
             client_ip: Client IP address
             user_agent: Client user agent
 
@@ -167,7 +185,7 @@ class ServiceCompletionService:
             CompletionResult with confirmation details
 
         Raises:
-            ValueError: If confirmation not allowed (open dispute, not authorized, etc)
+            ValueError: If confirmation not allowed
         """
         # 1. Check RBAC
         can_confirm, reason = await self.can_confirm_completion(user, deal)
@@ -215,36 +233,34 @@ class ServiceCompletionService:
         self.db.add(completion)
         await self.db.flush()
 
-        # 6. Check if all required parties confirmed
+        # 6. Check if all required agents confirmed
         required = await self.get_required_confirmers(deal)
         confirmations = await self.get_existing_confirmations(deal.id)
         confirmed_user_ids = {c.confirmed_by_user_id for c in confirmations}
         all_confirmed = required.issubset(confirmed_user_ids)
 
-        # 7. Handle release trigger
+        # UC-3.2: Initialize result fields
+        act_document = None
+        signing_url = None
+        awaiting_client_confirmation = False
         release_triggered = False
 
+        # 7. UC-3.2: When all agents confirmed → generate Act → AWAITING_CLIENT_CONFIRMATION
         if trigger_release and all_confirmed:
-            # Check if hold period has passed
-            if deal.hold_expires_at:
-                if now >= deal.hold_expires_at:
-                    # Hold expired, trigger immediate release
-                    release_triggered = await self._trigger_release(deal, completion)
-                else:
-                    # Hold still active, schedule release at expiry
-                    deal.auto_release_at = deal.hold_expires_at
-                    logger.info(
-                        f"Deal {deal.id} release scheduled for {deal.hold_expires_at}"
-                    )
-            else:
-                # No hold expiry set, trigger immediate release
-                release_triggered = await self._trigger_release(deal, completion)
+            act_document, signing_url = await self._initiate_client_confirmation(deal)
+            awaiting_client_confirmation = True
+
+            logger.info(
+                f"Deal {deal.id} moved to AWAITING_CLIENT_CONFIRMATION, "
+                f"act_document: {act_document.id}, signing_url: {signing_url}"
+            )
 
         await self.db.flush()
 
         logger.info(
             f"Service completion confirmed for deal {deal.id} by user {user.id} "
-            f"(role: {reason}, all_confirmed: {all_confirmed}, release: {release_triggered})"
+            f"(role: {reason}, all_confirmed: {all_confirmed}, "
+            f"awaiting_client: {awaiting_client_confirmation})"
         )
 
         return CompletionResult(
@@ -253,11 +269,119 @@ class ServiceCompletionService:
             release_triggered=release_triggered,
             confirmations_count=len(confirmed_user_ids),
             required_count=len(required),
+            act_document=act_document,
+            signing_url=signing_url,
+            awaiting_client_confirmation=awaiting_client_confirmation,
         )
+
+    async def _initiate_client_confirmation(
+        self, deal: Deal
+    ) -> tuple[Document, str]:
+        """
+        UC-3.2: Initiate client confirmation flow.
+
+        1. Generate Act of Completed Services
+        2. Create signing token for client
+        3. Transition deal to AWAITING_CLIENT_CONFIRMATION
+        4. Schedule Celery tasks for reminders and auto-release
+
+        Args:
+            deal: The deal to initiate confirmation for
+
+        Returns:
+            Tuple of (act_document, signing_url)
+        """
+        from app.services.bank_split.deal_service import BankSplitDealService
+        from app.services.document.act_service import ActGenerationService
+
+        deal_service = BankSplitDealService(self.db)
+        act_service = ActGenerationService(self.db)
+
+        # 1. Transition to AWAITING_CLIENT_CONFIRMATION
+        await deal_service.request_client_confirmation(deal, deal.agent_user_id)
+
+        # 2. Generate Act document
+        act_document = await act_service.generate_act_for_deal(deal)
+
+        # 3. Create signing token
+        client_phone = deal.client_phone
+        if not client_phone:
+            # Try to get from parties
+            parties = getattr(deal, "parties", None) or []
+            for party in parties:
+                if str(party.party_role) == "client" and party.phone_snapshot:
+                    client_phone = party.phone_snapshot
+                    break
+
+        if not client_phone:
+            raise ValueError("Client phone is required for Act signing")
+
+        signing_token = await act_service.create_signing_token(
+            document=act_document,
+            phone=client_phone,
+            expires_days=7,
+        )
+        signing_url = act_service.get_signing_url(signing_token.token)
+
+        # 4. Schedule Celery tasks for reminders and auto-release
+        await self._schedule_confirmation_tasks(deal)
+
+        logger.info(
+            f"Client confirmation initiated for deal {deal.id}: "
+            f"act={act_document.id}, deadline={deal.client_confirmation_deadline}"
+        )
+
+        return act_document, signing_url
+
+    async def _schedule_confirmation_tasks(self, deal: Deal) -> None:
+        """
+        Schedule Celery tasks for confirmation reminders and auto-release.
+
+        Reminders: Day 1, 3, 5, 6
+        Auto-release: Day 7
+        """
+        try:
+            from app.tasks.bank_split import (
+                send_act_signing_reminder,
+                check_act_signature_timeout,
+            )
+
+            deal_id = str(deal.id)
+            requested_at = deal.client_confirmation_requested_at
+
+            if not requested_at:
+                logger.warning(f"No confirmation requested_at for deal {deal.id}")
+                return
+
+            # Schedule reminders at day 1, 3, 5, 6
+            reminder_days = [1, 3, 5, 6]
+            for day in reminder_days:
+                eta = requested_at + timedelta(days=day)
+                send_act_signing_reminder.apply_async(
+                    args=[deal_id, day],
+                    eta=eta,
+                )
+                logger.debug(f"Scheduled reminder for deal {deal_id} at day {day}")
+
+            # Schedule auto-release check at day 7
+            auto_release_eta = requested_at + timedelta(days=7)
+            check_act_signature_timeout.apply_async(
+                args=[deal_id],
+                eta=auto_release_eta,
+            )
+            logger.debug(f"Scheduled auto-release check for deal {deal_id} at day 7")
+
+        except ImportError:
+            logger.warning("Celery tasks not available, skipping scheduling")
+        except Exception as e:
+            logger.error(f"Failed to schedule confirmation tasks for deal {deal.id}: {e}")
+            # Don't raise - tasks can be manually triggered later
 
     async def _trigger_release(self, deal: Deal, completion: ServiceCompletion) -> bool:
         """
-        Trigger fund release for the deal.
+        Trigger fund release for the deal (legacy method).
+
+        Note: UC-3.2 uses _initiate_client_confirmation instead.
 
         Args:
             deal: The deal to release

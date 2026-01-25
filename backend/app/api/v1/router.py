@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, users, organizations, deals, documents, payments, sign, templates, bank_split, invitations, disputes, admin, onboarding, inn, receipts, agency
+from app.api.v1.endpoints import auth, users, organizations, deals, documents, payments, sign, templates, bank_split, invitations, disputes, admin, onboarding, inn, receipts, agency, act_signing
 
 api_router = APIRouter()
 
@@ -14,6 +14,9 @@ api_router.include_router(deals.router, prefix="/deals", tags=["deals"])
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
 api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
 api_router.include_router(sign.router, prefix="/sign", tags=["signing"])
+
+# Act signing (UC-3.2 client confirmation)
+api_router.include_router(act_signing.router, prefix="/act", tags=["act-signing"])
 api_router.include_router(templates.router, prefix="/templates", tags=["templates"])
 
 # Bank Split (T-Bank instant split)

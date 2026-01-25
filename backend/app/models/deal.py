@@ -66,6 +66,7 @@ class DealStatus(str, PyEnum):
     # Bank-split specific statuses
     INVOICED = "invoiced"                    # Invoice created in T-Bank
     HOLD_PERIOD = "hold_period"              # Payment in hold, awaiting release
+    AWAITING_CLIENT_CONFIRMATION = "awaiting_client_confirmation"  # Waiting for client to sign Act
     PAYMENT_FAILED = "payment_failed"        # Payment attempt failed
     REFUNDED = "refunded"                    # Funds returned to client
     PAYOUT_READY = "payout_ready"            # Ready for payout to recipients
@@ -253,6 +254,13 @@ class Deal(BaseModel, SoftDeleteMixin):
     dispute_locked = Column(Boolean, default=False, nullable=False)
     dispute_locked_at = Column(DateTime, nullable=True)
     dispute_lock_reason = Column(String(500), nullable=True)
+
+    # Client confirmation / Act signing (UC-3.2)
+    act_document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=True)
+    client_confirmation_requested_at = Column(DateTime, nullable=True)  # When agent marked service completed
+    client_confirmation_deadline = Column(DateTime, nullable=True)  # +7 days from request
+    act_signed_at = Column(DateTime, nullable=True)  # When client signed the act
+    act_document = relationship("Document", foreign_keys=[act_document_id])
 
     # Bank Split relationships
     split_recipients = relationship("DealSplitRecipient", back_populates="deal", cascade="all, delete-orphan")

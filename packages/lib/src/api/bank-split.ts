@@ -11,6 +11,7 @@ export type BankSplitStatus =
   | 'payment_pending'
   | 'payment_failed'
   | 'hold_period'
+  | 'awaiting_client_confirmation' // UC-3.2: Waiting for client to sign Act
   | 'payout_ready'
   | 'payout_in_progress'
   | 'closed'
@@ -293,10 +294,18 @@ export interface ServiceCompletionRequest {
 }
 
 export interface ServiceCompletionResponse {
-  deal_id: string;
-  confirmed_by_user_id: number;
-  confirmed_at: string;
+  deal_id?: string;
+  confirmed_by_user_id?: number;
+  confirmed_at?: string;
   notes?: string;
+  // UC-3.2 fields
+  message?: string;
+  deal_status?: string;
+  all_confirmed?: boolean;
+  awaiting_client_confirmation?: boolean;
+  act_document_id?: string;
+  signing_url?: string;
+  client_confirmation_deadline?: string;
 }
 
 export interface ServiceCompletionStatus {
@@ -434,6 +443,7 @@ export const BANK_SPLIT_STATUS_LABELS: Record<BankSplitStatus, string> = {
   payment_pending: 'Ожидает оплаты',
   payment_failed: 'Ошибка оплаты',
   hold_period: 'Период удержания',
+  awaiting_client_confirmation: 'Ожидает подтверждения клиента', // UC-3.2
   payout_ready: 'Готов к выплате',
   payout_in_progress: 'Выплата в процессе',
   closed: 'Закрыта',
@@ -451,6 +461,7 @@ export const BANK_SPLIT_STATUS_STYLES: Record<BankSplitStatus, string> = {
   payment_pending: 'bg-gray-300 text-gray-900',
   payment_failed: 'bg-gray-300 text-gray-700',
   hold_period: 'bg-gray-400 text-white',
+  awaiting_client_confirmation: 'bg-gray-500 text-white', // UC-3.2
   payout_ready: 'bg-gray-500 text-white',
   payout_in_progress: 'bg-gray-600 text-white',
   closed: 'bg-black text-white',

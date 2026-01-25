@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 # State machine for bank-split deals (using DealStatus enum values)
+# UC-3.2: Added AWAITING_CLIENT_CONFIRMATION for Act signing flow
 BANK_SPLIT_TRANSITIONS = {
     DealStatus.DRAFT.value: {DealStatus.AWAITING_SIGNATURES.value, DealStatus.CANCELLED.value},
     DealStatus.AWAITING_SIGNATURES.value: {DealStatus.SIGNED.value, DealStatus.CANCELLED.value},
@@ -40,10 +41,31 @@ BANK_SPLIT_TRANSITIONS = {
     DealStatus.INVOICED.value: {DealStatus.PAYMENT_PENDING.value, DealStatus.PAYMENT_FAILED.value, DealStatus.CANCELLED.value},
     DealStatus.PAYMENT_PENDING.value: {DealStatus.HOLD_PERIOD.value, DealStatus.PAYMENT_FAILED.value, DealStatus.CANCELLED.value},
     DealStatus.PAYMENT_FAILED.value: {DealStatus.INVOICED.value, DealStatus.CANCELLED.value},  # Can retry
-    DealStatus.HOLD_PERIOD.value: {DealStatus.PAYOUT_READY.value, DealStatus.DISPUTE.value, DealStatus.CANCELLED.value},
+    # UC-3.2: HOLD_PERIOD can go to AWAITING_CLIENT_CONFIRMATION (agent marks service completed)
+    # or directly to PAYOUT_READY (legacy auto-release for MOR deals)
+    DealStatus.HOLD_PERIOD.value: {
+        DealStatus.AWAITING_CLIENT_CONFIRMATION.value,  # Agent marks service completed
+        DealStatus.PAYOUT_READY.value,  # Legacy auto-release (MOR deals)
+        DealStatus.DISPUTE.value,
+        DealStatus.CANCELLED.value,
+    },
+    # UC-3.2: Client confirmation via Act signing
+    # Client signs Act → PAYOUT_READY
+    # 7 days without action → auto-release to PAYOUT_READY
+    # Client opens dispute → DISPUTE
+    DealStatus.AWAITING_CLIENT_CONFIRMATION.value: {
+        DealStatus.PAYOUT_READY.value,  # Client signed Act or auto-release after 7 days
+        DealStatus.DISPUTE.value,  # Client opens dispute
+        DealStatus.CANCELLED.value,
+    },
     DealStatus.PAYOUT_READY.value: {DealStatus.PAYOUT_IN_PROGRESS.value, DealStatus.DISPUTE.value},
     DealStatus.PAYOUT_IN_PROGRESS.value: {DealStatus.CLOSED.value},
-    DealStatus.DISPUTE.value: {DealStatus.HOLD_PERIOD.value, DealStatus.REFUNDED.value, DealStatus.CANCELLED.value},  # After resolution
+    DealStatus.DISPUTE.value: {
+        DealStatus.HOLD_PERIOD.value,  # Dispute resolved, back to hold
+        DealStatus.AWAITING_CLIENT_CONFIRMATION.value,  # Dispute resolved, needs client confirmation
+        DealStatus.REFUNDED.value,  # Refund to client
+        DealStatus.CANCELLED.value,
+    },
     DealStatus.REFUNDED.value: set(),  # Terminal
     DealStatus.CLOSED.value: set(),  # Terminal
     DealStatus.CANCELLED.value: {DealStatus.DRAFT.value},  # Can recover early cancellations
@@ -320,6 +342,89 @@ class BankSplitDealService:
         logger.info(f"Deal {deal.id} payment received, hold until {deal.hold_expires_at}")
         return deal
 
+    async def request_client_confirmation(self, deal: Deal, agent_user_id: int) -> Deal:
+        """
+        UC-3.2: Agent marks service as completed, requesting client confirmation.
+
+        Precondition: deal.status == 'hold_period'
+        Postcondition: deal.status == 'awaiting_client_confirmation'
+
+        Args:
+            deal: The deal to request confirmation for
+            agent_user_id: ID of the agent marking service completed
+
+        Returns:
+            Updated deal
+
+        Raises:
+            ValueError: If invalid transition or agent not authorized
+        """
+        from datetime import timedelta
+
+        # Validate agent is authorized (must be deal's agent or coagent)
+        if deal.agent_user_id != agent_user_id and deal.coagent_user_id != agent_user_id:
+            raise ValueError("Only deal agent or coagent can mark service completed")
+
+        self._validate_transition(deal, DealStatus.AWAITING_CLIENT_CONFIRMATION.value)
+
+        # Set confirmation timestamps
+        now = datetime.utcnow()
+        deal.status = DealStatus.AWAITING_CLIENT_CONFIRMATION.value
+        deal.client_confirmation_requested_at = now
+        deal.client_confirmation_deadline = now + timedelta(days=7)  # Auto-release in 7 days
+
+        await self.db.flush()
+
+        logger.info(
+            f"Deal {deal.id} awaiting client confirmation, deadline: {deal.client_confirmation_deadline}"
+        )
+        return deal
+
+    async def handle_act_signed(self, deal: Deal) -> Deal:
+        """
+        UC-3.2: Handle client signing the Act of Completed Services.
+
+        Precondition: deal.status == 'awaiting_client_confirmation'
+        Postcondition: deal.status == 'payout_ready'
+
+        Returns:
+            Updated deal ready for payout
+        """
+        self._validate_transition(deal, DealStatus.PAYOUT_READY.value)
+
+        deal.status = DealStatus.PAYOUT_READY.value
+        deal.act_signed_at = datetime.utcnow()
+
+        await self.db.flush()
+
+        logger.info(f"Deal {deal.id} act signed, ready for payout")
+        return deal
+
+    async def auto_release_confirmation(self, deal: Deal) -> Deal:
+        """
+        UC-3.2: Auto-release after 7 days without client action.
+
+        Precondition: deal.status == 'awaiting_client_confirmation'
+        Postcondition: deal.status == 'payout_ready'
+
+        Called by Celery task when client_confirmation_deadline expires
+        without signature or dispute.
+        """
+        if deal.dispute_locked:
+            raise ValueError(
+                f"Cannot auto-release: dispute in progress. Reason: {deal.dispute_lock_reason}"
+            )
+
+        self._validate_transition(deal, DealStatus.PAYOUT_READY.value)
+
+        deal.status = DealStatus.PAYOUT_READY.value
+        # act_signed_at remains None - indicates auto-release
+
+        await self.db.flush()
+
+        logger.info(f"Deal {deal.id} auto-released after confirmation timeout")
+        return deal
+
     async def release_from_hold(self, deal: Deal) -> Deal:
         """
         Release deal from hold period (auto or manual).
@@ -398,6 +503,42 @@ class BankSplitDealService:
 
         if released:
             logger.info(f"Released {len(released)} deals from expired hold")
+
+        return released
+
+    async def check_expired_confirmations(self) -> List[Deal]:
+        """
+        UC-3.2: Check for deals with expired client confirmation deadline.
+
+        Called by background task (Celery).
+        Auto-releases deals where client hasn't signed Act within 7 days.
+        Skips deals locked by dispute.
+
+        Returns:
+            List of auto-released deals
+        """
+        now = datetime.utcnow()
+
+        stmt = select(Deal).where(
+            Deal.status == DealStatus.AWAITING_CLIENT_CONFIRMATION.value,
+            Deal.client_confirmation_deadline <= now,
+            Deal.act_signed_at.is_(None),  # Not signed yet
+            Deal.deleted_at.is_(None),
+            Deal.dispute_locked == False,  # Skip disputed deals
+        )
+        result = await self.db.execute(stmt)
+        deals = list(result.scalars().all())
+
+        released = []
+        for deal in deals:
+            try:
+                await self.auto_release_confirmation(deal)
+                released.append(deal)
+            except Exception as e:
+                logger.error(f"Failed to auto-release confirmation for deal {deal.id}: {e}")
+
+        if released:
+            logger.info(f"Auto-released {len(released)} deals from expired confirmation")
 
         return released
 
