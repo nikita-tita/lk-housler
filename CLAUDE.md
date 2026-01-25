@@ -2,7 +2,21 @@
 
 ## Проект
 
-**lk.housler.ru** — Личный кабинет экосистемы Housler
+**lk.housler.ru** — Личный кабинет экосистемы Housler (monorepo)
+
+---
+
+## ARCHITECTURE DECISIONS (ADR)
+
+Решения, которые выглядят странно, но имеют причины:
+
+| Решение | Причина | НЕ МЕНЯТЬ |
+|---------|---------|-----------|
+| `ENCRYPTION_KEY` + `ENCRYPTION_SALT` в config.py | Нужны для миграции с Fernet через `housler_crypto/migration.py` | Пока не завершена миграция |
+| Terms URL общий на всех login страницах | By design: общее ПС на входе, role-specific оферты в регистрации через `ConsentCheckbox` | - |
+| OTP код генерируется заново при resend | Безопасность: старый код инвалидируется, новый отправляется | - |
+| `SMS_TEST_MODE` защита только в config validator | Достаточно: validator бросает exception в production | - |
+| Token blacklist в Redis без TTL cleanup | TTL = refresh token lifetime, Redis сам чистит | - |
 
 ---
 
@@ -10,96 +24,115 @@
 
 **Никогда не коммитьте секреты в git!**
 
-Все credentials хранятся в **1Password**. См. таблицу в разделе "Переменные окружения".
-
 | Правило | Описание |
 |---------|----------|
 | Секреты | Только в .env (в .gitignore) и 1Password |
 | SSH | Только через SSH-ключи, НЕ пароли |
 | Документация | Никаких реальных паролей в README/docs |
 
+### Реализованные security features:
+
+- [x] **Token Blacklist** — logout инвалидирует токены (Redis)
+- [x] **Rate Limiting** — IP + account based (`core/rate_limit.py`)
+- [x] **Audit Logging** — security events в структурированный лог (`core/audit.py`)
+- [x] **OTP Brute Force Protection** — 5 попыток/час, блокировка 10 мин
+- [x] **Invitation Token Validation** — длина 40-50 символов до rate limit check
+- [x] **Phone Masking** — только 2 последние цифры в user search
+- [x] **PII Encryption** — `housler-crypto` (AES-256-GCM)
+- [x] **Graceful Shutdown** — connection pool disposal в lifespan handler
+
 ---
 
-## ЕДИНАЯ АВТОРИЗАЦИЯ (КРИТИЧЕСКИ ВАЖНО)
+## ЕДИНАЯ АВТОРИЗАЦИЯ
 
 **Авторизация использует API agent.housler.ru!**
-
-Подробная документация: `docs/UNIFIED_AUTH.md`
 
 ```
 lk.housler.ru (frontend) ──> agent.housler.ru/api/auth/* ──> housler_agent (БД)
 ```
 
-### Ключевые моменты:
+### Shared с agent.housler.ru:
 
-1. **Frontend** вызывает `https://agent.housler.ru/api/auth/*` для авторизации
-2. **JWT_SECRET** и **ENCRYPTION_KEY** должны совпадать с agent.housler.ru
-3. **База данных** - общая: `housler_agent` на `agent-postgres`
-4. **Изменения auth в agent.housler.ru влияют на lk.housler.ru!**
+| Ресурс | Где хранится | Синхронизация |
+|--------|--------------|---------------|
+| `JWT_SECRET` | 1Password | Должен совпадать |
+| `HOUSLER_CRYPTO_KEY` | 1Password | Должен совпадать |
+| База данных | `housler_agent` на `agent-postgres` | Общая |
+| Redis | `agent-redis` | Общий для rate limit |
 
 ### Тестовые данные:
-- SMS: `79999xxxxxx`, коды `111111-666666`
+- SMS: `79999xxxxxx`, код `123456` (настраивается через `SMS_TEST_PHONE_PREFIX`, `SMS_TEST_CODE`)
 - Email: `*@test.housler.ru`, коды `111111-666666`
 
 ### НЕ МЕНЯТЬ без согласования:
 - Формат ответа auth API
-- JWT_SECRET / ENCRYPTION_KEY
+- JWT_SECRET / HOUSLER_CRYPTO_KEY
 - Структуру таблицы users
+
+---
+
+## Структура проекта (Monorepo)
+
+```
+/Users/fatbookpro/Desktop/lk/
+├── apps/
+│   ├── lk/                    # Next.js frontend для lk.housler.ru
+│   │   ├── app/               # App Router pages
+│   │   │   ├── (auth)/        # Login pages (realtor, agency, client, employee)
+│   │   │   ├── agency/        # Agency dashboard, agents, deals
+│   │   │   └── ...
+│   │   └── components/        # UI components
+│   └── agent/                 # Копия agent frontend (для dev)
+├── packages/
+│   ├── lib/                   # Shared library (@housler/lib)
+│   │   └── src/
+│   │       ├── api/           # API client, auth functions
+│   │       └── stores/        # Zustand stores (auth, etc.)
+│   └── ui/                    # Shared UI components (@housler/ui)
+├── backend/
+│   ├── app/
+│   │   ├── api/v1/endpoints/  # FastAPI endpoints
+│   │   ├── core/              # Config, security, rate_limit, audit
+│   │   ├── models/            # SQLAlchemy models
+│   │   ├── services/          # Business logic (auth, sms, bank_split)
+│   │   └── main.py            # FastAPI app with lifespan
+│   ├── housler_crypto/        # PII encryption library
+│   └── alembic/               # DB migrations
+├── docs/                      # Documentation
+├── docker-compose.yml         # Development
+└── docker-compose.prod.yml    # Production
+```
 
 ---
 
 ## Технологический стек
 
 ### Backend (Python)
-- **Framework:** FastAPI
-- **ORM:** SQLAlchemy + Alembic (миграции)
+- **Framework:** FastAPI + async
+- **ORM:** SQLAlchemy 2.0 (async) + Alembic
 - **Database:** PostgreSQL 15
-- **Cache:** Redis 7
+- **Cache:** Redis 7 (rate limit, token blacklist, OTP)
 - **Storage:** MinIO (S3-compatible)
-- **Auth:** JWT + SMS/Email коды
+- **Auth:** JWT + SMS OTP (SMS.RU)
 
-### Frontend (планируется)
+### Frontend (Next.js)
 - **Framework:** Next.js 14+ (App Router)
+- **State:** Zustand (@housler/lib)
 - **Styling:** Tailwind CSS
 - **Font:** Inter (Google Fonts)
 
-## Структура проекта
+---
 
-```
-/Users/fatbookpro/Desktop/lk/
-├── backend/
-│   ├── app/
-│   │   ├── api/           # API endpoints (v1/...)
-│   │   ├── core/          # Конфигурация, security
-│   │   ├── db/            # Database connection
-│   │   ├── models/        # SQLAlchemy models
-│   │   ├── schemas/       # Pydantic schemas
-│   │   ├── services/      # Business logic
-│   │   └── main.py        # FastAPI app
-│   ├── alembic/           # Миграции БД
-│   ├── Dockerfile
-│   └── requirements.txt
-├── frontend/              # Next.js (будет добавлен)
-├── nginx/                 # Nginx конфигурации
-├── docker-compose.yml     # Development
-├── docker-compose.prod.yml # Production
-├── HOUSLER_ECOSYSTEM.md   # Документация экосистемы
-└── CLAUDE.md              # Этот файл
-```
+## KNOWN ISSUES / TECH DEBT
 
-## Связанные проекты Housler
+| Issue | Файл | Статус |
+|-------|------|--------|
+| Legacy Fernet миграция не завершена | `housler_crypto/migration.py` | В процессе |
+| Email notifications не реализованы | - | TODO |
+| Fiscalization (чеки) mock mode | `services/fiscalization/` | TODO для prod |
+| T-Bank integration mock mode | `services/tbank/` | TODO для prod |
 
-| Проект | Путь | Стек |
-|--------|------|------|
-| Agent Housler | `/Users/fatbookpro/Desktop/housler_pervichka` | Node.js + Next.js |
-| AI Calendar | `/Users/fatbookpro/Desktop/AI-Calendar-Project/ai-calendar-assistant` | Python + FastAPI |
-| Cian Analyzer | `/Users/fatbookpro/Desktop/cian` | Node.js |
-
-## SHARED Documentation
-
-Общая документация экосистемы: `/Users/fatbookpro/Desktop/housler_pervichka/docs/SHARED/`
-- `CRYPTO_LIBRARY.md` - housler-crypto (шифрование PII)
-- `DESIGN_SYSTEM.md` - единый дизайн экосистемы
+---
 
 ## Правила разработки
 
@@ -110,22 +143,22 @@ lk.housler.ru (frontend) ──> agent.housler.ru/api/auth/* ──> housler_age
 3. **Шрифт Inter** — единственный шрифт
 4. **Минимализм** — меньше элементов, больше пространства
 
-Полная документация: `docs/DESIGN-SYSTEM.md` в housler_pervichka
+### Code Patterns
 
-### Переиспользование кода
+```python
+# Rate limiting - использовать декораторы из core/rate_limit.py
+@rate_limit_otp_send  # 3 req/min per phone
+@rate_limit_otp_verify  # 5 req/hour per phone
 
-При реализации функционала ВСЕГДА проверяй:
-1. **housler_pervichka** — авторизация, SMS, API patterns
-2. **AI-Calendar** — Python/FastAPI patterns
-3. **Общие компоненты** — UI компоненты, стили
+# Audit logging - для security events
+from app.core.audit import log_audit_event, AuditEvent
+log_audit_event(AuditEvent.LOGIN_SUCCESS, user_id=str(user.id), ip_address=ip)
 
-### Авторизация
-
-Копировать логику из `housler_pervichka`:
-- SMS авторизация через SMS.RU
-- JWT токены (7 дней)
-- Шифрование PII (152-ФЗ)
-- Тестовые аккаунты
+# PII encryption
+from housler_crypto import HouslerCrypto
+crypto = HouslerCrypto(settings.HOUSLER_CRYPTO_KEY)
+encrypted = crypto.encrypt(phone, "phone")
+```
 
 ### Типы согласий
 
@@ -138,88 +171,82 @@ class ConsentType(str, Enum):
     AGENCY_OFFER = "agency_offer"
 ```
 
+---
+
 ## Команды
 
 ### Development
 
 ```bash
-# Запуск инфраструктуры
+# Запуск всего
 docker-compose up -d
+cd apps/lk && npm run dev
 
-# Backend (локально)
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+# Backend
+cd backend && uvicorn app.main:app --reload --port 8000
 
 # Миграции
-alembic upgrade head
-alembic revision --autogenerate -m "description"
+cd backend && alembic upgrade head
 ```
 
 ### Production
 
 ```bash
-# Деплой
 ssh -i ~/.ssh/id_housler root@95.163.227.26
 cd /root/lk-housler
 git pull origin main
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-## Важные файлы для изучения
-
-### Авторизация
-- `housler_pervichka/backend/src/services/auth.service.ts`
-- `housler_pervichka/backend/src/services/sms.service.ts`
-- `housler_pervichka/frontend/src/contexts/AuthContext.tsx`
-
-### API структура
-- `housler_pervichka/frontend/src/services/api.ts`
-- `housler_pervichka/backend/src/api/`
-
-### Design System
-- `housler_pervichka/docs/DESIGN-SYSTEM.md`
-- `housler_pervichka/frontend/src/app/globals.css`
-
-### Правовые документы
-- `housler_pervichka/frontend/src/app/doc/`
-
-### Деплой
-- `housler_pervichka/DEPLOY_INSTRUCTIONS.md`
-- `housler_pervichka/nginx/agent.housler.ru.conf`
-- `AI-Calendar-Project/ai-calendar-assistant/DEPLOY.md`
+---
 
 ## Сервер
 
 - **IP:** 95.163.227.26
 - **SSH:** `ssh -i ~/.ssh/id_housler root@95.163.227.26`
-- **Пароль:** В 1Password: `Housler Server Root`
-- **Путь на сервере:** `/root/lk-housler`
-- **Порт для lk.housler.ru:** 3090 (внутренний Nginx)
+- **Путь:** `/root/lk-housler`
+- **Порт lk.housler.ru:** 3090
 
-> **Главный документ:** См. [housler_pervichka/docs/SHARED/SERVER_ACCESS.md](../housler_pervichka/docs/SHARED/SERVER_ACCESS.md)
+---
 
 ## Переменные окружения
 
-Смотри `.env.example` в корне проекта.
-
 Критичные (все в 1Password):
-- `JWT_SECRET` — 1Password: `Housler LK JWT`
-- `ENCRYPTION_KEY` — 1Password: `Housler Encryption` (общий с agent!)
-- `ENCRYPTION_SALT` — 1Password: `Housler Encryption`
-- `DB_PASSWORD` — 1Password: `Housler PostgreSQL`
-- `REDIS_PASSWORD` — 1Password: `Housler Redis`
-- `MINIO_ROOT_PASSWORD` — 1Password: `Housler MinIO`
-- `SMS_RU_API_ID` — из SMS.RU кабинета
+
+| Переменная | 1Password | Примечание |
+|------------|-----------|------------|
+| `JWT_SECRET` | Housler LK JWT | Shared с agent |
+| `HOUSLER_CRYPTO_KEY` | Housler Crypto | 64 hex chars, shared |
+| `ENCRYPTION_KEY` | Housler Encryption | Legacy, для миграции |
+| `ENCRYPTION_SALT` | Housler Encryption | Legacy, для миграции |
+| `SMS_RU_API_ID` | SMS.RU | - |
+
+### Test mode settings:
+```env
+SMS_TEST_MODE=true
+SMS_TEST_PHONE_PREFIX=79999
+SMS_TEST_CODE=123456
+```
+
+---
 
 ## Чеклист нового функционала
 
 ```
 [ ] Проверил аналог в housler_pervichka
-[ ] Использовал Design System
-[ ] Нет цветных элементов
-[ ] Нет эмоджи
-[ ] Шифрование PII если нужно
+[ ] Использовал Design System (ч/б, без эмоджи)
+[ ] Rate limiting если нужно
+[ ] Audit logging для security events
+[ ] Шифрование PII через housler-crypto
 [ ] Миграция создана
 [ ] Тесты написаны
 ```
+
+---
+
+## Связанные проекты
+
+| Проект | Путь | Назначение |
+|--------|------|------------|
+| Agent Housler | `/Users/fatbookpro/Desktop/housler_pervichka` | Основной backend auth |
+| Shared docs | `housler_pervichka/docs/SHARED/` | Общая документация |
