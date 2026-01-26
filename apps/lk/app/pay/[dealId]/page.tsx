@@ -13,9 +13,9 @@ interface PaymentInfo {
   deal_id: string;
   property_address: string;
   amount: number;
-  payment_url: string;
+  payment_url: string | null;
   qr_code?: string;
-  expires_at: string;
+  expires_at: string | null;
   status: 'pending' | 'paid' | 'expired' | 'cancelled';
   client_name?: string;
 }
@@ -266,20 +266,35 @@ export default function PaymentPage() {
 
           {/* Payment Button */}
           <div className="space-y-4">
-            <a
-              href={paymentInfo.payment_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block"
-            >
-              <Button fullWidth size="lg">
-                Перейти к оплате
-              </Button>
-            </a>
+            {paymentInfo.payment_url ? (
+              <>
+                <a
+                  href={paymentInfo.payment_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block"
+                >
+                  <Button fullWidth size="lg">
+                    Перейти к оплате
+                  </Button>
+                </a>
 
-            <p className="text-xs text-center text-gray-500">
-              Ссылка действительна до {formatDateTime(paymentInfo.expires_at)}
-            </p>
+                {paymentInfo.expires_at && (
+                  <p className="text-xs text-center text-gray-500">
+                    Ссылка действительна до {formatDateTime(paymentInfo.expires_at)}
+                  </p>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-sm text-gray-600 mb-2">
+                  Платёжная ссылка формируется...
+                </p>
+                <p className="text-xs text-gray-500">
+                  Пожалуйста, обновите страницу через несколько секунд
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Footer */}
