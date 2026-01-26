@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@housler/lib';
-import { sendSMS, verifySMS, registerAgent } from '@housler/lib';
+import { sendSMS, resendSMS, verifySMS, registerAgent } from '@housler/lib';
 import { getDashboardPath } from '@housler/lib';
 import { PhoneInput, SmsCodeInput, ConsentCheckbox, RegistrationStepper } from '@/components/auth';
 
@@ -139,24 +139,18 @@ export default function RealtorLoginPage() {
     setStep('code');
   };
 
-  // Request new SMS code (explicit user action)
+  // Request new SMS code (explicit user action) - always sends new code
   const handleRequestNewCode = async () => {
     setError('');
     setIsLoading(true);
 
     try {
-      const result = await sendSMS(formData.phone);
-      if (result.existingCode) {
-        // Code already exists
-        setExistingCode(true);
-        if (result.codeSentAt) setCodeSentAt(result.codeSentAt);
-        if (result.canResendAt) setCanResendAt(new Date(result.canResendAt));
-      } else {
-        // New code sent
-        setExistingCode(false);
-        if (result.codeSentAt) setCodeSentAt(result.codeSentAt);
-        if (result.canResendAt) setCanResendAt(new Date(result.canResendAt));
-      }
+      // Use resendSMS to force send new code (invalidates old one)
+      const result = await resendSMS(formData.phone);
+      // New code sent successfully
+      setExistingCode(false);
+      if (result.codeSentAt) setCodeSentAt(result.codeSentAt);
+      if (result.canResendAt) setCanResendAt(new Date(result.canResendAt));
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string } }; message?: string };
       setError(axiosError.response?.data?.error || axiosError.message || 'Ошибка отправки SMS');

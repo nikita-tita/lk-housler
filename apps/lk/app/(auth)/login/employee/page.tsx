@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@housler/lib';
-import { sendSMS, verifySMS } from '@housler/lib';
+import { sendSMS, resendSMS, verifySMS } from '@housler/lib';
 import { getDashboardPath } from '@housler/lib';
 import { PhoneInput, SmsCodeInput, RegistrationStepper } from '@/components/auth';
 
@@ -135,22 +135,18 @@ export default function EmployeeLoginPage() {
     setStep('code');
   };
 
-  // Request new SMS code
+  // Request new SMS code - always sends new code
   const handleRequestNewCode = async () => {
     setError('');
     setIsLoading(true);
 
     try {
-      const result = await sendSMS(verifiedPhone);
-      if (result.existingCode) {
-        setExistingCode(true);
-        if (result.codeSentAt) setCodeSentAt(result.codeSentAt);
-        if (result.canResendAt) setCanResendAt(new Date(result.canResendAt));
-      } else {
-        setExistingCode(false);
-        if (result.codeSentAt) setCodeSentAt(result.codeSentAt);
-        if (result.canResendAt) setCanResendAt(new Date(result.canResendAt));
-      }
+      // Use resendSMS to force send new code (invalidates old one)
+      const result = await resendSMS(verifiedPhone);
+      // New code sent successfully
+      setExistingCode(false);
+      if (result.codeSentAt) setCodeSentAt(result.codeSentAt);
+      if (result.canResendAt) setCanResendAt(new Date(result.canResendAt));
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string } }; message?: string };
       setError(axiosError.response?.data?.error || axiosError.message || 'Ошибка отправки SMS');
