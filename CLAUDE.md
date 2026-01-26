@@ -128,9 +128,9 @@ cd /root/lk-housler && git pull && docker compose -f docker-compose.prod.yml up 
 
 ## TECH DEBT
 
-- Legacy Fernet миграция не завершена
-- Email notifications — TODO
-- T-Bank/Fiscalization — mock mode
+- ~~Legacy Fernet миграция~~ — ✅ завершена (2026-01-26)
+- ~~Email notifications~~ — ✅ настроен Yandex SMTP
+- T-Bank/Fiscalization — mock mode (нужны production ключи)
 
 ---
 
