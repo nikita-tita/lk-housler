@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { sendSMS, verifySMS } from '@housler/lib';
+import { sendSMS, resendSMS, verifySMS } from '@housler/lib';
 import { useAuthStore } from '@housler/lib';
 import { formatPhone } from '@housler/lib';
 import { getDashboardPath } from '@housler/lib';
@@ -15,7 +15,9 @@ export function SMSAuthForm() {
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [error, setError] = useState('');
+  const [resendSuccess, setResendSuccess] = useState(false);
 
   const handleSendSMS = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +39,23 @@ export function SMSAuthForm() {
       setError(axiosError.response?.data?.error || axiosError.message || 'Ошибка отправки SMS');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendSMS = async () => {
+    setError('');
+    setResendSuccess(false);
+    setResending(true);
+
+    try {
+      await resendSMS(phone);
+      setResendSuccess(true);
+      setCode('');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string } }; message?: string };
+      setError(axiosError.response?.data?.error || axiosError.message || 'Ошибка отправки SMS');
+    } finally {
+      setResending(false);
     }
   };
 
@@ -97,7 +116,10 @@ export function SMSAuthForm() {
   return (
     <form onSubmit={handleVerifyCode}>
       <h1 className="auth-title">Введите код из SMS</h1>
-      <p className="auth-subtitle">Код отправлен на {formatPhone(phone)}</p>
+      <p className="auth-subtitle">
+        Код отправлен на {formatPhone(phone)}
+        {resendSuccess && <span style={{ color: '#16a34a', display: 'block', marginTop: '4px' }}>Новый код отправлен!</span>}
+      </p>
 
       <div className="field">
         <label className="field-label">Код подтверждения</label>
@@ -107,15 +129,25 @@ export function SMSAuthForm() {
           placeholder="123456"
           value={code}
           onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-          disabled={loading}
+          disabled={loading || resending}
           maxLength={6}
           required
         />
         {error && <p className="field-error">{error}</p>}
       </div>
 
-      <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
+      <button type="submit" className="btn btn-primary btn-block" disabled={loading || resending}>
         {loading ? 'Проверка...' : 'Войти'}
+      </button>
+
+      <button
+        type="button"
+        onClick={handleResendSMS}
+        className="btn btn-ghost btn-block"
+        style={{ marginTop: '12px' }}
+        disabled={resending || loading}
+      >
+        {resending ? 'Отправка...' : 'Отправить новый код'}
       </button>
 
       <button
@@ -124,9 +156,10 @@ export function SMSAuthForm() {
           setStep('phone');
           setCode('');
           setError('');
+          setResendSuccess(false);
         }}
         className="btn btn-ghost btn-block"
-        style={{ marginTop: '12px' }}
+        style={{ marginTop: '8px' }}
       >
         Изменить номер
       </button>

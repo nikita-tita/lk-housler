@@ -19,6 +19,7 @@ export type {
 
 export {
   sendSMS,
+  resendSMS,
   verifySMS,
   sendEmail,
   verifyEmail,

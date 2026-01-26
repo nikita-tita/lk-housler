@@ -85,6 +85,45 @@ export async function sendSMS(phone: string): Promise<SendSmsResult> {
   }
 }
 
+/**
+ * Force resend SMS code (invalidates old code)
+ */
+export async function resendSMS(phone: string): Promise<SendSmsResult> {
+  if (IS_MOCK) {
+    console.log('[MOCK] resendSMS', phone);
+    return {
+      success: true,
+      message: 'Новый код (MOCK): 111111',
+      codeSentAt: new Date().toISOString(),
+      canResendAt: new Date(Date.now() + 60000).toISOString(),
+    };
+  }
+
+  const AUTH_API_URL = authClient.defaults.baseURL || 'https://agent.housler.ru/api';
+
+  try {
+    const response = await fetch(`${AUTH_API_URL}/auth/resend-sms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ phone }),
+    });
+
+    const data: ApiResponse<RequestSmsData> = await response.json();
+
+    return {
+      success: data.success,
+      message: data.data?.message || data.error || '',
+      existingCode: false,
+      canResendAt: data.data?.canResendAt,
+      codeSentAt: data.data?.codeSentAt
+    };
+  } catch (error) {
+    console.error('[resendSMS] error:', error);
+    throw error;
+  }
+}
+
 interface VerifySmsData {
   isNewUser: boolean;
   user?: User;
