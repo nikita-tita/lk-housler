@@ -150,7 +150,7 @@ class Document(BaseModel):
     document_hash = Column(String(64), nullable=False, index=True)
 
     # Relationships
-    deal = relationship("Deal", back_populates="documents")
+    deal = relationship("Deal", back_populates="documents", foreign_keys=[deal_id])
     signatures = relationship("Signature", back_populates="document", cascade="all, delete-orphan")
 
 
