@@ -87,6 +87,17 @@ class PaymentObject(str, Enum):
     ANOTHER = "another"  # Иной предмет расчета
 
 
+class AgentSign(str, Enum):
+    """Признак агента (тег 1057 ФФД)"""
+    BANK_PAYING_AGENT = "bank_paying_agent"
+    BANK_PAYING_SUBAGENT = "bank_paying_subagent"
+    PAYING_AGENT = "paying_agent"
+    PAYING_SUBAGENT = "paying_subagent"
+    ATTORNEY = "attorney"
+    COMMISSION_AGENT = "commission_agent"
+    AGENT = "agent"
+
+
 class TBankChecksReceiptStatus(str, Enum):
     """Receipt status from T-Bank Checks API"""
     NEW = "new"  # Создан, ожидает отправки
@@ -106,6 +117,9 @@ class ReceiptItem:
     payment_method: PaymentMethod = PaymentMethod.FULL_PAYMENT
     payment_object: PaymentObject = PaymentObject.SERVICE
     vat: VatType = VatType.NONE
+    # Agent tags for 54-ФЗ compliance
+    agent_data: Optional["AgentData"] = None
+    supplier_info: Optional["SupplierInfo"] = None
 
 
 @dataclass
@@ -113,6 +127,22 @@ class ReceiptClient:
     """Client info for receipt"""
     email: Optional[str] = None  # Email для отправки чека
     phone: Optional[str] = None  # Телефон для отправки чека (format: +7XXXXXXXXXX)
+
+
+@dataclass
+class AgentData:
+    """Данные агента для чека (тег 1057)"""
+    agent_sign: AgentSign
+    operation: Optional[str] = None  # Наименование операции
+    phones: Optional[List[str]] = None  # Телефоны агента
+
+
+@dataclass
+class SupplierInfo:
+    """Данные поставщика для чека (теги 1225, 1226, 1171)"""
+    inn: str  # ИНН поставщика (обязательно)
+    name: Optional[str] = None  # Наименование поставщика
+    phones: Optional[List[str]] = None  # Телефоны поставщика
 
 
 @dataclass
@@ -380,7 +410,7 @@ class TBankChecksClient:
         items = []
         total_amount = 0
         for item in request.items:
-            items.append({
+            item_dict = {
                 "Name": item.name[:128],  # Max 128 chars
                 "Quantity": float(item.quantity),
                 "Price": item.price,
@@ -388,7 +418,29 @@ class TBankChecksClient:
                 "PaymentMethod": item.payment_method.value,
                 "PaymentObject": item.payment_object.value,
                 "Tax": item.vat.value,
-            })
+            }
+
+            # Add agent data (tag 1057)
+            if item.agent_data:
+                item_dict["AgentData"] = {
+                    "AgentSign": item.agent_data.agent_sign.value,
+                }
+                if item.agent_data.operation:
+                    item_dict["AgentData"]["OperatorName"] = item.agent_data.operation
+                if item.agent_data.phones:
+                    item_dict["AgentData"]["Phones"] = item.agent_data.phones
+
+            # Add supplier info (tags 1225, 1226, 1171)
+            if item.supplier_info:
+                item_dict["SupplierInfo"] = {
+                    "Inn": item.supplier_info.inn,
+                }
+                if item.supplier_info.name:
+                    item_dict["SupplierInfo"]["Name"] = item.supplier_info.name
+                if item.supplier_info.phones:
+                    item_dict["SupplierInfo"]["Phones"] = item.supplier_info.phones
+
+            items.append(item_dict)
             total_amount += item.amount
 
         # Build receipt data

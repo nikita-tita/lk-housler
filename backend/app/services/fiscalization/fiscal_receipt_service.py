@@ -12,16 +12,19 @@ This service handles:
 import logging
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.models.bank_split import DealSplitRecipient, RecipientRole, LegalType
 from app.models.deal import Deal
 from app.models.fiscalization import FiscalReceipt, FiscalReceiptType, FiscalReceiptStatus
+from app.models.organization import Organization
 from app.models.payment_profile import FiscalizationMethod, PaymentProfile
+from app.models.user import User
 from app.services.fiscalization.tbank_checks import (
     TBankChecksClient,
     TBankChecksError,
@@ -35,6 +38,9 @@ from app.services.fiscalization.tbank_checks import (
     VatType,
     TBankChecksReceiptStatus,
     get_tbank_checks_client,
+    AgentSign,
+    AgentData,
+    SupplierInfo,
 )
 from app.services.fiscalization.service import FiscalizationService
 
@@ -191,31 +197,147 @@ class FiscalReceiptService:
         await self.db.flush()
         return fiscal_receipt
 
+    async def _get_deal_split_recipients(self, deal_id: UUID) -> List[DealSplitRecipient]:
+        """Get all split recipients for a deal."""
+        stmt = select(DealSplitRecipient).where(
+            DealSplitRecipient.deal_id == deal_id
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
+    async def _get_supplier_name(self, recipient: DealSplitRecipient) -> Optional[str]:
+        """Get supplier name for receipt from User or Organization."""
+        if recipient.organization_id:
+            stmt = select(Organization).where(Organization.id == recipient.organization_id)
+            result = await self.db.execute(stmt)
+            org = result.scalar_one_or_none()
+            if org:
+                return org.legal_name
+
+        if recipient.user_id:
+            stmt = select(User).where(User.id == recipient.user_id)
+            result = await self.db.execute(stmt)
+            user = result.scalar_one_or_none()
+            if user and user.name:
+                return user.name
+
+        return None
+
+    async def _get_supplier_phone(self, recipient: DealSplitRecipient) -> Optional[str]:
+        """Get supplier phone for receipt."""
+        if recipient.user_id:
+            stmt = select(User).where(User.id == recipient.user_id)
+            result = await self.db.execute(stmt)
+            user = result.scalar_one_or_none()
+            if user and user.phone:
+                return user.phone
+
+        return None
+
     async def _send_receipt_to_tbank(
         self,
         fiscal_receipt: FiscalReceipt,
         deal: Deal,
     ) -> None:
-        """Send receipt to T-Bank Checks API.
+        """Send receipt to T-Bank Checks API with agent tags for each recipient.
 
-        Args:
-            fiscal_receipt: The receipt record to send
-            deal: The associated deal
+        Creates receipt items for each split recipient (except platform_fee),
+        with proper AgentData and SupplierInfo for 54-FZ compliance.
         """
-        # Build receipt item
-        item_name = f"Услуги агента по сделке {deal.property_address or 'Недвижимость'}"
-        if len(item_name) > 128:
-            item_name = item_name[:125] + "..."
+        # Get all split recipients for this deal
+        recipients = await self._get_deal_split_recipients(deal.id)
 
-        receipt_item = ReceiptItem(
-            name=item_name,
-            quantity=Decimal("1"),
-            price=fiscal_receipt.amount,
-            amount=fiscal_receipt.amount,
-            payment_method=PaymentMethod.FULL_PAYMENT,
-            payment_object=PaymentObject.AGENT_COMMISSION,
-            vat=VatType.NONE,  # Self-employed don't pay VAT
-        )
+        # Filter out platform_fee and build receipt items
+        items = []
+        recipient_meta = []  # For logging
+
+        for recipient in recipients:
+            # Skip platform fee - it's our commission, not part of agent scheme
+            if recipient.role == RecipientRole.PLATFORM_FEE.value:
+                continue
+
+            # Skip if no calculated amount
+            if not recipient.calculated_amount or recipient.calculated_amount <= 0:
+                continue
+
+            # Skip if no INN (required for SupplierInfo)
+            if not recipient.inn:
+                logger.warning(
+                    f"Recipient {recipient.id} has no INN, skipping from receipt"
+                )
+                continue
+
+            # Build item name based on role
+            if recipient.role == RecipientRole.AGENCY.value:
+                item_name = "Услуги агентства недвижимости"
+            elif recipient.role == RecipientRole.AGENT.value:
+                item_name = "Услуги риелтора"
+            else:
+                item_name = "Услуги по сделке"
+
+            # Add property address if fits
+            if deal.property_address and len(item_name) + len(deal.property_address) < 120:
+                item_name = f"{item_name}: {deal.property_address}"
+
+            # Determine VAT based on legal type
+            # OOO typically has VAT, SE (self-employed) and IP on USN don't
+            if recipient.legal_type == LegalType.OOO.value:
+                vat = VatType.VAT20
+            else:
+                vat = VatType.NONE
+
+            # Get supplier info
+            supplier_name = await self._get_supplier_name(recipient)
+            supplier_phone = await self._get_supplier_phone(recipient)
+
+            # Amount in kopeks
+            amount_kopeks = int(recipient.calculated_amount * 100)
+
+            receipt_item = ReceiptItem(
+                name=item_name[:128],
+                quantity=Decimal("1"),
+                price=amount_kopeks,
+                amount=amount_kopeks,
+                payment_method=PaymentMethod.FULL_PAYMENT,
+                payment_object=PaymentObject.AGENT_COMMISSION,
+                vat=vat,
+                agent_data=AgentData(
+                    agent_sign=AgentSign.AGENT,
+                ),
+                supplier_info=SupplierInfo(
+                    inn=recipient.inn,
+                    name=supplier_name,
+                    phones=[supplier_phone] if supplier_phone else None,
+                ),
+            )
+
+            items.append(receipt_item)
+            recipient_meta.append({
+                "role": recipient.role,
+                "inn": recipient.inn,
+                "amount": float(recipient.calculated_amount),
+            })
+
+        # If no valid items, fall back to single item without agent tags
+        if not items:
+            logger.warning(
+                f"No valid recipients with INN for deal {deal.id}, "
+                "creating receipt without agent tags"
+            )
+            item_name = f"Услуги агента по сделке {deal.property_address or 'Недвижимость'}"
+            if len(item_name) > 128:
+                item_name = item_name[:125] + "..."
+
+            receipt_item = ReceiptItem(
+                name=item_name,
+                quantity=Decimal("1"),
+                price=fiscal_receipt.amount,
+                amount=fiscal_receipt.amount,
+                payment_method=PaymentMethod.FULL_PAYMENT,
+                payment_object=PaymentObject.AGENT_COMMISSION,
+                vat=VatType.NONE,
+            )
+            items = [receipt_item]
 
         # Build client info
         client = ReceiptClient(
@@ -232,12 +354,18 @@ class FiscalReceiptService:
 
         request = CreateReceiptRequest(
             receipt_type=tbank_receipt_type,
-            items=[receipt_item],
+            items=items,
             client=client,
             tax_system=TaxSystem.USN_INCOME,
             order_id=str(deal.id),
             payment_id=deal.external_deal_id,
         )
+
+        # Update meta with recipient info
+        if fiscal_receipt.meta:
+            fiscal_receipt.meta["recipients"] = recipient_meta
+        else:
+            fiscal_receipt.meta = {"recipients": recipient_meta}
 
         # Send to T-Bank
         fiscal_receipt.sent_at = datetime.utcnow()
@@ -256,7 +384,7 @@ class FiscalReceiptService:
             fiscal_receipt.confirmed_at = datetime.utcnow()
 
         logger.info(
-            f"Receipt {fiscal_receipt.id} sent to T-Bank, "
+            f"Receipt {fiscal_receipt.id} sent to T-Bank with {len(items)} items, "
             f"external_id: {response.receipt_id}, status: {response.status.value}"
         )
 
