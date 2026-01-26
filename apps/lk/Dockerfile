@@ -21,7 +21,9 @@ COPY . .
 
 # Build args (must be declared with ARG to receive from docker-compose)
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ARG NEXT_PUBLIC_AUTH_API_URL=https://agent.housler.ru/api
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_AUTH_API_URL=${NEXT_PUBLIC_AUTH_API_URL}
 ENV NODE_ENV=production
 
 WORKDIR /app/apps/lk
