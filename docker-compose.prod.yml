@@ -72,7 +72,11 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - ENCRYPTION_SALT=${ENCRYPTION_SALT}
       - FRONTEND_URL=https://lk.housler.ru
-      - CORS_ORIGINS=https://lk.housler.ru
+      - CORS_ORIGINS=https://lk.housler.ru,https://agent.housler.ru
+      # Cross-domain cookies (lk.housler.ru <-> agent.housler.ru)
+      - COOKIE_DOMAIN=.housler.ru
+      - COOKIE_SAMESITE=none
+      - COOKIE_SECURE=true
       - SMS_PROVIDER=${SMS_PROVIDER:-sms_ru}
       - SMS_RU_API_ID=${SMS_RU_API_ID}
       - SMS_TEST_MODE=${SMS_TEST_MODE:-false}

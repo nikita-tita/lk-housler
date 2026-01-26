@@ -95,9 +95,10 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # Cookies (httpOnly for security)
+    # IMPORTANT: For cross-domain auth (lk.housler.ru <-> agent.housler.ru), set COOKIE_DOMAIN=".housler.ru" in .env
     COOKIE_DOMAIN: str = ""  # Empty = current domain, ".housler.ru" for cross-domain
     COOKIE_SECURE: bool = True  # True in production (HTTPS only)
-    COOKIE_SAMESITE: str = "lax"  # "lax" prevents CSRF on GET, allows cross-site navigation
+    COOKIE_SAMESITE: str = "none"  # "none" required for cross-domain cookies (lk <-> agent)
     COOKIE_HTTPONLY: bool = True  # Prevent JS access (XSS protection)
     COOKIE_PATH: str = "/"  # Cookie available for all paths
 
