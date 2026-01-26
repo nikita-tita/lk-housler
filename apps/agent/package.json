@@ -12,6 +12,7 @@
     "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
+    "@housler/auth": "workspace:*",
     "@sentry/nextjs": "^10.28.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.4",

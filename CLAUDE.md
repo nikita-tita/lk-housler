@@ -49,16 +49,30 @@ lk.housler.ru (frontend) → agent.housler.ru/api/auth/* → housler_agent (DB)
 **Frontend:** Next.js 14 (App Router) + Tailwind + Zustand
 
 ```
-apps/lk/          # Next.js frontend (lk.housler.ru)
-apps/agent/       # Next.js frontend (agent.housler.ru)
-packages/lib/     # Shared API client (@housler/lib)
-packages/ui/      # Shared UI components (@housler/ui)
-backend/          # FastAPI backend
+~/Desktop/housler/              # Housler workspace
+├── lk-monorepo/                # Этот проект
+│   ├── apps/lk/                # Next.js frontend (lk.housler.ru)
+│   ├── apps/agent/             # Next.js frontend (agent.housler.ru)
+│   ├── packages/auth/          # ⭐ Shared auth components (@housler/auth)
+│   ├── packages/lib/           # Shared API client (@housler/lib)
+│   ├── packages/ui/            # Shared UI components (@housler/ui)
+│   └── backend/                # FastAPI backend
+├── agent-backend/              # Node.js backend для agent.housler.ru
+├── club/                       # club.housler.ru
+└── housler-crypto/             # Библиотека шифрования
 ```
 
 ---
 
 ## CODE PATTERNS
+
+```tsx
+// Shared auth components (используй из @housler/auth!)
+import { PhoneInput, SmsCodeInput, DateInput } from '@housler/auth';
+
+// Формы и логика auth остаются в apps/*/components/auth/
+// SMSAuthForm, RegistrationStepper - специфичны для каждого app
+```
 
 ```python
 # httpOnly Cookies (XSS-safe auth)

@@ -82,13 +82,10 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
       const newValue = input.value;
       const cursorPos = input.selectionStart || 0;
 
-      // Count digits before cursor
       const digitsBeforeCursor = newValue.slice(0, cursorPos).replace(/\D/g, '').length;
 
-      // Extract only digits
       let digits = newValue.replace(/\D/g, '').slice(0, 8);
 
-      // Format for display
       let formatted = '';
       if (digits.length > 0) {
         formatted = digits.slice(0, 2);
@@ -102,19 +99,16 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
 
       setDisplayValue(formatted);
 
-      // Convert to ISO format if complete
       if (digits.length === 8) {
         const isoDate = toISODate(formatted);
         onChange(isoDate);
       } else {
-        // Store partial as-is (won't be valid ISO)
         onChange('');
       }
 
-      // Calculate new cursor position
       let newCursorPos = digitsBeforeCursor;
-      if (digitsBeforeCursor > 2) newCursorPos += 1; // After first dot
-      if (digitsBeforeCursor > 4) newCursorPos += 1; // After second dot
+      if (digitsBeforeCursor > 2) newCursorPos += 1;
+      if (digitsBeforeCursor > 4) newCursorPos += 1;
       cursorPosRef.current = Math.min(newCursorPos, formatted.length);
     };
 
