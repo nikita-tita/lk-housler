@@ -131,12 +131,15 @@ const getAuthRedirectUrl = (): string => {
 };
 
 /**
- * Clear auth state and redirect to login.
+ * Clear auth state. Don't redirect - let React handle navigation.
+ * Redirecting here causes infinite loops on public pages.
  */
 const handleAuthFailure = (): void => {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('housler_token');
-    window.location.href = getAuthRedirectUrl();
+    localStorage.removeItem('housler_user_role');
+    // Don't redirect here - let the auth store and React components handle navigation
+    // Redirecting causes infinite loops on public pages like '/'
   }
 };
 

@@ -78,6 +78,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           return;
         }
 
+        // Quick check: if no token in localStorage, skip API call
+        // httpOnly cookies are validated server-side, but if user never logged in
+        // there won't be any cookies either
+        const hasToken = localStorage.getItem('housler_token');
+        const hasRole = localStorage.getItem('housler_user_role');
+
+        if (!hasToken && !hasRole) {
+          // No auth indicators - user is not logged in
+          set({
+            token: null,
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+          });
+          return;
+        }
+
         // Try to get current user from server
         // Server validates auth via:
         // 1. httpOnly cookies (preferred, XSS-safe)
